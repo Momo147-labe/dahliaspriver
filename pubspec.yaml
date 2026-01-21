@@ -1,0 +1,105 @@
+name: guinerschools
+description: "A new Flutter project."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+
+  cupertino_icons: ^1.0.8
+    # Base de données locale
+  sqflite: ^2.3.0
+
+   # Support commun SQLite
+  sqflite_common: ^2.5.3
+
+  # SQLite Desktop (Windows / Linux / macOS)
+  sqflite_common_ffi: ^2.3.3
+
+  # Path
+  path: ^1.9.0
+
+  # Path Provider
+  path_provider: ^2.1.2
+
+  # Images locales
+  image_picker: ^1.0.7
+  permission_handler: ^11.3.0
+
+  # UI / UX
+  flutter_svg: ^2.0.10
+  flutter_screenutil: ^5.9.0
+
+  # State management
+  provider: ^6.1.2
+
+  # Navigation
+  go_router: ^14.0.0
+
+  # Utilitaires
+  intl: ^0.20.2
+  uuid: ^4.3.3
+  flutter_localizations:
+    sdk: flutter
+  
+  # Icons
+  material_symbols_icons: ^4.2719.3
+  shared_preferences: ^2.2.2
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  crypto: ^3.0.7
+  fl_chart: ^0.70.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+flutter:
+
+  uses-material-design: true
+
+  # To add assets to your application, add an assets section, like this:
+  assets:
+    - assets/ondoarding/
+    - assets/profilStudents/
+    - assets/images/drapeau_guinee.png
+    - assets/images/logo_ecole.png
+    - assets/images/photo_eleve.png
+  #   - images/a_dot_ham.jpeg
+
+  # An image asset can refer to one or more resolution-specific "variants", see
+  # https://flutter.dev/to/resolution-aware-images
+
+  # For details regarding adding assets from package dependencies, see
+  # https://flutter.dev/to/asset-from-package
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list should have a
+  # "family" key with the font family name, and a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
