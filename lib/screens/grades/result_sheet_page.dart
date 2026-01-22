@@ -50,13 +50,14 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
       final ecoleList = await db.query('ecole', limit: 1);
       if (ecoleList.isNotEmpty) _ecole = Ecole.fromMap(ecoleList.first);
 
-      final classeRes = await db.query(
-        'classe',
-        where: 'id = ?',
-        whereArgs: [widget.classeId],
-        limit: 1,
+      final classeRes = await DatabaseHelper.instance.getClasseWithCycle(
+        widget.classeId,
       );
-      if (classeRes.isNotEmpty) _classe = classeRes.first;
+      if (classeRes != null) _classe = classeRes;
+
+      // 1.1 Load Mentions for this cycle (optional, removed if unused)
+      // final int? cycleId = _classe?['cycle_id'];
+      // _mentions = await DatabaseHelper.instance.getMentionsByCycle(cycleId);
 
       final anneeRes = await db.query(
         'annee_scolaire',
@@ -108,7 +109,7 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
         String periodWhere = '';
         List<dynamic> periodArgs = [student.id, widget.anneeId];
 
-        if (widget.trimestre > 0) {
+        if (widget.trimestre > 0 && widget.trimestre < 4) {
           periodWhere = 'AND trimestre = ?';
           periodArgs.add(widget.trimestre);
         }
@@ -123,9 +124,6 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
           );
 
           if (grades.isNotEmpty) {
-            // Calculate average based on stored 'note' (assuming it's already the value)
-            // If weighted average within subject needed needed, logic would go here.
-            // For now, simple average of all notes found for this subject/period.
             double sum = 0;
             for (var g in grades) {
               double val = (g['note'] as num).toDouble();
@@ -133,24 +131,26 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
             }
             double avg = sum / grades.length;
             subjectAverages[subj['id']] = avg;
-
-            // Sum of averages for General Average calculation
             totalPoints += avg;
           }
         }
 
-        // Calculate General Average
-        // If coeffs: totalPoints / totalCoeffs. If not: sum(avgs) / count(subjects)
         double generalAvg = _subjects.isNotEmpty
             ? totalPoints / _subjects.length
             : 0;
+
+        final double passMark =
+            (_classe?['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
+        final bool isAdmis = generalAvg >= passMark;
 
         calculatedResults.add({
           'student': student,
           'subject_avgs': subjectAverages,
           'total_points': totalPoints,
           'moyenne_generale': generalAvg,
-          'rang_str': '', // To be filled
+          'rang_str': '',
+          'is_admis': isAdmis,
+          'decision': isAdmis ? 'ADMIS' : 'REDOUBLE',
         });
       }
 
@@ -325,114 +325,123 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
     return Column(
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left: Ministry & School
-            Expanded(
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(4),
+            // Left: Republic Logo
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 25,
+                      color: const Color(0xFFCE1126),
                     ),
-                    child:
-                        _ecole?.logo != null && File(_ecole!.logo!).existsSync()
-                        ? Image.file(File(_ecole!.logo!), fit: BoxFit.contain)
-                        : const Icon(Icons.school, color: Colors.grey),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Ministère de l'Éducation Nationale et de l'Alphabétisation",
-                          style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Text(
-                          "Inspection Régionale de Conakry",
-                          style: TextStyle(fontSize: 8),
-                        ),
-                        if (_ecole != null)
-                          Text(
-                            _ecole!.nom.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                      ],
+                    const SizedBox(width: 2),
+                    Container(
+                      width: 8,
+                      height: 25,
+                      color: const Color(0xFFFCD116),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 2),
+                    Container(
+                      width: 8,
+                      height: 25,
+                      color: const Color(0xFF009460),
+                    ),
+                  ],
+                ),
+                const Text(
+                  'RÉPUBLIQUE DE GUINÉE',
+                  style: TextStyle(fontSize: 7, fontWeight: FontWeight.bold),
+                ),
+                const Text(
+                  'TRAVAIL - JUSTICE - SOLIDARITÉ',
+                  style: TextStyle(fontSize: 5),
+                ),
+              ],
             ),
-            // Center: Title
-            Expanded(
-              child: Column(
-                children: [
-                  const Text(
-                    "FICHE DE RÉSULTAT OFFICIELLE",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1,
-                    ),
+            // Center: School Info
+            Column(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  Text(
-                    "Année Scolaire: ${_anneeLibelle ?? ''}",
+                  child:
+                      _ecole?.logo != null && File(_ecole!.logo!).existsSync()
+                      ? Image.file(File(_ecole!.logo!), fit: BoxFit.contain)
+                      : const Icon(Icons.school, color: Colors.grey),
+                ),
+                Text(
+                  _ecole?.nom.toUpperCase() ?? 'GROUPE SCOLAIRE',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  _ecole?.adresse ?? '',
+                  style: const TextStyle(fontSize: 7),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  "FICHE DE RÉSULTAT OFFICIELLE",
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            // Right: Academic Info
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'ANNÉE SCOLAIRE',
+                  style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  _anneeLibelle ?? '',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF13DAEC),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(border: Border.all(width: 1)),
+                  child: Text(
+                    "CLASSE: ${_classe?['nom'] ?? ''}",
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 8,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Container(
-                    margin: const EdgeInsets.only(top: 4),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black),
-                    ),
-                    child: Text(
-                      "Classe: ${_classe?['nom'] ?? ''}",
-                      style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'PÉRIODE: ${widget.trimestre == 4 ? 'Bilan Annuel' : 'Trimestre ${widget.trimestre}'}',
+                  style: const TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
-              ),
-            ),
-            // Right: Republic
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Icon(Icons.verified_outlined, size: 24),
-                  const Text(
-                    "RÉPUBLIQUE DE GUINÉE",
-                    style: TextStyle(fontSize: 7, fontWeight: FontWeight.bold),
-                  ),
-                  const Text(
-                    "Travail — Justice — Solidarité",
-                    style: TextStyle(fontSize: 7),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
         ),
-        const Divider(color: Colors.black, thickness: 2, height: 16),
+        const SizedBox(height: 5),
+        const Divider(color: Colors.black, thickness: 1),
       ],
     );
   }
@@ -463,6 +472,7 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
               ),
               _th("Total", w: 40, bg: Colors.grey[50]),
               _th("Moy\nGén", w: 45, bg: Colors.grey[200]),
+              _th("Décision", w: 50, bg: Colors.grey[50]),
             ],
           ),
         ),
@@ -516,6 +526,14 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
                       bg: Colors.grey[200],
                       bold: true,
                       fontSize: 10,
+                    ),
+                    _td(
+                      res['decision'] ?? '',
+                      w: 50,
+                      bg: res['is_admis'] ? Colors.green[50] : Colors.red[50],
+                      bold: true,
+                      fontSize: 8,
+                      align: Alignment.center,
                     ),
                   ],
                 ),
@@ -591,85 +609,98 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
   }
 
   Widget _buildFooter() {
+    final now = DateTime.now();
+    final dateStr = '${now.day}/${now.month}/${now.year}';
     return Column(
       children: [
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stats
+            // Left: Recap Box
             Container(
+              width: 180,
               padding: const EdgeInsets.all(8),
-              color: Colors.grey[50],
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.black),
+                border: Border.all(color: Colors.black, width: 1),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "Récapitulatif de Classe",
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      decoration: TextDecoration.underline,
-                    ),
+                    'RÉCAPITULATIF DE CLASSE',
+                    style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Effectif: ${_classStats['effectif']} Élèves",
-                    style: const TextStyle(fontSize: 8),
+                  Container(
+                    height: 1,
+                    color: Colors.black,
+                    margin: const EdgeInsets.symmetric(vertical: 4),
                   ),
-                  Text(
-                    "Moyenne: ${(_classStats['moyenne_classe'] as double? ?? 0).toStringAsFixed(2)} / 20",
-                    style: const TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  _recapRow(
+                    'Effectif total:',
+                    '${_classStats['effectif']} Élèves',
                   ),
-                  Text(
-                    "Taux de réussite: ${(_classStats['taux_reussite'] as double? ?? 0).toStringAsFixed(1)}%",
-                    style: const TextStyle(fontSize: 8),
+                  _recapRow(
+                    'Moyenne de la classe:',
+                    '${(_classStats['moyenne_classe'] as double? ?? 0).toStringAsFixed(2)} / 20',
+                  ),
+                  _recapRow(
+                    'Taux de réussite:',
+                    '${(_classStats['taux_reussite'] as double? ?? 0).toStringAsFixed(1)}%',
                   ),
                 ],
               ),
             ),
-            // Signatures
-            Padding(
-              padding: const EdgeInsets.only(right: 32),
-              child: Column(
-                children: [
-                  const Text(
-                    "Cachet du Directeur",
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      decoration: TextDecoration.underline,
-                    ),
+            // Right: Signature Box
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'CACHET DU DIRECTEUR',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
                   ),
-                  const SizedBox(height: 40),
-                  // Mock stamp
-                ],
-              ),
+                ),
+                const SizedBox(height: 40),
+                Container(width: 180, height: 1, color: Colors.black),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              "Document généré par Guinée École",
-              style: TextStyle(fontSize: 7, color: Colors.grey),
+            Text(
+              'Document généré par Guinée École le $dateStr',
+              style: const TextStyle(fontSize: 6, color: Colors.grey),
             ),
             const Text(
-              "Page 1/1",
-              style: TextStyle(fontSize: 7, color: Colors.grey),
+              'Page 1/1',
+              style: TextStyle(fontSize: 6, color: Colors.grey),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _recapRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 7)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 7, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
     );
   }
 
@@ -736,151 +767,164 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
     return pw.Column(
       children: [
         pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Expanded(
-              child: pw.Row(
-                children: [
-                  if (logo != null)
-                    pw.Container(width: 40, height: 40, child: pw.Image(logo)),
-                  pw.SizedBox(width: 8),
-                  pw.Expanded(
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          "Ministère de l'Éducation Nationale...",
-                          style: pw.TextStyle(
-                            fontSize: 8,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                        pw.Text(
-                          "Inspection Régionale de Conakry",
-                          style: const pw.TextStyle(fontSize: 8),
-                        ),
-                        if (_ecole != null)
-                          pw.Text(
-                            _ecole!.nom.toUpperCase(),
-                            style: pw.TextStyle(
-                              fontSize: 9,
-                              fontWeight: pw.FontWeight.bold,
-                            ),
-                          ),
-                      ],
+            // Left: Republic Logo (matching bulletin design)
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  children: [
+                    pw.Container(
+                      width: 10,
+                      height: 30,
+                      color: PdfColor.fromInt(0xFFCE1126),
                     ),
+                    pw.SizedBox(width: 2),
+                    pw.Container(
+                      width: 10,
+                      height: 30,
+                      color: PdfColor.fromInt(0xFFFCD116),
+                    ),
+                    pw.SizedBox(width: 2),
+                    pw.Container(
+                      width: 10,
+                      height: 30,
+                      color: PdfColor.fromInt(0xFF009460),
+                    ),
+                  ],
+                ),
+                pw.Text(
+                  'RÉPUBLIQUE DE GUINÉE',
+                  style: pw.TextStyle(
+                    fontSize: 8,
+                    fontWeight: pw.FontWeight.bold,
                   ),
-                ],
-              ),
+                ),
+                pw.Text(
+                  'TRAVAIL - JUSTICE - SOLIDARITÉ',
+                  style: const pw.TextStyle(fontSize: 5),
+                ),
+              ],
             ),
-            pw.Expanded(
-              child: pw.Column(
-                children: [
-                  pw.Text(
-                    "FICHE DE RÉSULTAT OFFICIELLE",
+            // Center: School Info
+            pw.Column(
+              children: [
+                if (logo != null)
+                  pw.Container(width: 50, height: 50, child: pw.Image(logo)),
+                pw.Text(
+                  _ecole?.nom.toUpperCase() ?? 'GROUPE SCOLAIRE',
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.Text(
+                  _ecole?.adresse ?? '',
+                  style: const pw.TextStyle(fontSize: 8),
+                ),
+                pw.SizedBox(height: 5),
+                pw.Text(
+                  "FICHE DE RÉSULTAT OFFICIELLE",
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 2,
+                  ),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
+                  child: pw.Text(
+                    "CLASSE: ${_classe?['nom'] ?? ''}",
                     style: pw.TextStyle(
-                      fontSize: 14,
+                      fontSize: 9,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
-                  pw.Text(
-                    "Année Scolaire: ${_anneeLibelle ?? ''}",
-                    style: pw.TextStyle(
-                      fontSize: 10,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.Container(
-                    margin: const pw.EdgeInsets.only(top: 4),
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 2,
-                    ),
-                    decoration: pw.BoxDecoration(border: pw.Border.all()),
-                    child: pw.Text(
-                      "Classe: ${_classe?['nom'] ?? ''}",
-                      style: pw.TextStyle(
-                        fontSize: 9,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            pw.Expanded(
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
-                  pw.Text(
-                    "RÉPUBLIQUE DE GUINÉE",
-                    style: pw.TextStyle(
-                      fontSize: 7,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
+            // Right: Academic Info
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text(
+                  'ANNÉE SCOLAIRE',
+                  style: pw.TextStyle(
+                    fontSize: 8,
+                    fontWeight: pw.FontWeight.bold,
                   ),
-                  pw.Text(
-                    "Travail — Justice — Solidarité",
-                    style: const pw.TextStyle(fontSize: 7),
+                ),
+                pw.Text(
+                  _anneeLibelle ?? '',
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromInt(0xFF13DAEC),
                   ),
-                ],
-              ),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text(
+                  'PÉRIODE: ${widget.trimestre == 4 ? 'Bilan Annuel' : 'Trimestre ${widget.trimestre}'}',
+                  style: pw.TextStyle(
+                    fontSize: 8,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        pw.Divider(),
+        pw.SizedBox(height: 5),
+        pw.Divider(thickness: 1, color: PdfColors.black),
       ],
     );
   }
 
   pw.Widget _buildPdfTable(Map<String, pw.MemoryImage> photos) {
-    final headers = [
-      "Rang",
-      "Photo",
-      "Matricule",
-      "Nom et Prénoms",
-      ..._subjects.map(
-        (s) => s['nom']
-            .toString()
-            .substring(0, min(s['nom'].toString().length, 4))
-            .toUpperCase(),
-      ),
-      "Total",
-      "Moy\nGén",
-    ];
+    final Map<int, pw.TableColumnWidth> columnWidths = {
+      0: const pw.FixedColumnWidth(25), // Rang
+      1: const pw.FixedColumnWidth(25), // Photo
+      2: const pw.FixedColumnWidth(55), // Matricule
+      3: const pw.FlexColumnWidth(3), // Nom
+    };
+
+    int colIdx = 4;
+    for (var i = 0; i < _subjects.length; i++) {
+      columnWidths[colIdx++] = const pw.FixedColumnWidth(30);
+    }
+    columnWidths[colIdx++] = const pw.FixedColumnWidth(35); // Total Points
+    columnWidths[colIdx++] = const pw.FixedColumnWidth(40); // Moyenne
+    columnWidths[colIdx++] = const pw.FixedColumnWidth(45); // Decision
 
     return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.grey800, width: 0.5),
-      columnWidths: {
-        0: const pw.FixedColumnWidth(25), // Rang
-        1: const pw.FixedColumnWidth(25), // Photo
-        2: const pw.FixedColumnWidth(50), // Mat
-        3: const pw.FlexColumnWidth(), // Nom
-        // Dynamic cols will be auto/flex in standard table logic or fixed if we knew count.
-        // PDF Table columnWidths map matches index.
-        // We must generate the map dynamically.
-      },
+      border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
+      columnWidths: columnWidths,
       children: [
-        // Header
+        // Header Row
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey100),
-          children: headers
-              .map(
-                (h) => pw.Container(
-                  padding: const pw.EdgeInsets.all(2),
-                  alignment: pw.Alignment.center,
-                  child: pw.Text(
-                    h,
-                    style: pw.TextStyle(
-                      fontSize: 7,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
+          children: [
+            _pdfHeaderCell("Rang"),
+            _pdfHeaderCell("Photo"),
+            _pdfHeaderCell("Matricule"),
+            _pdfHeaderCell("Nom et Prénoms", align: pw.Alignment.centerLeft),
+            ..._subjects.map((s) {
+              String name = s['nom'].toString();
+              return _pdfHeaderCell(
+                name.substring(0, min(name.length, 4)).toUpperCase(),
+              );
+            }),
+            _pdfHeaderCell("Total\nPoints"),
+            _pdfHeaderCell("Moyenne\nGénérale"),
+            _pdfHeaderCell("Décision"),
+          ],
         ),
-        // Rows
+        // Data Rows
         ..._studentResults.map((res) {
           final student = res['student'] as Student;
           final avgs = res['subject_avgs'] as Map<int, double>;
@@ -888,39 +932,41 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
           return pw.TableRow(
             verticalAlignment: pw.TableCellVerticalAlignment.middle,
             children: [
-              _pdfCell(res['rang_str'], bold: true),
+              _pdfDataCell(res['rang_str'], bold: true),
               photos.containsKey(student.id)
                   ? pw.Container(
-                      width: 20,
-                      height: 20,
+                      width: 18,
+                      height: 18,
                       child: pw.Image(
                         photos[student.id]!,
                         fit: pw.BoxFit.cover,
                       ),
                     )
                   : pw.Container(
-                      width: 20,
-                      height: 20,
+                      width: 18,
+                      height: 18,
                       color: PdfColors.grey200,
                     ),
-              _pdfCell(student.matricule),
-              _pdfCell(
-                student.fullName,
+              _pdfDataCell(student.matricule, fontSize: 6),
+              _pdfDataCell(
+                student.fullName.toUpperCase(),
                 align: pw.Alignment.centerLeft,
                 bold: true,
+                fontSize: 7,
               ),
               ..._subjects.map((s) {
                 final avg = avgs[s['id']];
-                return _pdfCell(avg != null ? avg.toStringAsFixed(2) : "-");
+                return _pdfDataCell(avg != null ? avg.toStringAsFixed(2) : "-");
               }),
-              _pdfCell(
+              _pdfDataCell(
                 (res['total_points'] as double).toStringAsFixed(2),
                 bold: true,
               ),
-              _pdfCell(
+              _pdfDataCell(
                 (res['moyenne_generale'] as double).toStringAsFixed(2),
                 bold: true,
               ),
+              _pdfDataCell(res['decision'] ?? '', bold: true, fontSize: 6),
             ],
           );
         }),
@@ -928,18 +974,34 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
     );
   }
 
-  pw.Widget _pdfCell(
+  pw.Widget _pdfHeaderCell(
     String text, {
-    bool bold = false,
     pw.Alignment align = pw.Alignment.center,
   }) {
     return pw.Container(
-      padding: const pw.EdgeInsets.all(2),
+      padding: const pw.EdgeInsets.all(3),
+      alignment: align,
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
+        textAlign: pw.TextAlign.center,
+      ),
+    );
+  }
+
+  pw.Widget _pdfDataCell(
+    String text, {
+    bool bold = false,
+    pw.Alignment align = pw.Alignment.center,
+    double fontSize = 7,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(3),
       alignment: align,
       child: pw.Text(
         text,
         style: pw.TextStyle(
-          fontSize: 8,
+          fontSize: fontSize,
           fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
         ),
       ),
@@ -947,54 +1009,100 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
   }
 
   pw.Widget _buildPdfFooter() {
-    return pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+    final now = DateTime.now();
+    final dateStr = '${now.day}/${now.month}/${now.year}';
+
+    return pw.Column(
       children: [
-        pw.Container(
-          padding: const pw.EdgeInsets.all(5),
-          decoration: pw.BoxDecoration(border: pw.Border.all()),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                "Récapitulatif",
-                style: pw.TextStyle(
-                  fontSize: 8,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.Text(
-                "Effectif: ${_classStats['effectif']}",
-                style: const pw.TextStyle(fontSize: 7),
-              ),
-              pw.Text(
-                "Moyenne: ${(_classStats['moyenne_classe'] as double? ?? 0).toStringAsFixed(2)}",
-                style: pw.TextStyle(
-                  fontSize: 7,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.Text(
-                "Taux: ${(_classStats['taux_reussite'] as double? ?? 0).toStringAsFixed(1)}%",
-                style: const pw.TextStyle(fontSize: 7),
-              ),
-            ],
-          ),
-        ),
-        pw.Column(
+        pw.SizedBox(height: 10),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text(
-              "Cachet du Directeur",
-              style: pw.TextStyle(
-                fontSize: 9,
-                fontWeight: pw.FontWeight.bold,
-                decoration: pw.TextDecoration.underline,
+            // Left: Recap Box
+            pw.Container(
+              width: 180,
+              padding: const pw.EdgeInsets.all(8),
+              decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'RÉCAPITULATIF DE CLASSE',
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.Container(
+                    height: 1,
+                    color: PdfColors.black,
+                    margin: const pw.EdgeInsets.symmetric(vertical: 4),
+                  ),
+                  _recapPdfRow(
+                    'Effectif total:',
+                    '${_classStats['effectif']} Élèves',
+                  ),
+                  _recapPdfRow(
+                    'Moyenne de la classe:',
+                    '${(_classStats['moyenne_classe'] as double? ?? 0).toStringAsFixed(2)} / 20',
+                  ),
+                  _recapPdfRow(
+                    'Taux de réussite:',
+                    '${(_classStats['taux_reussite'] as double? ?? 0).toStringAsFixed(1)}%',
+                  ),
+                ],
               ),
             ),
-            pw.SizedBox(height: 30),
+            // Right: Signature Box
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text(
+                  'CACHET DU DIRECTEUR',
+                  style: pw.TextStyle(
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                    decoration: pw.TextDecoration.underline,
+                  ),
+                ),
+                pw.SizedBox(height: 40),
+                pw.Container(width: 180, height: 1, color: PdfColors.black),
+              ],
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 10),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'Document généré par Guinée École le $dateStr',
+              style: const pw.TextStyle(fontSize: 6, color: PdfColors.grey),
+            ),
+            pw.Text(
+              'Page 1/1',
+              style: const pw.TextStyle(fontSize: 6, color: PdfColors.grey),
+            ),
           ],
         ),
       ],
+    );
+  }
+
+  pw.Widget _recapPdfRow(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 1),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: const pw.TextStyle(fontSize: 7)),
+          pw.Text(
+            value,
+            style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -87,11 +87,13 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
       );
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.surfaceDark : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -111,9 +113,13 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
                 ),
               ),
               const SizedBox(width: 16),
-              const Text(
+              Text(
                 "Fiche de Résultat",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppTheme.textPrimary,
+                ),
               ),
             ],
           ),
@@ -121,13 +127,28 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
 
           // Class Dropdown
           DropdownButtonFormField<int>(
+            dropdownColor: isDark ? AppTheme.surfaceDark : Colors.white,
+            style: TextStyle(
+              color: isDark ? Colors.white : AppTheme.textPrimary,
+            ),
             decoration: InputDecoration(
               labelText: "Classe",
+              labelStyle: TextStyle(
+                color: isDark ? Colors.white70 : AppTheme.textSecondary,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark ? Colors.white24 : Colors.grey,
+                ),
+              ),
               filled: true,
-              fillColor: Colors.grey[50],
+              fillColor: isDark
+                  ? Colors.white.withOpacity(0.05)
+                  : Colors.grey[50],
             ),
             value: _selectedClass?['id'] as int?,
             items: _classes.map((item) {
@@ -147,21 +168,37 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
 
           const SizedBox(height: 16),
 
-          // Trimester Dropdown (Static 1, 2, 3)
+          // Trimester Dropdown (Static 1, 2, 3, 4)
           DropdownButtonFormField<int>(
+            dropdownColor: isDark ? AppTheme.surfaceDark : Colors.white,
+            style: TextStyle(
+              color: isDark ? Colors.white : AppTheme.textPrimary,
+            ),
             decoration: InputDecoration(
               labelText: "Période",
+              labelStyle: TextStyle(
+                color: isDark ? Colors.white70 : AppTheme.textSecondary,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark ? Colors.white24 : Colors.grey,
+                ),
+              ),
               filled: true,
-              fillColor: Colors.grey[50],
+              fillColor: isDark
+                  ? Colors.white.withOpacity(0.05)
+                  : Colors.grey[50],
             ),
             value: _selectedTrimestre,
             items: const [
-              DropdownMenuItem(value: 1, child: Text("Trimestre 1")),
-              DropdownMenuItem(value: 2, child: Text("Trimestre 2")),
-              DropdownMenuItem(value: 3, child: Text("Trimestre 3")),
+              DropdownMenuItem(value: 1, child: Text("1er Trimestre")),
+              DropdownMenuItem(value: 2, child: Text("2ème Trimestre")),
+              DropdownMenuItem(value: 3, child: Text("3ème Trimestre")),
+              DropdownMenuItem(value: 4, child: Text("Bilan Annuel")),
             ],
             onChanged: (val) => setState(() => _selectedTrimestre = val!),
           ),

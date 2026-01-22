@@ -1433,6 +1433,20 @@ class DatabaseHelper {
     );
   }
 
+  Future<Map<String, dynamic>?> getClasseWithCycle(int classId) async {
+    final db = await database;
+    final results = await db.rawQuery(
+      '''
+      SELECT c.*, cy.nom as cycle_nom, cy.note_min, cy.note_max, cy.moyenne_passage, cy.id as cycle_id
+      FROM classe c
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+      WHERE c.id = ?
+    ''',
+      [classId],
+    );
+    return results.isNotEmpty ? results.first : null;
+  }
+
   // -------------------------
   // Mentions configuration
   // -------------------------
@@ -1975,11 +1989,33 @@ class DatabaseHelper {
         ? totalClassAvg / allAvgsResult.length
         : 0.0;
 
+    // 3. Get class passing mark
+    final classe = await getClasseWithCycle(classId);
+
+    // 4. Get student total points
+    final studentSumResult = await db.rawQuery(
+      '''
+      SELECT SUM(note * COALESCE(cm.coefficient, 1)) as total_points
+      FROM notes n
+      JOIN matiere m ON n.matiere_id = m.id
+      JOIN eleve e ON n.eleve_id = e.id
+      LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
+           AND cm.classe_id = e.classe_id
+           AND cm.annee_scolaire_id = n.annee_scolaire_id
+      WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
+    ''',
+      [studentId, trimestre, anneeId],
+    );
+    double totalPoints =
+        (studentSumResult.first['total_points'] as num?)?.toDouble() ?? 0.0;
+
     return {
       'average': studentAvg,
       'rank': rank,
       'classAverage': classAvg,
       'totalStudents': allAvgsResult.length,
+      'moyenne_passage': classe?['moyenne_passage'] ?? 10.0,
+      'totalPoints': totalPoints,
     };
   }
 

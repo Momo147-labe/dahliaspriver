@@ -5,6 +5,7 @@ import '../../../core/database/database_helper.dart';
 import '../../../widgets/reports/bulletin_preview.dart';
 import '../../../widgets/reports/bulletin_pdf_helper.dart';
 import '../../../models/ecole.dart';
+import '../../grades/result_sheet_selection_modal.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -151,6 +152,15 @@ class _ReportsPageState extends State<ReportsPage> {
         });
       }
     }
+  }
+
+  void _showResultSheetModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ResultSheetSelectionModal(dbHelper: _dbHelper),
+    );
   }
 
   @override
@@ -343,8 +353,11 @@ class _ReportsPageState extends State<ReportsPage> {
               const SizedBox(width: 16),
               Flexible(
                 flex: 1,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 12,
                   children: [
                     Container(
                       decoration: BoxDecoration(
@@ -375,13 +388,12 @@ class _ReportsPageState extends State<ReportsPage> {
                         icon: const Icon(Icons.file_download, size: 18),
                         label: const Text('Exporter CSV'),
                         style: OutlinedButton.styleFrom(
-                          backgroundColor:
-                              Colors.transparent, // Handled by Container
+                          backgroundColor: Colors.transparent,
                           foregroundColor: isDark ? Colors.white : textPrimary,
-                          side: BorderSide.none, // Handled by Container
+                          side: BorderSide.none,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 20,
+                            horizontal: 16,
+                            vertical: 12,
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(24),
@@ -389,20 +401,37 @@ class _ReportsPageState extends State<ReportsPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _showResultSheetModal,
+                      icon: const Icon(Icons.analytics_outlined, size: 18),
+                      label: const Text('Rapport de Classe'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: primaryColor,
+                        side: BorderSide(color: primaryColor),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
                     ElevatedButton.icon(
                       onPressed: _exportBatchPdf,
                       icon: const Icon(Icons.print, size: 18),
-                      label: const Text('Générer Tous (PDF)'),
+                      label: const Text('Générer Bulletins (PDF)'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: textPrimary,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
+                          horizontal: 16,
                           vertical: 12,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(24),
                         ),
                         elevation: 2,
                       ),
