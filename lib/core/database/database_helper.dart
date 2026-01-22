@@ -37,7 +37,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 31,
+      version: 42,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -54,10 +54,10 @@ class DatabaseHelper {
         date_debut TEXT NOT NULL,
         date_fin TEXT NOT NULL,
         active INTEGER DEFAULT 0,
-        statut TEXT CHECK (statut IN ('Active','Inactive')) DEFAULT 'Active',
+        statut TEXT CHECK (statut IN ('Active', 'Inactive')) DEFAULT 'Active',
+        annee_precedente_id INTEGER,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        annee_precedente_id INTEGER,
         FOREIGN KEY (annee_precedente_id) REFERENCES annee_scolaire(id)
       )
     ''');
@@ -82,19 +82,19 @@ class DatabaseHelper {
       CREATE TABLE IF NOT EXISTS classe (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nom TEXT NOT NULL,
-        cycle TEXT NOT NULL,
+        cycle_id INTEGER,
         salle TEXT,
-        niveau TEXT,
+        niveau_id INTEGER,
         eff_max INTEGER DEFAULT 100,
         next_class_id INTEGER,
         is_final_class INTEGER DEFAULT 0,
         annee_scolaire_id INTEGER,
-        moyenne_min_promotion REAL DEFAULT 10.0,
-        moyenne_max_promotion REAL DEFAULT 20.0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
-        FOREIGN KEY (next_class_id) REFERENCES classe(id)
+        FOREIGN KEY (next_class_id) REFERENCES classe(id),
+        FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id),
+        FOREIGN KEY (niveau_id) REFERENCES niveaux(id)
       )
     ''');
 
@@ -112,6 +112,8 @@ class DatabaseHelper {
         annee_scolaire_id INTEGER,
         frais_id INTEGER,
         photo TEXT,
+        personne_a_prevenir TEXT,
+        contact_urgence TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (classe_id) REFERENCES classe(id),
@@ -177,6 +179,8 @@ class DatabaseHelper {
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         mode_calcul_moyenne TEXT DEFAULT 'trimestrielle',
         use_custom_mentions INTEGER DEFAULT 1,
+        base_notation REAL DEFAULT 20.0,
+        include_conduite INTEGER DEFAULT 1,
         FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
       )
     ''');
@@ -200,20 +204,30 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS cycles_scolaires (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nom_cycle TEXT NOT NULL,
-        code_cycle TEXT UNIQUE NOT NULL,
-        niveau_min INTEGER NOT NULL,
-        niveau_max INTEGER NOT NULL,
-        ordre_cycle INTEGER NOT NULL,
-        couleur_cycle TEXT DEFAULT '#2196F3',
-        sous_titre_cycle TEXT,
-        droit_redoublement INTEGER DEFAULT 1,
-        seuil_redoublement REAL DEFAULT 8.0,
+        nom TEXT NOT NULL,
+        ordre INTEGER NOT NULL,
+        note_min REAL NOT NULL DEFAULT 0,
+        note_max REAL NOT NULL DEFAULT 20,
+        moyenne_passage REAL NOT NULL,
+        is_terminal INTEGER DEFAULT 0,
+        actif INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS niveaux (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nom TEXT NOT NULL,
+        ordre INTEGER NOT NULL,
+        cycle_id INTEGER NOT NULL,
+        moyenne_passage REAL,
+        is_examen INTEGER DEFAULT 0,
         actif INTEGER DEFAULT 1,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        moyenne_passage_cycle REAL DEFAULT 10.0,
-        moyenne_excellence_cycle REAL DEFAULT 15.0
+        FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id)
       )
     ''');
 
@@ -395,8 +409,12 @@ class DatabaseHelper {
         note_min REAL NOT NULL,
         note_max REAL NOT NULL,
         couleur TEXT,
+        cycle_id INTEGER,
+        appreciation TEXT,
+        icone TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id)
       )
     ''');
 
@@ -409,6 +427,21 @@ class DatabaseHelper {
         categorie TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sequence_planification (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        annee_scolaire_id INTEGER,
+        trimestre INTEGER,
+        numero_sequence INTEGER,
+        nom TEXT,
+        date_debut TEXT,
+        date_fin TEXT,
+        poids REAL,
+        statut TEXT,
+        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
       )
     ''');
   }
@@ -896,6 +929,305 @@ class DatabaseHelper {
         'REAL DEFAULT 8.0',
       );
     }
+
+    if (oldVersion < 32) {
+      await _addColumnSafely(
+        db,
+        'configuration_ecole',
+        'base_notation',
+        'REAL DEFAULT 20.0',
+      );
+      await _addColumnSafely(
+        db,
+        'configuration_ecole',
+        'include_conduite',
+        'INTEGER DEFAULT 1',
+      );
+      await _addColumnSafely(db, 'mention_config', 'cycle_id', 'INTEGER');
+    }
+
+    if (oldVersion < 34) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sequence_planification (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          annee_scolaire_id INTEGER,
+          trimestre INTEGER,
+          numero_sequence INTEGER,
+          nom TEXT,
+          date_debut TEXT,
+          date_fin TEXT,
+          poids REAL,
+          statut TEXT,
+          FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
+        )
+      ''');
+    }
+
+    if (oldVersion < 35) {
+      // Migration de cycles_scolaires vers le nouveau schéma
+      // 1. Renommer l'ancienne table
+      await db.execute(
+        'ALTER TABLE cycles_scolaires RENAME TO cycles_scolaires_old',
+      );
+
+      // 2. Créer la nouvelle table
+      await db.execute('''
+        CREATE TABLE cycles_scolaires (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nom TEXT NOT NULL,
+          ordre INTEGER NOT NULL,
+          niveau_min INTEGER NOT NULL,
+          niveau_max INTEGER NOT NULL,
+          moyenne_passage REAL NOT NULL,
+          is_terminal INTEGER DEFAULT 0,
+          actif INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      ''');
+
+      // 3. Copier les données
+      await db.execute('''
+        INSERT INTO cycles_scolaires (id, nom, ordre, niveau_min, niveau_max, moyenne_passage, actif, created_at, updated_at)
+        SELECT id, nom_cycle, ordre_cycle, niveau_min, niveau_max, moyenne_passage_cycle, actif, created_at, updated_at
+        FROM cycles_scolaires_old
+      ''');
+
+      // 4. Supprimer l'ancienne table
+      await db.execute('DROP TABLE cycles_scolaires_old');
+
+      // 5. Créer la table niveaux
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS niveaux (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nom TEXT NOT NULL,
+          ordre INTEGER NOT NULL,
+          cycle_id INTEGER NOT NULL,
+          moyenne_passage REAL,
+          is_examen INTEGER DEFAULT 0,
+          actif INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id)
+        )
+      ''');
+    }
+
+    if (oldVersion < 36) {
+      await _addColumnSafely(db, 'mention_config', 'appreciation', 'TEXT');
+      await _addColumnSafely(db, 'mention_config', 'icone', 'TEXT');
+    }
+
+    if (oldVersion < 37) {
+      await _addColumnSafely(
+        db,
+        'annee_scolaire',
+        'statut',
+        "TEXT CHECK (statut IN ('Active', 'Inactive')) DEFAULT 'Active'",
+      );
+      await _addColumnSafely(
+        db,
+        'annee_scolaire',
+        'annee_precedente_id',
+        "INTEGER REFERENCES annee_scolaire(id)",
+      );
+    }
+
+    if (oldVersion < 38) {
+      await _addColumnSafely(db, 'eleve', 'personne_a_prevenir', 'TEXT');
+      await _addColumnSafely(db, 'eleve', 'contact_urgence', 'TEXT');
+    }
+
+    if (oldVersion < 39) {
+      // Rename niveau_min/niveau_max to note_min/note_max in cycles_scolaires
+      try {
+        // SQLite doesn't support renaming columns directly, so we need to recreate the table
+        await db.execute('''
+          CREATE TABLE cycles_scolaires_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nom TEXT NOT NULL,
+            ordre INTEGER NOT NULL,
+            note_min REAL NOT NULL DEFAULT 0,
+            note_max REAL NOT NULL DEFAULT 20,
+            moyenne_passage REAL NOT NULL,
+            is_terminal INTEGER DEFAULT 0,
+            actif INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        ''');
+
+        // Copy data from old table to new table
+        await db.execute('''
+          INSERT INTO cycles_scolaires_new (id, nom, ordre, note_min, note_max, moyenne_passage, is_terminal, actif, created_at, updated_at)
+          SELECT id, nom, ordre, niveau_min, niveau_max, moyenne_passage, is_terminal, actif, created_at, updated_at
+          FROM cycles_scolaires
+        ''');
+
+        // Drop old table
+        await db.execute('DROP TABLE cycles_scolaires');
+
+        // Rename new table to original name
+        await db.execute(
+          'ALTER TABLE cycles_scolaires_new RENAME TO cycles_scolaires',
+        );
+
+        debugPrint(
+          'Successfully migrated cycles_scolaires to use note_min/note_max',
+        );
+      } catch (e) {
+        debugPrint('Error during v39 migration: $e');
+      }
+    }
+
+    if (oldVersion < 41) {
+      debugPrint(
+        'Mise à jour vers la version 41 : Refonte de la table classe (Tentative 2)',
+      );
+      try {
+        // Vérifier si la migration a déjà été faite (précaution)
+        var tableInfo = await db.rawQuery("PRAGMA table_info(classe)");
+        bool alreadyMigrated = tableInfo.any(
+          (col) => col['name'] == 'cycle_id',
+        );
+
+        if (!alreadyMigrated) {
+          // 1. Création de la nouvelle table classe avec le schéma mis à jour
+          await db.execute('''
+            CREATE TABLE classe_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              nom TEXT NOT NULL,
+              cycle_id INTEGER,
+              salle TEXT,
+              niveau_id INTEGER,
+              eff_max INTEGER DEFAULT 100,
+              next_class_id INTEGER,
+              is_final_class INTEGER DEFAULT 0,
+              annee_scolaire_id INTEGER,
+              created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+              updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
+              FOREIGN KEY (next_class_id) REFERENCES classe(id),
+              FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id),
+              FOREIGN KEY (niveau_id) REFERENCES niveaux(id)
+            )
+          ''');
+
+          // 2. Migration des données
+          final List<Map<String, dynamic>> oldClasses = await db.query(
+            'classe',
+          );
+
+          for (var oldClasse in oldClasses) {
+            // Dans l'ancienne table, c'était 'cycle' et 'niveau'
+            final String? cycleName = oldClasse['cycle'] as String?;
+            final String? niveauName = oldClasse['niveau'] as String?;
+
+            int? cycleId;
+            int? niveauId;
+
+            if (cycleName != null && cycleName.isNotEmpty) {
+              final List<Map<String, dynamic>> cycles = await db.query(
+                'cycles_scolaires',
+                where: 'nom = ?',
+                whereArgs: [cycleName],
+              );
+
+              if (cycles.isNotEmpty) {
+                cycleId = cycles.first['id'] as int;
+              } else {
+                cycleId = await db.insert('cycles_scolaires', {
+                  'nom': cycleName,
+                  'ordre': 0,
+                  'note_min': 0.0,
+                  'note_max': 20.0,
+                  'moyenne_passage': 10.0,
+                });
+              }
+            }
+
+            if (niveauName != null &&
+                niveauName.isNotEmpty &&
+                cycleId != null) {
+              final List<Map<String, dynamic>> levels = await db.query(
+                'niveaux',
+                where: 'nom = ? AND cycle_id = ?',
+                whereArgs: [niveauName, cycleId],
+              );
+
+              if (levels.isNotEmpty) {
+                niveauId = levels.first['id'] as int;
+              } else {
+                niveauId = await db.insert('niveaux', {
+                  'nom': niveauName,
+                  'ordre': 0,
+                  'cycle_id': cycleId,
+                  'moyenne_passage': 10.0,
+                });
+              }
+            }
+
+            await db.insert('classe_new', {
+              'id': oldClasse['id'],
+              'nom': oldClasse['nom'],
+              'cycle_id': cycleId,
+              'salle': oldClasse['salle'],
+              'niveau_id': niveauId,
+              'eff_max': oldClasse['eff_max'],
+              'next_class_id': oldClasse['next_class_id'],
+              'is_final_class': oldClasse['is_final_class'],
+              'annee_scolaire_id': oldClasse['annee_scolaire_id'],
+              'created_at': oldClasse['created_at'],
+              'updated_at': oldClasse['updated_at'],
+            });
+          }
+
+          // 3. Remplacement
+          await db.execute('DROP TABLE classe');
+          await db.execute('ALTER TABLE classe_new RENAME TO classe');
+          debugPrint('Migration vers la version 41 terminée avec succès.');
+        } else {
+          debugPrint(
+            'La table classe semble déjà être à jour (cycle_id présent).',
+          );
+        }
+      } catch (e) {
+        debugPrint('Erreur lors de la migration vers la version 41 : $e');
+      }
+    }
+
+    if (oldVersion < 42) {
+      try {
+        // 1. Ensure 'statut' column exists
+        final List<Map<String, dynamic>> columns = await db.rawQuery(
+          'PRAGMA table_info(annee_scolaire)',
+        );
+
+        final bool hasStatut = columns.any(
+          (column) => column['name'] == 'statut',
+        );
+        if (!hasStatut) {
+          await db.execute(
+            "ALTER TABLE annee_scolaire ADD COLUMN statut TEXT CHECK (statut IN ('Active', 'Inactive')) DEFAULT 'Active'",
+          );
+          debugPrint('Column statut added to table annee_scolaire');
+        }
+
+        // 2. Migrate from 'etat' if it exists
+        final bool hasEtat = columns.any((column) => column['name'] == 'etat');
+        if (hasEtat) {
+          await db.execute(
+            "UPDATE annee_scolaire SET statut = 'Active' WHERE etat = 'EN_COURS'",
+          );
+          await db.execute(
+            "UPDATE annee_scolaire SET statut = 'Inactive' WHERE etat = 'TERMINEE'",
+          );
+          debugPrint('Migrated data from etat to statut in annee_scolaire');
+        }
+      } catch (e) {
+        debugPrint('Error during v42 migration: $e');
+      }
+    }
   }
 
   Future<void> _addColumnSafely(
@@ -1027,7 +1359,21 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getCyclesScolaires() async {
     final db = await database;
-    return await db.query('cycles_scolaires', orderBy: 'ordre_cycle');
+    return await db.query(
+      'cycles_scolaires',
+      where: 'actif = 1',
+      orderBy: 'ordre',
+    );
+  }
+
+  Future<Map<String, dynamic>?> getCycleById(int id) async {
+    final db = await database;
+    final result = await db.query(
+      'cycles_scolaires',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return result.isNotEmpty ? result.first : null;
   }
 
   Future<int> updateCycleScolaire(int id, Map<String, dynamic> cycle) async {
@@ -1049,6 +1395,104 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // -------------------------
+  // Niveaux configuration
+  // -------------------------
+  Future<List<Map<String, dynamic>>> getNiveauxByCycle(int cycleId) async {
+    final db = await database;
+    return await db.query(
+      'niveaux',
+      where: 'cycle_id = ? AND actif = 1',
+      whereArgs: [cycleId],
+      orderBy: 'ordre',
+    );
+  }
+
+  Future<int> saveNiveau(Map<String, dynamic> niveau) async {
+    final db = await database;
+    if (niveau['id'] != null) {
+      int id = niveau['id'];
+      Map<String, dynamic> data = Map.from(niveau);
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
+      return await db.update('niveaux', data, where: 'id = ?', whereArgs: [id]);
+    } else {
+      return await db.insert('niveaux', niveau);
+    }
+  }
+
+  Future<int> deleteNiveau(int id) async {
+    final db = await database;
+    return await db.update(
+      'niveaux',
+      {'actif': 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // -------------------------
+  // Mentions configuration
+  // -------------------------
+  Future<List<Map<String, dynamic>>> getMentionsByCycle(int? cycleId) async {
+    final db = await database;
+    return await db.query(
+      'mention_config',
+      where: cycleId == null ? 'cycle_id IS NULL' : 'cycle_id = ?',
+      whereArgs: cycleId == null ? [] : [cycleId],
+      orderBy: 'note_min DESC',
+    );
+  }
+
+  Future<void> saveMention(Map<String, dynamic> mention) async {
+    final db = await database;
+    await db.insert(
+      'mention_config',
+      mention,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteMention(int id) async {
+    final db = await database;
+    await db.delete('mention_config', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // -------------------------
+  // Evaluation Planification
+  // -------------------------
+  Future<List<Map<String, dynamic>>> getSequencesPlanification(
+    int anneeId,
+  ) async {
+    final db = await database;
+    return await db.query(
+      'sequence_planification',
+      where: 'annee_scolaire_id = ?',
+      whereArgs: [anneeId],
+      orderBy: 'numero_sequence ASC',
+    );
+  }
+
+  Future<void> saveSequencesPlanification(
+    List<Map<String, dynamic>> sequences,
+  ) async {
+    final db = await database;
+    final batch = db.batch();
+    for (var seq in sequences) {
+      if (seq['id'] != null) {
+        batch.update(
+          'sequence_planification',
+          seq,
+          where: 'id = ?',
+          whereArgs: [seq['id']],
+        );
+      } else {
+        batch.insert('sequence_planification', seq);
+      }
+    }
+    await batch.commit(noResult: true);
   }
 
   // -------------------------
@@ -1170,6 +1614,30 @@ class DatabaseHelper {
     if (moyenne >= 10) return "Assez bien";
     if (moyenne >= 8) return "Passable";
     return "Insuffisant";
+  }
+
+  Future<String> getAppreciation(double moyenne, {int? cycleId}) async {
+    final mentions = await getMentionsByCycle(cycleId);
+    if (mentions.isEmpty && cycleId != null) {
+      // Fallback to global mentions if no cycle mentions
+      final globalMentions = await getMentionsByCycle(null);
+      if (globalMentions.isNotEmpty) {
+        for (var m in globalMentions) {
+          if (moyenne >= (m['note_min'] as num).toDouble() &&
+              moyenne <= (m['note_max'] as num).toDouble()) {
+            return m['label'];
+          }
+        }
+      }
+    } else {
+      for (var m in mentions) {
+        if (moyenne >= (m['note_min'] as num).toDouble() &&
+            moyenne <= (m['note_max'] as num).toDouble()) {
+          return m['label'];
+        }
+      }
+    }
+    return appreciationAutomatique(moyenne);
   }
 
   Future<bool> estBloque(int eleveId, int anneeId) async {
@@ -1830,8 +2298,9 @@ class DatabaseHelper {
     int subjectId,
     int trimestre,
     int sequence,
-    int anneeId,
-  ) async {
+    int anneeId, {
+    double passingGrade = 10.0,
+  }) async {
     final db = await database;
     final result = await db.rawQuery(
       '''
@@ -1840,12 +2309,12 @@ class DatabaseHelper {
         MAX(note) as maxNote,
         MIN(note) as minNote,
         COUNT(id) as total,
-        SUM(CASE WHEN note >= 10 THEN 1 ELSE 0 END) as passed
+        SUM(CASE WHEN note >= ? THEN 1 ELSE 0 END) as passed
       FROM notes
       WHERE matiere_id = ? AND trimestre = ? AND sequence = ? AND annee_scolaire_id = ?
       AND eleve_id IN (SELECT id FROM eleve WHERE classe_id = ?)
     ''',
-      [subjectId, trimestre, sequence, anneeId, classId],
+      [passingGrade, subjectId, trimestre, sequence, anneeId, classId],
     );
 
     if (result.isEmpty || result.first['total'] == 0) {
@@ -2147,11 +2616,12 @@ class DatabaseHelper {
     // Distribution by cycle
     final cycleDistribution = await db.rawQuery(
       '''
-      SELECT c.cycle, COUNT(e.id) as count
+      SELECT cy.nom as cycle, COUNT(e.id) as count
       FROM eleve e
       JOIN classe c ON e.classe_id = c.id
+      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       WHERE e.annee_scolaire_id = ?
-      GROUP BY c.cycle
+      GROUP BY cy.nom
     ''',
       [currentYearId],
     );
@@ -2299,15 +2769,16 @@ class DatabaseHelper {
       '''
       SELECT 
         c.nom as class_name,
-        c.cycle,
+        cy.nom as cycle,
         AVG(n.note) as average,
         COUNT(DISTINCT n.eleve_id) as students
       FROM notes n
       JOIN eleve e ON n.eleve_id = e.id
       JOIN classe c ON e.classe_id = c.id
+      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       WHERE e.annee_scolaire_id = ?
       GROUP BY c.id
-      ORDER BY c.cycle, c.nom
+      ORDER BY cy.nom, c.nom
     ''',
       [currentYearId],
     );
@@ -2373,13 +2844,14 @@ class DatabaseHelper {
     final cycleDistribution = await db.rawQuery(
       '''
       SELECT 
-        c.cycle,
+        cy.nom as cycle,
         COUNT(DISTINCT c.id) as class_count,
         COUNT(e.id) as student_count
       FROM classe c
+      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN eleve e ON c.id = e.classe_id AND e.annee_scolaire_id = ?
       WHERE c.annee_scolaire_id = ?
-      GROUP BY c.cycle
+      GROUP BY cy.nom
     ''',
       [currentYearId, currentYearId],
     );
@@ -2388,14 +2860,15 @@ class DatabaseHelper {
     final levelDistribution = await db.rawQuery(
       '''
       SELECT 
-        c.niveau,
+        n.nom as niveau,
         COUNT(DISTINCT c.id) as class_count,
         COUNT(e.id) as student_count
       FROM classe c
+      JOIN niveaux n ON c.niveau_id = n.id
       LEFT JOIN eleve e ON c.id = e.classe_id AND e.annee_scolaire_id = ?
       WHERE c.annee_scolaire_id = ?
-      GROUP BY c.niveau
-      ORDER BY c.niveau
+      GROUP BY n.nom
+      ORDER BY n.ordre
     ''',
       [currentYearId, currentYearId],
     );
@@ -2726,11 +3199,12 @@ class DatabaseHelper {
     // Students by level (existing)
     final levelStats = await db.rawQuery(
       '''
-      SELECT c.niveau, COUNT(e.id) as count
+      SELECT n.nom as niveau, COUNT(e.id) as count
       FROM eleve e
       JOIN classe c ON e.classe_id = c.id
+      JOIN niveaux n ON c.niveau_id = n.id
       WHERE e.annee_scolaire_id = ?
-      GROUP BY c.niveau
+      GROUP BY n.nom
     ''',
       [anneeId],
     );
@@ -2744,11 +3218,12 @@ class DatabaseHelper {
     // Stats par cycle
     final cycleStats = await db.rawQuery(
       '''
-      SELECT c.cycle, COUNT(e.id) as count 
+      SELECT cy.nom as cycle, COUNT(e.id) as count 
       FROM eleve e 
       JOIN classe c ON e.classe_id = c.id 
+      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       WHERE e.annee_scolaire_id = ? 
-      GROUP BY c.cycle
+      GROUP BY cy.nom
       ''',
       [anneeId],
     );
@@ -3313,8 +3788,10 @@ class DatabaseHelper {
     final db = await database;
     return await db.rawQuery(
       '''
-      SELECT DISTINCT c.nom, c.cycle, c.niveau
+      SELECT DISTINCT c.nom, cy.nom as cycle, n.nom as niveau
       FROM classe c
+      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+      JOIN niveaux n ON c.niveau_id = n.id
       JOIN attribution_enseignant ae ON c.id = ae.classe_id
       WHERE ae.enseignant_id = ? AND ae.annee_scolaire_id = ?
       ORDER BY c.nom ASC
@@ -3407,5 +3884,93 @@ class DatabaseHelper {
   Future<int> deleteUser(int id) async {
     final db = await database;
     return await db.delete('user', where: 'id = ?', whereArgs: [id]);
+  }
+  // ==============================================================================
+  // GESTION DES SEQUENCES ET TRIMESTRES (DYNAMIC)
+  // ==============================================================================
+
+  /// Get configured sequences for a specific academic year
+  Future<List<Map<String, dynamic>>> getSequences(int anneeId) async {
+    final db = await database;
+    try {
+      // First try to get explicit sequence definitions
+      final sequences = await db.query(
+        'sequence_planification',
+        where: 'annee_scolaire_id = ? AND statut = ?',
+        whereArgs: [anneeId, 'active'],
+        orderBy: 'trimestre ASC, numero_sequence ASC',
+      );
+
+      if (sequences.isNotEmpty) {
+        return sequences;
+      }
+
+      // Fallback: Check configuration_evaluation
+      final config = await db.query(
+        'configuration_evaluation',
+        where: 'annee_scolaire_id = ?',
+        whereArgs: [anneeId],
+        limit: 1,
+      );
+
+      if (config.isNotEmpty) {
+        final conf = config.first;
+        final int nbSeq = (conf['nombre_sequences_trimestre'] as int?) ?? 2;
+        final int nbTrim = (conf['nombre_trimestres_annee'] as int?) ?? 3;
+
+        List<Map<String, dynamic>> generated = [];
+        for (int t = 1; t <= nbTrim; t++) {
+          for (int s = 1; s <= nbSeq; s++) {
+            generated.add({
+              'id': generated.length + 1, // Fake ID
+              'nom': 'Séquence $s',
+              'trimestre': t,
+              'numero_sequence': s,
+            });
+          }
+        }
+        return generated;
+      }
+    } catch (e) {
+      debugPrint('Error loading sequences: $e');
+    }
+
+    // Default fallback
+    return List.generate(6, (index) {
+      final t = (index ~/ 2) + 1;
+      final s = (index % 2) + 1;
+      return {
+        'id': index + 1,
+        'nom': 'Séquence $s',
+        'trimestre': t,
+        'numero_sequence':
+            index +
+            1, // Global sequence number or per trimester? Usually per trimester logic in UI
+      };
+    });
+  }
+
+  /// Get configured trimesters for a specific academic year
+  Future<List<int>> getTrimesters(int anneeId) async {
+    final db = await database;
+    try {
+      // Check configuration_evaluation
+      final config = await db.query(
+        'configuration_evaluation',
+        where: 'annee_scolaire_id = ?',
+        whereArgs: [anneeId],
+        limit: 1,
+      );
+
+      if (config.isNotEmpty) {
+        final int nbTrim =
+            (config.first['nombre_trimestres_annee'] as int?) ?? 3;
+        return List.generate(nbTrim, (i) => i + 1);
+      }
+    } catch (e) {
+      debugPrint('Error loading trimesters: $e');
+    }
+    // Default
+    return [1, 2, 3];
   }
 }

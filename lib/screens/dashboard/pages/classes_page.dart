@@ -17,8 +17,8 @@ class _ClassesPageState extends State<ClassesPage> {
   List<Map<String, dynamic>> _academicYears = [];
   bool _isLoading = true;
   String _searchTerm = '';
-  String _filterNiveau = 'tous';
-  String _filterCycle = 'tous';
+  int? _filterNiveauId;
+  int? _filterCycleId;
   String _sortBy = 'nom';
   String _sortOrder = 'asc';
   String _viewMode = 'grid'; // 'grid' or 'list'
@@ -31,31 +31,15 @@ class _ClassesPageState extends State<ClassesPage> {
   final _salleController = TextEditingController();
   final _searchController = TextEditingController();
 
-  String? _selectedNiveau;
-  String? _selectedCycle;
+  int? _selectedNiveauId;
+  int? _selectedCycleId;
   int? _selectedAnneeId;
   int? _selectedNextClassId;
   bool _isFinalClass = false;
 
-  final List<String> _niveaux = [
-    'Petite Section',
-    'Moyenne Section',
-    'Grande Section',
-    '1ère',
-    '2ème',
-    '3ème',
-    '4ème',
-    '5ème',
-    '6ème',
-    '7ème',
-    '8ème',
-    '9ème',
-    '10ème',
-    '11ème',
-    '12ème',
-    'Terminale',
-  ];
-  final List<String> _cycles = ['Maternelle', 'Primaire', 'Collège', 'Lycée'];
+  List<Map<String, dynamic>> _allCycles = [];
+  List<Map<String, dynamic>> _allNiveaux = [];
+  List<Map<String, dynamic>> _filteredNiveauxForModal = [];
 
   @override
   void initState() {
@@ -93,9 +77,18 @@ class _ClassesPageState extends State<ClassesPage> {
       );
 
       await _loadClasses(anneeId);
+
+      // Charger les cycles
+      final cycles = await DatabaseHelper.instance.getCyclesScolaires();
+
+      // Charger tous les niveaux (pour le filtrage initial)
+      final allNiveaux = await db.query('niveaux', where: 'actif = 1');
+
       setState(() {
         _selectedAnneeId = anneeId;
         _academicYears = years;
+        _allCycles = cycles;
+        _allNiveaux = allNiveaux;
         _isLoading = false;
       });
     } catch (e) {
@@ -141,9 +134,13 @@ class _ClassesPageState extends State<ClassesPage> {
       SELECT 
         c.*, 
         a.libelle as annee_libelle,
+        cy.nom as cycle_nom,
+        nv.nom as niveau_nom,
         (SELECT COUNT(*) FROM eleve WHERE classe_id = c.id AND annee_scolaire_id = ?) as eleve_count
       FROM classe c
       LEFT JOIN annee_scolaire a ON c.annee_scolaire_id = a.id
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+      LEFT JOIN niveaux nv ON c.niveau_id = nv.id
     ''',
       [anneeId],
     );
@@ -184,7 +181,7 @@ class _ClassesPageState extends State<ClassesPage> {
 
     Map<String, int> niveauCounts = {};
     for (var c in _classes) {
-      String nv = c['niveau'] ?? 'N/A';
+      String nv = c['niveau_nom'] ?? 'N/A';
       niveauCounts[nv] = (niveauCounts[nv] ?? 0) + 1;
     }
     String level = 'N/A';
@@ -213,8 +210,9 @@ class _ClassesPageState extends State<ClassesPage> {
       final name = (c['nom'] ?? '').toString().toLowerCase();
       final matchesSearch = name.contains(_searchTerm.toLowerCase());
       final matchesNiveau =
-          _filterNiveau == 'tous' || c['niveau'] == _filterNiveau;
-      final matchesCycle = _filterCycle == 'tous' || c['cycle'] == _filterCycle;
+          _filterNiveauId == null || c['niveau_id'] == _filterNiveauId;
+      final matchesCycle =
+          _filterCycleId == null || c['cycle_id'] == _filterCycleId;
       return matchesSearch && matchesNiveau && matchesCycle;
     }).toList();
 
@@ -225,7 +223,7 @@ class _ClassesPageState extends State<ClassesPage> {
           comparison = (a['nom'] ?? '').compareTo(b['nom'] ?? '');
           break;
         case 'niveau':
-          comparison = (a['niveau'] ?? '').compareTo(b['niveau'] ?? '');
+          comparison = (a['niveau_nom'] ?? '').compareTo(b['niveau_nom'] ?? '');
           break;
         case 'effectif':
           comparison = (a['eleve_count'] as int).compareTo(
@@ -607,20 +605,40 @@ class _ClassesPageState extends State<ClassesPage> {
                 Expanded(
                   child: _buildDropdown(
                     'Niveau',
-                    _filterNiveau,
-                    ['tous', ..._niveaux],
-                    (v) => setState(() => _filterNiveau = v!),
+                    _filterNiveauId?.toString() ?? 'tous',
+                    ['tous', ..._allNiveaux.map((e) => e['id'].toString())],
+                    (v) => setState(() {
+                      _filterNiveauId = v == 'tous' ? null : int.parse(v!);
+                    }),
                     isDark,
+                    itemLabels: {
+                      'tous': 'Tous',
+                      ...Map.fromEntries(
+                        _allNiveaux.map(
+                          (e) => MapEntry(e['id'].toString(), e['nom']),
+                        ),
+                      ),
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildDropdown(
                     'Cycle',
-                    _filterCycle,
-                    ['tous', ..._cycles],
-                    (v) => setState(() => _filterCycle = v!),
+                    _filterCycleId?.toString() ?? 'tous',
+                    ['tous', ..._allCycles.map((e) => e['id'].toString())],
+                    (v) => setState(() {
+                      _filterCycleId = v == 'tous' ? null : int.parse(v!);
+                    }),
                     isDark,
+                    itemLabels: {
+                      'tous': 'Tous',
+                      ...Map.fromEntries(
+                        _allCycles.map(
+                          (e) => MapEntry(e['id'].toString(), e['nom']),
+                        ),
+                      ),
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -704,8 +722,9 @@ class _ClassesPageState extends State<ClassesPage> {
     String value,
     List<String> items,
     ValueChanged<String?> onChanged,
-    bool isDark,
-  ) {
+    bool isDark, {
+    Map<String, String>? itemLabels,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -720,11 +739,16 @@ class _ClassesPageState extends State<ClassesPage> {
         const SizedBox(height: 4),
         DropdownButtonFormField<String>(
           value: value,
+          isExpanded: true,
           items: items
               .map(
                 (e) => DropdownMenuItem(
                   value: e,
-                  child: Text(e, style: const TextStyle(fontSize: 14)),
+                  child: Text(
+                    itemLabels?[e] ?? e,
+                    style: const TextStyle(fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               )
               .toList(),
@@ -842,7 +866,7 @@ class _ClassesPageState extends State<ClassesPage> {
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           Text(
-            '${c['niveau']} • $count/${max} élèves',
+            '${c['niveau_nom'] ?? 'N/A'} • $count/${max} élèves',
             style: TextStyle(
               color: isDark ? Colors.grey[400] : Colors.grey[600],
               fontSize: 14,
@@ -1011,7 +1035,7 @@ class _ClassesPageState extends State<ClassesPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${c['niveau']} • ${c['eleve_count']}/${c['eff_max']} élèves',
+                  '${c['niveau_nom'] ?? 'N/A'} • ${c['eleve_count']}/${c['eff_max']} élèves',
                   style: const TextStyle(fontSize: 12),
                 ),
                 if (c['next_class_id'] != null)
@@ -1087,20 +1111,30 @@ class _ClassesPageState extends State<ClassesPage> {
       _nameController.text = classe['nom'];
       _effMaxController.text = classe['eff_max'].toString();
       _salleController.text = classe['salle'] ?? '';
-      _selectedNiveau = classe['niveau'];
-      _selectedCycle = classe['cycle'];
+      _selectedCycleId = classe['cycle_id'];
+      _selectedNiveauId = classe['niveau_id'];
       _selectedAnneeId = classe['annee_scolaire_id'];
       _selectedNextClassId = classe['next_class_id'];
       _isFinalClass = classe['is_final_class'] == 1;
+
+      // Filter levels based on selected cycle
+      if (_selectedCycleId != null) {
+        _filteredNiveauxForModal = _allNiveaux
+            .where((n) => n['cycle_id'] == _selectedCycleId)
+            .toList();
+      } else {
+        _filteredNiveauxForModal = [];
+      }
     } else {
       _nameController.clear();
       _effMaxController.text = '100';
       _salleController.clear();
-      _selectedNiveau = null;
-      _selectedCycle = null;
+      _selectedCycleId = null;
+      _selectedNiveauId = null;
       _selectedAnneeId = DatabaseHelper.activeAnneeId;
       _selectedNextClassId = null;
       _isFinalClass = false;
+      _filteredNiveauxForModal = [];
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1193,21 +1227,29 @@ class _ClassesPageState extends State<ClassesPage> {
                         Row(
                           children: [
                             Expanded(
-                              child: _buildModalDropdown(
-                                'Niveau *',
-                                _selectedNiveau,
-                                _niveaux,
-                                (v) => setModalState(() => _selectedNiveau = v),
+                              child: _buildModalIdDropdown(
+                                'Cycle *',
+                                _selectedCycleId,
+                                _allCycles,
+                                (v) => setModalState(() {
+                                  _selectedCycleId = v;
+                                  _selectedNiveauId =
+                                      null; // Reset level when cycle changes
+                                  _filteredNiveauxForModal = _allNiveaux
+                                      .where((n) => n['cycle_id'] == v)
+                                      .toList();
+                                }),
                                 isDark,
                               ),
                             ),
                             const SizedBox(width: 20),
                             Expanded(
-                              child: _buildModalDropdown(
-                                'Cycle *',
-                                _selectedCycle,
-                                _cycles,
-                                (v) => setModalState(() => _selectedCycle = v),
+                              child: _buildModalIdDropdown(
+                                'Niveau *',
+                                _selectedNiveauId,
+                                _filteredNiveauxForModal,
+                                (v) =>
+                                    setModalState(() => _selectedNiveauId = v),
                                 isDark,
                               ),
                             ),
@@ -1377,6 +1419,52 @@ class _ClassesPageState extends State<ClassesPage> {
     );
   }
 
+  Widget _buildModalIdDropdown(
+    String label,
+    int? value,
+    List<Map<String, dynamic>> items,
+    ValueChanged<int?> onChanged,
+    bool isDark,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          value: value,
+          isExpanded: true,
+          items: items
+              .map(
+                (e) => DropdownMenuItem<int>(
+                  value: e['id'] as int,
+                  child: Text(
+                    e['nom'].toString(),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: onChanged,
+          validator: (v) => v == null ? 'Requis' : null,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: isDark
+                ? const Color(0xFF374151)
+                : const Color(0xFFF3F4F6),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildModalDropdown(
     String label,
     String? value,
@@ -1394,8 +1482,14 @@ class _ClassesPageState extends State<ClassesPage> {
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: value,
+          isExpanded: true,
           items: items
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+              .map(
+                (e) => DropdownMenuItem(
+                  value: e,
+                  child: Text(e, overflow: TextOverflow.ellipsis),
+                ),
+              )
               .toList(),
           onChanged: onChanged,
           validator: (v) => v == null ? 'Requis' : null,
@@ -1433,9 +1527,9 @@ class _ClassesPageState extends State<ClassesPage> {
 
     final data = {
       'nom': _nameController.text,
-      'cycle': _selectedCycle,
+      'cycle_id': _selectedCycleId,
       'salle': _salleController.text,
-      'niveau': _selectedNiveau,
+      'niveau_id': _selectedNiveauId,
       'eff_max': int.tryParse(_effMaxController.text) ?? 100,
       'next_class_id': _selectedNextClassId,
       'is_final_class': _isFinalClass ? 1 : 0,

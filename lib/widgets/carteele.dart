@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/student.dart';
 import '../models/ecole.dart';
 import '../core/database/database_helper.dart';
-import 'student_id_card.dart';
+import 'student_card_design.dart';
 
 class CarteScolaireGuinee extends StatefulWidget {
   final String? studentId;
@@ -87,17 +87,28 @@ class _CarteScolaireGuineeState extends State<CarteScolaireGuinee> {
 
     return Scaffold(
       backgroundColor: Colors.grey[300],
+      appBar: AppBar(
+        title: const Text('Carte d\'Identité Scolaire'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print),
+            onPressed: () {
+              // TODO: Implement print for individual card
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Impression en cours...')),
+              );
+            },
+          ),
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          scrollDirection: Axis.horizontal,
-          child: StudentIdCard(
+          child: StudentCardDesign(
             student: student,
             ecole: ecole,
             anneeLibelle: anneeLibelle,
-            scale:
-                0.8, // Slightly smaller for the view mode maybe? Or 1.0. Let's keep 1.0 logic or allow fitting.
-            // But user wants same design.
+            scale: 1.5,
           ),
         ),
       ),

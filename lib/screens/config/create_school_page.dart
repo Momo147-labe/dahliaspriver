@@ -19,12 +19,12 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
   final directorCtrl = TextEditingController();
   final addressCtrl = TextEditingController();
   final phoneCtrl = TextEditingController();
-  
+
   // Contrôleurs pour l'année académique
   final academicYearCtrl = TextEditingController();
   final startDateCtrl = TextEditingController();
   final endDateCtrl = TextEditingController();
-  
+
   String? _logoPath;
   String? _stampPath;
   bool _isLoading = false;
@@ -39,7 +39,7 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
     final now = DateTime.now();
     final currentYear = now.year;
     final nextYear = currentYear + 1;
-    
+
     academicYearCtrl.text = "$currentYear-$nextYear";
     startDateCtrl.text = "${currentYear}-09-01";
     endDateCtrl.text = "${nextYear}-06-30";
@@ -51,14 +51,14 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
     final isDark = theme.brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 768;
-    
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDark 
+            colors: isDark
                 ? [
                     const Color(0xFF1A1F2E),
                     const Color(0xFF2D3748),
@@ -91,7 +91,9 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                     const SizedBox(height: 40),
 
                     // Main Content
-                    isTablet ? _buildTabletLayout(isDark) : _buildMobileLayout(isDark),
+                    isTablet
+                        ? _buildTabletLayout(isDark)
+                        : _buildMobileLayout(isDark),
                     const SizedBox(height: 40),
 
                     // Footer Actions
@@ -118,12 +120,12 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
             child: Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: isDark 
+                color: isDark
                     ? Colors.white.withOpacity(0.05)
                     : Colors.white.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isDark 
+                  color: isDark
                       ? Colors.white.withOpacity(0.1)
                       : Colors.white.withOpacity(0.5),
                   width: 1,
@@ -180,7 +182,9 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                           style: TextStyle(
                             fontSize: isTablet ? 28.0 : 22.0,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF1A202C),
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF1A202C),
                             letterSpacing: -0.5,
                           ),
                         ),
@@ -189,7 +193,9 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                           "Configurez les informations essentielles de votre école",
                           style: TextStyle(
                             fontSize: isTablet ? 16.0 : 14.0,
-                            color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                            color: isDark
+                                ? Colors.white70
+                                : const Color(0xFF64748B),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -205,7 +211,6 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
     );
   }
 
-  
   Widget _buildMobileLayout(bool isDark) {
     return Column(
       children: [
@@ -265,12 +270,10 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
             child: Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.white,
+                color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isDark 
+                  color: isDark
                       ? Colors.white.withOpacity(0.1)
                       : const Color(0xFFE2E8F0),
                   width: 1,
@@ -314,7 +317,9 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF1A202C),
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF1A202C),
                           ),
                         ),
                       ),
@@ -365,12 +370,10 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
             child: Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.white,
+                color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isDark 
+                  color: isDark
                       ? Colors.white.withOpacity(0.1)
                       : const Color(0xFFE2E8F0),
                   width: 1,
@@ -414,7 +417,9 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF1A202C),
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF1A202C),
                           ),
                         ),
                       ),
@@ -483,43 +488,40 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
             ),
             prefixIcon: Container(
               padding: const EdgeInsets.all(12),
-              child: Icon(
-                icon,
-                color: const Color(0xFF13DAEC),
-                size: 20,
-              ),
+              child: Icon(icon, color: const Color(0xFF13DAEC), size: 20),
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE5E7EB),
+                color: isDark
+                    ? Colors.white.withOpacity(0.1)
+                    : const Color(0xFFE5E7EB),
                 width: 1,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE5E7EB),
+                color: isDark
+                    ? Colors.white.withOpacity(0.1)
+                    : const Color(0xFFE5E7EB),
                 width: 1,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(
-                color: Color(0xFF13DAEC),
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: Color(0xFF13DAEC), width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(
-                color: Color(0xFFEF4444),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 16,
+            ),
             filled: true,
-            fillColor: isDark 
+            fillColor: isDark
                 ? Colors.white.withOpacity(0.05)
                 : const Color(0xFFF9FAFB),
           ),
@@ -540,12 +542,10 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
             child: Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.white,
+                color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isDark 
+                  color: isDark
                       ? Colors.white.withOpacity(0.1)
                       : const Color(0xFFE2E8F0),
                   width: 1,
@@ -589,7 +589,9 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF1A202C),
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF1A202C),
                           ),
                         ),
                       ),
@@ -622,7 +624,11 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                           hint: "AAAA-MM-JJ",
                           icon: Icons.play_arrow,
                           isDark: isDark,
-                          onTap: () => _selectDate(context, startDateCtrl, "Début de l'année académique"),
+                          onTap: () => _selectDate(
+                            context,
+                            startDateCtrl,
+                            "Début de l'année académique",
+                          ),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -633,7 +639,11 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                           hint: "AAAA-MM-JJ",
                           icon: Icons.stop,
                           isDark: isDark,
-                          onTap: () => _selectDate(context, endDateCtrl, "Fin de l'année académique"),
+                          onTap: () => _selectDate(
+                            context,
+                            endDateCtrl,
+                            "Fin de l'année académique",
+                          ),
                         ),
                       ),
                     ],
@@ -695,7 +705,8 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
             opacity: value,
             child: _buildEnhancedImageUploadCard(
               title: "📷 Logo de l'école",
-              subtitle: "Le logo sera affiché sur l'interface principale et les documents officiels.",
+              subtitle:
+                  "Le logo sera affiché sur l'interface principale et les documents officiels.",
               imagePath: _logoPath,
               onTap: () async {
                 final db = await DatabaseHelper.instance.database;
@@ -726,7 +737,8 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
             opacity: value,
             child: _buildEnhancedImageUploadCard(
               title: "🏷️ Timbre officiel",
-              subtitle: "Le timbre sera utilisé pour générer automatiquement les bulletins et documents officiels.",
+              subtitle:
+                  "Le timbre sera utilisé pour générer automatiquement les bulletins et documents officiels.",
               imagePath: _stampPath,
               onTap: () async {
                 final db = await DatabaseHelper.instance.database;
@@ -757,12 +769,10 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: isDark 
-            ? Colors.white.withOpacity(0.08)
-            : Colors.white,
+        color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark 
+          color: isDark
               ? Colors.white.withOpacity(0.1)
               : const Color(0xFFE2E8F0),
           width: 1,
@@ -796,11 +806,7 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  color: const Color(0xFF13DAEC),
-                  size: 24,
-                ),
+                child: Icon(icon, color: const Color(0xFF13DAEC), size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -820,7 +826,9 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                       subtitle,
                       style: TextStyle(
                         fontSize: 13,
-                        color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                        color: isDark
+                            ? Colors.white70
+                            : const Color(0xFF64748B),
                         fontWeight: FontWeight.w500,
                         height: 1.3,
                       ),
@@ -837,12 +845,12 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
               width: double.infinity,
               height: 180,
               decoration: BoxDecoration(
-                color: isDark 
+                color: isDark
                     ? Colors.white.withOpacity(0.05)
                     : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDark 
+                  color: isDark
                       ? Colors.white.withOpacity(0.1)
                       : const Color(0xFFE2E8F0),
                   width: 2,
@@ -866,7 +874,7 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                     )
                   else
                     _buildImagePlaceholder(isDark),
-                  
+
                   // Overlay avec icône
                   Positioned(
                     top: 12,
@@ -947,12 +955,10 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
             child: Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.white,
+                color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: isDark 
+                  color: isDark
                       ? Colors.white.withOpacity(0.1)
                       : const Color(0xFFE2E8F0),
                   width: 1,
@@ -970,7 +976,9 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                   ),
                 ],
               ),
-              child: isTablet ? _buildTabletFooter(isDark) : _buildMobileFooter(isDark),
+              child: isTablet
+                  ? _buildTabletFooter(isDark)
+                  : _buildMobileFooter(isDark),
             ),
           ),
         );
@@ -991,12 +999,12 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                 child: Container(
                   height: 56,
                   decoration: BoxDecoration(
-                    color: isDark 
+                    color: isDark
                         ? Colors.white.withOpacity(0.05)
                         : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isDark 
+                      color: isDark
                           ? Colors.white.withOpacity(0.1)
                           : const Color(0xFFE2E8F0),
                       width: 1,
@@ -1015,14 +1023,18 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                           children: [
                             Icon(
                               Icons.arrow_back_ios,
-                              color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                              color: isDark
+                                  ? Colors.white70
+                                  : const Color(0xFF64748B),
                               size: 18,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               "Précédent",
                               style: TextStyle(
-                                color: isDark ? Colors.white : const Color(0xFF374151),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF374151),
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
                               ),
@@ -1073,7 +1085,9 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                                 width: 24,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2.5,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : Row(
@@ -1121,12 +1135,12 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                 height: 56,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isDark 
+                    color: isDark
                         ? Colors.white.withOpacity(0.05)
                         : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isDark 
+                      color: isDark
                           ? Colors.white.withOpacity(0.1)
                           : const Color(0xFFE2E8F0),
                       width: 1,
@@ -1145,14 +1159,18 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                           children: [
                             Icon(
                               Icons.arrow_back_ios,
-                              color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                              color: isDark
+                                  ? Colors.white70
+                                  : const Color(0xFF64748B),
                               size: 18,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               "Précédent",
                               style: TextStyle(
-                                color: isDark ? Colors.white : const Color(0xFF374151),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF374151),
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
                               ),
@@ -1203,7 +1221,9 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
                                 width: 24,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2.5,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : Row(
@@ -1256,7 +1276,7 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
 
     try {
       final db = await DatabaseHelper.instance.database;
-      
+
       final schoolData = {
         'nom': schoolNameCtrl.text.trim(),
         'fondateur': founderCtrl.text.trim(),
@@ -1276,13 +1296,11 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
       if (schoolId != null) {
         // Créer la première année académique active
         await _createFirstAcademicYear(db);
-        
+
         _showSuccessSnackBar("École créée avec succès !");
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => const CreateAdminPage(),
-          ),
+          MaterialPageRoute(builder: (context) => const CreateAdminPage()),
         );
       } else {
         _showErrorSnackBar("Erreur lors de la création de l'école");
@@ -1308,9 +1326,7 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
         ),
         backgroundColor: AppTheme.successColor,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -1327,9 +1343,7 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
         ),
         backgroundColor: AppTheme.errorColor,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -1361,25 +1375,48 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
               controller: controller,
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: TextStyle(color: isDark ? AppTheme.textDarkSecondary : const Color(0xFF618689)),
-                prefixIcon: Icon(icon, color: isDark ? AppTheme.textDarkSecondary : const Color(0xFF618689)),
+                hintStyle: TextStyle(
+                  color: isDark
+                      ? AppTheme.textDarkSecondary
+                      : const Color(0xFF618689),
+                ),
+                prefixIcon: Icon(
+                  icon,
+                  color: isDark
+                      ? AppTheme.textDarkSecondary
+                      : const Color(0xFF618689),
+                ),
                 suffixIcon: Icon(
                   Icons.calendar_month,
                   color: const Color(0xFF13DAEC),
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: isDark ? AppTheme.borderDark : const Color(0xFFDBE5E6)),
+                  borderSide: BorderSide(
+                    color: isDark
+                        ? AppTheme.borderDark
+                        : const Color(0xFFDBE5E6),
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: isDark ? AppTheme.borderDark : const Color(0xFFDBE5E6)),
+                  borderSide: BorderSide(
+                    color: isDark
+                        ? AppTheme.borderDark
+                        : const Color(0xFFDBE5E6),
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF13DAEC), width: 2),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF13DAEC),
+                    width: 2,
+                  ),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 15),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 48,
+                  vertical: 15,
+                ),
                 filled: true,
                 fillColor: isDark ? AppTheme.surfaceDark : Colors.white,
               ),
@@ -1390,7 +1427,11 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
     );
   }
 
-  Future<void> _selectDate(BuildContext context, TextEditingController controller, String title) async {
+  Future<void> _selectDate(
+    BuildContext context,
+    TextEditingController controller,
+    String title,
+  ) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -1405,7 +1446,8 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
 
     if (picked != null) {
       setState(() {
-        controller.text = "${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        controller.text =
+            "${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       });
     }
   }
@@ -1413,36 +1455,45 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
   Future<void> _createFirstAcademicYear(Database db) async {
     try {
       // Utiliser les valeurs saisies par l'utilisateur
-      final libelle = academicYearCtrl.text.trim().isEmpty 
+      final libelle = academicYearCtrl.text.trim().isEmpty
           ? "${DateTime.now().year}-${DateTime.now().year + 1}"
           : academicYearCtrl.text.trim();
-      
+
       // Parser les dates ou utiliser les valeurs par défaut
       DateTime dateDebut;
       DateTime dateFin;
-      
+
       try {
         dateDebut = DateTime.parse(startDateCtrl.text.trim());
       } catch (e) {
-        dateDebut = DateTime(DateTime.now().year, 9, 1); // 1er septembre par défaut
+        dateDebut = DateTime(
+          DateTime.now().year,
+          9,
+          1,
+        ); // 1er septembre par défaut
       }
-      
+
       try {
         dateFin = DateTime.parse(endDateCtrl.text.trim());
       } catch (e) {
-        dateFin = DateTime(DateTime.now().year + 1, 6, 30); // 30 juin année suivante par défaut
+        dateFin = DateTime(
+          DateTime.now().year + 1,
+          6,
+          30,
+        ); // 30 juin année suivante par défaut
       }
-      
+
       final academicYearData = {
         'libelle': libelle,
         'date_debut': dateDebut.toIso8601String(),
         'date_fin': dateFin.toIso8601String(),
         'active': 1, // 1 pour actif, 0 pour inactif
-        'statut': 'Active',
+        'etat': 'EN_COURS',
+        'annee_precedente_id': null,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };
-      
+
       await db.insert('annee_scolaire', academicYearData);
       print("Année académique $libelle créée avec succès !");
     } catch (e) {

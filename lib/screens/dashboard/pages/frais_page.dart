@@ -81,10 +81,11 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
       // Charger les frais avec les informations de classe et d'année
       final fraisResult = await db.rawQuery(
         '''
-        SELECT fs.*, c.nom as classe_nom, c.niveau as classe_niveau, 
+        SELECT fs.*, c.nom as classe_nom, n.nom as classe_niveau, 
                an.libelle as annee_libelle
         FROM frais_scolarite fs
         LEFT JOIN classe c ON fs.classe_id = c.id
+        LEFT JOIN niveaux n ON c.niveau_id = n.id
         LEFT JOIN annee_scolaire an ON fs.annee_scolaire_id = an.id
         WHERE fs.annee_scolaire_id = ?
         ORDER BY an.libelle DESC, c.nom ASC
@@ -92,8 +93,13 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
         [anneeId],
       );
 
-      // Charger les classes
-      final classesResult = await db.query('classe');
+      // Charger les classes avec leurs niveaux
+      final classesResult = await db.rawQuery('''
+        SELECT c.*, n.nom as niveau
+        FROM classe c
+        LEFT JOIN niveaux n ON c.niveau_id = n.id
+        ORDER BY c.nom ASC
+      ''');
 
       if (mounted) {
         setState(() {

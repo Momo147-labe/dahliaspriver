@@ -14,6 +14,8 @@ class Student {
   final String annee;
   final String statut;
   final String photo;
+  final String? personneAPrevenir;
+  final String? contactUrgence;
 
   Student({
     required this.id,
@@ -29,6 +31,8 @@ class Student {
     this.annee = '',
     required this.statut,
     this.photo = '',
+    this.personneAPrevenir,
+    this.contactUrgence,
   });
 
   // Constructeur depuis Map (pour SQLite)
@@ -47,6 +51,8 @@ class Student {
       annee: map['annee']?.toString() ?? '',
       statut: map['statut']?.toString() ?? 'inscrit',
       photo: map['photo']?.toString() ?? '',
+      personneAPrevenir: map['personne_a_prevenir']?.toString(),
+      contactUrgence: map['contact_urgence']?.toString(),
     );
   }
 
@@ -66,6 +72,8 @@ class Student {
       'annee': annee,
       'statut': statut,
       'photo': photo,
+      'personne_a_prevenir': personneAPrevenir,
+      'contact_urgence': contactUrgence,
     };
   }
 
@@ -84,6 +92,8 @@ class Student {
     String? annee,
     String? statut,
     String? photo,
+    String? personneAPrevenir,
+    String? contactUrgence,
   }) {
     return Student(
       id: id ?? this.id,
@@ -99,6 +109,8 @@ class Student {
       annee: annee ?? this.annee,
       statut: statut ?? this.statut,
       photo: photo ?? this.photo,
+      personneAPrevenir: personneAPrevenir ?? this.personneAPrevenir,
+      contactUrgence: contactUrgence ?? this.contactUrgence,
     );
   }
 

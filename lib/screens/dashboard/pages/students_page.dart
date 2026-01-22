@@ -61,9 +61,10 @@ class _StudentsPageState extends State<StudentsPage> {
         SELECT 
           e.*,
           c.nom as classe_nom,
-          c.niveau as classe_niveau
+          n.nom as classe_niveau
         FROM eleve e
         LEFT JOIN classe c ON e.classe_id = c.id
+        LEFT JOIN niveaux n ON c.niveau_id = n.id
         WHERE e.annee_scolaire_id = ?
         ORDER BY e.nom, e.prenom
       ''',

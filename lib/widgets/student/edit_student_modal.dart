@@ -30,6 +30,8 @@ class _EditStudentModalState extends State<EditStudentModal> {
   late TextEditingController _matriculeController;
   late TextEditingController _dateNaissanceController;
   late TextEditingController _lieuNaissanceController;
+  late TextEditingController _personneAPrevenirController;
+  late TextEditingController _contactUrgenceController;
 
   late String _selectedSexe;
   File? _selectedImage;
@@ -49,6 +51,12 @@ class _EditStudentModalState extends State<EditStudentModal> {
     _lieuNaissanceController = TextEditingController(
       text: widget.student.lieuNaissance,
     );
+    _personneAPrevenirController = TextEditingController(
+      text: widget.student.personneAPrevenir,
+    );
+    _contactUrgenceController = TextEditingController(
+      text: widget.student.contactUrgence,
+    );
     _selectedSexe = widget.student.sexe;
 
     if (widget.student.photo.isNotEmpty &&
@@ -64,6 +72,8 @@ class _EditStudentModalState extends State<EditStudentModal> {
     _matriculeController.dispose();
     _dateNaissanceController.dispose();
     _lieuNaissanceController.dispose();
+    _personneAPrevenirController.dispose();
+    _contactUrgenceController.dispose();
     super.dispose();
   }
 
@@ -144,6 +154,8 @@ class _EditStudentModalState extends State<EditStudentModal> {
         'lieu_naissance': _lieuNaissanceController.text,
         'sexe': _selectedSexe,
         'photo': _selectedImage?.path ?? widget.student.photo,
+        'personne_a_prevenir': _personneAPrevenirController.text.trim(),
+        'contact_urgence': _contactUrgenceController.text.trim(),
       };
 
       await db.update(
@@ -367,6 +379,30 @@ class _EditStudentModalState extends State<EditStudentModal> {
                             hintText: 'Ex: Conakry, Guinée',
                             icon: Icons.location_on,
                             isRequired: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _personneAPrevenirController,
+                            label: 'Personne à prévenir',
+                            hintText: 'Ex: Père, Mère...',
+                            icon: Icons.person_pin_rounded,
+                            isRequired: false,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _contactUrgenceController,
+                            label: 'Contact d\'urgence',
+                            hintText: 'Ex: +224...',
+                            icon: Icons.phone_android_rounded,
+                            isRequired: false,
                           ),
                         ),
                       ],

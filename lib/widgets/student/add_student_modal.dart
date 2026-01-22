@@ -34,6 +34,10 @@ class _AddStudentModalState extends State<AddStudentModal> {
   final TextEditingController _referenceController = TextEditingController();
   final TextEditingController _anneeScolaireController =
       TextEditingController();
+  final TextEditingController _personneAPrevenirController =
+      TextEditingController();
+  final TextEditingController _contactUrgenceController =
+      TextEditingController();
 
   String _selectedSexe = 'M';
   String _selectedAnneeScolaire = '';
@@ -77,6 +81,14 @@ class _AddStudentModalState extends State<AddStudentModal> {
           _anneeScolaireController.text = _selectedAnneeScolaire;
         }
       });
+
+      // Charger les informations de l'école pour le contact par défaut
+      final ecoleInfo = await DatabaseHelper.instance.getEcoleInfo();
+      if (mounted) {
+        setState(() {
+          _contactUrgenceController.text = ecoleInfo['telephone'] ?? '';
+        });
+      }
 
       // Charger les classes pour l'année scolaire active uniquement
       await _loadClassesForAnnee();
@@ -175,6 +187,8 @@ class _AddStudentModalState extends State<AddStudentModal> {
     _lieuNaissanceController.dispose();
     _montantPayeController.dispose();
     _referenceController.dispose();
+    _personneAPrevenirController.dispose();
+    _contactUrgenceController.dispose();
     super.dispose();
   }
 
@@ -326,6 +340,8 @@ class _AddStudentModalState extends State<AddStudentModal> {
         'annee_scolaire_id': anneeScolaireId,
         'frais_id': _fraisId,
         'photo': _selectedImage?.path ?? '',
+        'personne_a_prevenir': _personneAPrevenirController.text.trim(),
+        'contact_urgence': _contactUrgenceController.text.trim(),
         'statut': _selectedTypeInscription == 'reinscrit'
             ? 'reinscrit'
             : 'inscrit',
@@ -660,6 +676,30 @@ class _AddStudentModalState extends State<AddStudentModal> {
                             hintText: 'Ex: Conakry, Guinée',
                             icon: Icons.location_on,
                             isRequired: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _personneAPrevenirController,
+                            label: 'Personne à prévenir',
+                            hintText: 'Ex: Père, Mère...',
+                            icon: Icons.person_pin_rounded,
+                            isRequired: false,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _contactUrgenceController,
+                            label: 'Contact d\'urgence',
+                            hintText: 'Ex: +224...',
+                            icon: Icons.phone_android_rounded,
+                            isRequired: false,
                           ),
                         ),
                       ],

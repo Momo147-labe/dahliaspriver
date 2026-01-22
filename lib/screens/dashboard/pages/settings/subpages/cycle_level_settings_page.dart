@@ -12,7 +12,7 @@ class CycleLevelSettingsPage extends StatefulWidget {
 class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
   final _db = DatabaseHelper.instance;
   bool _isLoading = true;
-  List<Map<String, dynamic>> _cycles = [];
+  List<Map<String, dynamic>> _cyclesWithLevels = [];
 
   @override
   void initState() {
@@ -24,22 +24,20 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
     setState(() => _isLoading = true);
     try {
       final cycles = await _db.getCyclesScolaires();
+      List<Map<String, dynamic>> enrichedCycles = [];
+
+      for (var cycle in cycles) {
+        final levels = await _db.getNiveauxByCycle(cycle['id']);
+        enrichedCycles.add({...cycle, 'niveaux': levels});
+      }
+
       setState(() {
-        _cycles = cycles;
+        _cyclesWithLevels = enrichedCycles;
         _isLoading = false;
       });
     } catch (e) {
       debugPrint('Error loading cycle data: $e');
       setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _updateCycleField(int id, String field, dynamic value) async {
-    try {
-      await _db.updateCycleScolaire(id, {field: value});
-      // Optionally reload or just update local state
-    } catch (e) {
-      debugPrint('Error updating cycle field: $e');
     }
   }
 
@@ -56,538 +54,280 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // En-tête de la page
-          Text(
-            'Cycles & Niveaux de Passage',
-            style: theme.textTheme.displaySmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : const Color(0xFF121717),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Configurez les cycles scolaires, les niveaux rattachés et les conditions de réussite pour chaque étape académique.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          // Section principale (Tableau Premium)
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppTheme.cardDark : Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Cycles & Niveaux',
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? Colors.white : const Color(0xFF121717),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Configurez les cycles scolaires et les niveaux rattachés.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                  ),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                // Header du tableau
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.rule_folder,
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Gestion des Cycles & Niveaux',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 18,
-                                ),
-                              ),
-                              Text(
-                                'Définissez les paliers et critères de transition',
-                                style: TextStyle(
-                                  color: Colors.grey[500],
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => _showAddCycleDialog(),
-                        icon: const Icon(Icons.add_circle_outline, size: 18),
-                        label: const Text('Nouveau Cycle'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor.withOpacity(
-                            0.15,
-                          ),
-                          foregroundColor: AppTheme.primaryColor,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Tableau
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Theme(
-                    data: theme.copyWith(
-                      dividerColor: isDark
-                          ? Colors.grey[800]
-                          : Colors.grey[100],
-                    ),
-                    child: DataTable(
-                      horizontalMargin: 24,
-                      columnSpacing: 40,
-                      headingRowColor: MaterialStateProperty.all(
-                        isDark
-                            ? Colors.grey[900]!.withOpacity(0.3)
-                            : Colors.grey[50]!,
-                      ),
-                      headingTextStyle: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.2,
-                        color: Colors.grey[500],
-                      ),
-                      columns: const [
-                        DataColumn(label: Text('CYCLE SCOLAIRE')),
-                        DataColumn(label: Text('NIVEAUX ASSOCIÉS')),
-                        DataColumn(label: Text('MOYENNE PASSAGE')),
-                        DataColumn(label: Text('DROIT REDOUBLEMENT')),
-                        DataColumn(label: Text('SEUIL')),
-                        DataColumn(label: Text('ACTIONS')),
-                      ],
-                      rows: _cycles.map((cycle) {
-                        return _buildDataRow(cycle, isDark);
-                      }).toList(),
-                    ),
-                  ),
-                ),
-
-                // Footer du tableau
-                Container(
+              ElevatedButton.icon(
+                onPressed: () => _showAddCycleDialog(),
+                icon: const Icon(Icons.add_circle_outline, size: 20),
+                label: const Text('Nouveau Cycle'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 16,
                   ),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.grey[900]!.withOpacity(0.3)
-                        : Colors.grey[50]!,
-                    border: Border(
-                      top: BorderSide(
-                        color: isDark ? Colors.grey[800]! : Colors.grey[100]!,
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Dernière mise à jour effectuée le ${_getLastUpdateDate()}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontStyle: FontStyle.italic,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          TextButton(
-                            onPressed: _loadData,
-                            child: const Text('RÉINITIALISER'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.grey,
-                              textStyle: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          TextButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Section validée et enregistrée',
-                                  ),
-                                ),
-                              );
-                            },
-                            child: const Text('VALIDER LA SECTION'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppTheme.primaryColor,
-                              textStyle: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 40),
-
-          // Info Cards du bas (Infos Institutionnelles & Notation)
-          Row(
-            children: [
-              Expanded(
-                child: _buildInfoCard(
-                  icon: Icons.branding_watermark,
-                  title: 'Infos Institutionnelles',
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.grey[800] : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(Icons.image, color: Colors.grey[400]),
-                      ),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'La Renaissance',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          Text(
-                            'GNE-CON-2024-X8',
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                child: _buildInfoCard(
-                  icon: Icons.percent,
-                  title: 'Système de Notation',
-                  child: Row(
-                    children: [
-                      _buildPill('Sur 10', true),
-                      const SizedBox(width: 8),
-                      _buildPill('Sur 20', false),
-                    ],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 40),
+
+          if (_cyclesWithLevels.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 80),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.layers_clear_outlined,
+                      size: 80,
+                      color: Colors.grey[300],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Aucun cycle configuré',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 18),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _cyclesWithLevels.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 24),
+              itemBuilder: (context, index) {
+                final cycle = _cyclesWithLevels[index];
+                return _buildCycleCard(cycle, isDark);
+              },
+            ),
+
           const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  DataRow _buildDataRow(Map<String, dynamic> cycle, bool isDark) {
-    final nom = (cycle['nom_cycle'] ?? '').toString();
-    final sousTitre = (cycle['sous_titre_cycle'] ?? 'Éducation').toString();
-    final min = cycle['niveau_min'] ?? 1;
-    final max = cycle['niveau_max'] ?? 6;
-    final id = cycle['id'];
-    final moyPassage = (cycle['moyenne_passage_cycle'] ?? 10.0) as double;
-    final droitRedoublement = (cycle['droit_redoublement'] ?? 1) == 1;
-    final seuilRedoublement = (cycle['seuil_redoublement'] ?? 8.0) as double;
+  Widget _buildCycleCard(Map<String, dynamic> cycle, bool isDark) {
+    final levels = cycle['niveaux'] as List<Map<String, dynamic>>;
+    final color = AppTheme.primaryColor;
 
-    // Détermination de l'icône selon le cycle
-    IconData iconData = Icons.school;
-    Color iconBg = Colors.blue.withOpacity(0.1);
-    Color iconColor = Colors.blue;
-
-    if (nom.toLowerCase().contains('maternelle') ||
-        nom.toLowerCase().contains('préscolaire')) {
-      iconData = Icons.child_care;
-      iconBg = Colors.orange.withOpacity(0.1);
-      iconColor = Colors.orange;
-    } else if (nom.toLowerCase().contains('collège')) {
-      iconData = Icons.architecture;
-      iconBg = Colors.teal.withOpacity(0.1);
-      iconColor = Colors.teal;
-    } else if (nom.toLowerCase().contains('lycée')) {
-      iconData = Icons.workspace_premium;
-      iconBg = Colors.purple.withOpacity(0.1);
-      iconColor = Colors.purple;
-    }
-
-    return DataRow(
-      cells: [
-        // Cycle Scolaire
-        DataCell(
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(iconData, color: iconColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    nom,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
-                  ),
-                  Text(
-                    sousTitre.toUpperCase(),
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
         ),
-        // Niveaux Associés
-        DataCell(
-          SizedBox(
-            width: 180,
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header du Cycle
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
               children: [
-                ..._generateLevelBadges(min, max),
-                _buildAddLevelButton(),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(Icons.school, color: color),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        cycle['nom'],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                        ),
+                      ),
+                      Text(
+                        'Notes ${cycle['note_min']} à ${cycle['note_max']} • Moyenne passage: ${cycle['moyenne_passage']}/20',
+                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                if ((cycle['is_terminal'] ?? 0) == 1)
+                  Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: const Text(
+                      'Terminal',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                IconButton(
+                  onPressed: () => _showAddCycleDialog(cycle: cycle),
+                  icon: const Icon(Icons.edit_outlined),
+                  color: color,
+                ),
+                IconButton(
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Supprimer le cycle ?'),
+                        content: const Text(
+                          'Cette action désactivera le cycle et ses niveaux associés.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('ANNULER'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text(
+                              'SUPPRIMER',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await _db.deleteCycleScolaire(cycle['id']);
+                      _loadData();
+                    }
+                  },
+                  icon: const Icon(Icons.delete_outline),
+                  color: Colors.red[300],
+                ),
               ],
             ),
           ),
-        ),
-        // Moyenne Passage
-        DataCell(
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 80,
-                height: 40,
-                child: TextField(
-                  textAlign: TextAlign.center,
-                  decoration: InputDecoration(
-                    contentPadding: EdgeInsets.zero,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+          const Divider(height: 1),
+
+          // Liste des niveaux
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'NIVEAUX CONFIGURÉS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                        color: Colors.grey[500],
+                      ),
                     ),
-                  ),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                  ),
-                  controller: TextEditingController(
-                    text: moyPassage.toStringAsFixed(1),
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  onSubmitted: (v) => _updateCycleField(
-                    id,
-                    'moyenne_passage_cycle',
-                    double.tryParse(v) ?? 10.0,
-                  ),
+                    TextButton.icon(
+                      onPressed: () =>
+                          _showAddLevelDialog(cycleId: cycle['id']),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('AJOUTER UN NIVEAU'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: color,
+                        textStyle: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const Text(
-                '/20',
-                style: TextStyle(fontSize: 10, color: Colors.grey),
-              ),
-            ],
-          ),
-        ),
-        // Droit Redoublement
-        DataCell(
-          Switch(
-            value: droitRedoublement,
-            onChanged: (v) {
-              setState(() {
-                _updateCycleField(id, 'droit_redoublement', v ? 1 : 0);
-                _loadData();
-              });
-            },
-            activeColor: AppTheme.primaryColor,
-          ),
-        ),
-        // Seuil
-        DataCell(
-          SizedBox(
-            width: 60,
-            height: 40,
-            child: TextField(
-              textAlign: TextAlign.center,
-              enabled: droitRedoublement,
-              decoration: InputDecoration(
-                contentPadding: EdgeInsets.zero,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: !droitRedoublement,
-                fillColor: Colors.grey[100],
-              ),
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: droitRedoublement ? null : Colors.grey,
-              ),
-              controller: TextEditingController(
-                text: seuilRedoublement.toStringAsFixed(1),
-              ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              onSubmitted: (v) => _updateCycleField(
-                id,
-                'seuil_redoublement',
-                double.tryParse(v) ?? 8.0,
-              ),
+                const SizedBox(height: 16),
+                if (levels.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.grey[900]!.withOpacity(0.3)
+                          : Colors.grey[50],
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? Colors.grey[800]! : Colors.grey[100]!,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Aucun niveau n\'a été ajouté à ce cycle.',
+                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      ),
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: levels
+                        .map((lvl) => _buildLevelCard(lvl, isDark))
+                        .toList(),
+                  ),
+              ],
             ),
           ),
-        ),
-        // Actions
-        DataCell(
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                onPressed: () => _showLevelManagementDialog(cycle),
-                icon: const Icon(Icons.list_alt, size: 20),
-                color: Colors.grey[400],
-                hoverColor: AppTheme.primaryColor.withOpacity(0.05),
-                padding: EdgeInsets.zero,
-                tooltip: 'Gérer les niveaux',
-              ),
-              IconButton(
-                onPressed: () => _showAddCycleDialog(cycle: cycle),
-                icon: const Icon(Icons.edit_note, size: 20),
-                color: Colors.grey[400],
-                hoverColor: AppTheme.primaryColor.withOpacity(0.05),
-                padding: EdgeInsets.zero,
-                tooltip: 'Modifier le cycle',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<Widget> _generateLevelBadges(int min, int max) {
-    List<Widget> badges = [];
-    for (int i = min; i <= max; i++) {
-      badges.add(_buildLevelBadge(i.toString()));
-    }
-    return badges;
-  }
-
-  Widget _buildLevelBadge(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Colors.grey[800]
-            : Colors.grey[100],
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.grey[700]!
-              : Colors.grey[200]!,
-        ),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.grey[400]
-              : Colors.grey[600],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildAddLevelButton() {
+  Widget _buildLevelCard(Map<String, dynamic> lvl, bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(2),
+      width: 200,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.primaryColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
-      ),
-      child: const Icon(Icons.add, size: 12, color: AppTheme.primaryColor),
-    );
-  }
-
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required Widget child,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: isDark ? Colors.grey[900] : Colors.grey[50],
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark ? Colors.grey[800]! : Colors.grey[100]!,
         ),
@@ -598,273 +338,392 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(icon, color: AppTheme.primaryColor, size: 20),
-                  const SizedBox(width: 12),
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  lvl['nom'],
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
-                ],
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              Icon(Icons.open_in_new, color: Colors.grey[400], size: 16),
+              if ((lvl['is_examen'] ?? 0) == 1)
+                const Icon(
+                  Icons.assignment_turned_in_outlined,
+                  size: 14,
+                  color: Colors.blue,
+                ),
             ],
           ),
-          const SizedBox(height: 16),
-          child,
+          const SizedBox(height: 8),
+          Text(
+            lvl['moyenne_passage'] != null
+                ? 'Seuil: ${lvl['moyenne_passage']}/20'
+                : 'Seuil hérité',
+            style: TextStyle(color: Colors.grey[500], fontSize: 11),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                onPressed: () =>
+                    _showAddLevelDialog(cycleId: lvl['cycle_id'], level: lvl),
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                visualDensity: VisualDensity.compact,
+                color: Colors.grey,
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () async {
+                  await _db.deleteNiveau(lvl['id']);
+                  _loadData();
+                },
+                icon: const Icon(Icons.delete_outline, size: 16),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                visualDensity: VisualDensity.compact,
+                color: Colors.red[300],
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPill(String text, bool active) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: active
-            ? AppTheme.primaryColor.withOpacity(0.1)
-            : (Theme.of(context).brightness == Brightness.dark
-                  ? Colors.grey[800]
-                  : Colors.grey[100]),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: active ? AppTheme.primaryColor : Colors.grey[500],
+  void _showAddCycleDialog({Map<String, dynamic>? cycle}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final nameController = TextEditingController(
+      text: (cycle?['nom'] ?? '').toString(),
+    );
+    final ordreController = TextEditingController(
+      text: (cycle?['ordre'] ?? '').toString(),
+    );
+    final minController = TextEditingController(
+      text: (cycle?['note_min'] ?? 0).toString(),
+    );
+    final maxController = TextEditingController(
+      text: (cycle?['note_max'] ?? 20).toString(),
+    );
+    final moyController = TextEditingController(
+      text: (cycle?['moyenne_passage'] ?? 10.0).toString(),
+    );
+    bool isTerminal = (cycle?['is_terminal'] ?? 0) == 1;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: 500,
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.cardDark : Colors.white,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.05),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(28),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        cycle == null ? 'Nouveau Cycle' : 'Modifier le Cycle',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      _buildDialogTextField(
+                        controller: nameController,
+                        label: 'NOM DU CYCLE',
+                        hint: 'Ex: Primaire',
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDialogTextField(
+                              controller: ordreController,
+                              label: 'ORDRE',
+                              hint: '1',
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildDialogTextField(
+                              controller: moyController,
+                              label: 'MOYENNE PASSAGE',
+                              hint: '10.0',
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDialogTextField(
+                              controller: minController,
+                              label: 'NOTE MIN',
+                              hint: '0',
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildDialogTextField(
+                              controller: maxController,
+                              label: 'NOTE MAX',
+                              hint: '20',
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      SwitchListTile(
+                        title: const Text(
+                          'Cycle Terminal (Fin de scolarité)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        value: isTerminal,
+                        onChanged: (v) => setDialogState(() => isTerminal = v),
+                        activeColor: AppTheme.primaryColor,
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('ANNULER'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final data = {
+                              'nom': nameController.text,
+                              'ordre': int.tryParse(ordreController.text) ?? 1,
+                              'note_min':
+                                  double.tryParse(minController.text) ?? 0.0,
+                              'note_max':
+                                  double.tryParse(maxController.text) ?? 20.0,
+                              'moyenne_passage':
+                                  double.tryParse(moyController.text) ?? 10.0,
+                              'is_terminal': isTerminal ? 1 : 0,
+                            };
+                            if (cycle != null) {
+                              await _db.updateCycleScolaire(cycle['id'], data);
+                            } else {
+                              await _db.saveCycleScolaire(data);
+                            }
+                            Navigator.pop(context);
+                            _loadData();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: Text(cycle == null ? 'CRÉER' : 'ENREGISTRER'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  String _getLastUpdateDate() {
-    // Dans un vrai projet, on récupèrerait cela des données
-    return '24 Octobre 2024';
-  }
-
-  void _showAddCycleDialog({Map<String, dynamic>? cycle}) {
+  void _showAddLevelDialog({
+    required int cycleId,
+    Map<String, dynamic>? level,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final nameController = TextEditingController(
-      text: (cycle?['nom_cycle'] ?? '').toString(),
+      text: (level?['nom'] ?? '').toString(),
     );
-    final sousTitreController = TextEditingController(
-      text: (cycle?['sous_titre_cycle'] ?? '').toString(),
+    final ordreController = TextEditingController(
+      text: (level?['ordre'] ?? '').toString(),
     );
-    final codeController = TextEditingController(
-      text: (cycle?['code_cycle'] ?? '').toString(),
+    final moyController = TextEditingController(
+      text: (level?['moyenne_passage']?.toString() ?? ''),
     );
-    final minController = TextEditingController(
-      text: (cycle?['niveau_min'] ?? 1).toString(),
-    );
-    final maxController = TextEditingController(
-      text: (cycle?['niveau_max'] ?? 6).toString(),
-    );
+    bool isExamen = (level?['is_examen'] ?? 0) == 1;
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          width: 500,
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.cardDark : Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 30,
-                offset: const Offset(0, 15),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header du Dialog
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.05),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(28),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: 450,
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.cardDark : Colors.white,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.05),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(28),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        level == null ? 'Nouveau Niveau' : 'Modifier le Niveau',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
+                Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      _buildDialogTextField(
+                        controller: nameController,
+                        label: 'NOM DU NIVEAU',
+                        hint: 'Ex: CM2',
                       ),
-                      child: const Icon(
-                        Icons.settings_suggest,
-                        color: AppTheme.primaryColor,
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDialogTextField(
+                              controller: ordreController,
+                              label: 'ORDRE GLOBAL',
+                              hint: '1',
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildDialogTextField(
+                              controller: moyController,
+                              label: 'SEUIL SPÉCIFIQUE (Optionnel)',
+                              hint: 'Ex: 12.0',
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          cycle == null ? 'Nouveau Cycle' : 'Modifier le Cycle',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                          ),
-                        ),
-                        Text(
-                          'Configurez les paramètres du cycle scolaire',
+                      const SizedBox(height: 20),
+                      SwitchListTile(
+                        title: const Text(
+                          'Classe d\'examen',
                           style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                      color: Colors.grey,
-                    ),
-                  ],
-                ),
-              ),
-
-              // Contenu du Dialog
-              Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  children: [
-                    _buildDialogTextField(
-                      controller: nameController,
-                      label: 'NOM DU CYCLE',
-                      hint: 'Ex: Enseignement Primaire',
-                      icon: Icons.label_important_outline,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildDialogTextField(
-                      controller: sousTitreController,
-                      label: 'SOUS-TITRE',
-                      hint: 'Ex: Éducation de base',
-                      icon: Icons.subtitles_outlined,
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildDialogTextField(
-                            controller: codeController,
-                            label: 'CODE',
-                            hint: 'Ex: PRIM',
-                            icon: Icons.code,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _buildDialogTextField(
-                                  controller: minController,
-                                  label: 'MIN',
-                                  hint: '1',
-                                  keyboardType: TextInputType.number,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _buildDialogTextField(
-                                  controller: maxController,
-                                  label: 'MAX',
-                                  hint: '6',
-                                  keyboardType: TextInputType.number,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Actions du Dialog
-              Padding(
-                padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'ANNULER',
-                          style: TextStyle(
-                            color: Colors.grey[500],
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
                           ),
                         ),
+                        value: isExamen,
+                        onChanged: (v) => setDialogState(() => isExamen = v),
+                        activeColor: AppTheme.primaryColor,
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final newCycle = {
-                            'nom_cycle': nameController.text,
-                            'sous_titre_cycle': sousTitreController.text,
-                            'code_cycle': codeController.text,
-                            'niveau_min': int.tryParse(minController.text) ?? 1,
-                            'niveau_max': int.tryParse(maxController.text) ?? 6,
-                            'ordre_cycle': (cycle?['ordre_cycle'] ?? 1),
-                          };
-                          if (cycle != null) {
-                            await _db.updateCycleScolaire(
-                              cycle['id'],
-                              newCycle,
-                            );
-                          } else {
-                            await _db.saveCycleScolaire(newCycle);
-                          }
-                          if (mounted) {
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('ANNULER'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final data = {
+                              'id': level?['id'],
+                              'nom': nameController.text,
+                              'ordre': int.tryParse(ordreController.text) ?? 1,
+                              'cycle_id': cycleId,
+                              'moyenne_passage': double.tryParse(
+                                moyController.text,
+                              ),
+                              'is_examen': isExamen ? 1 : 0,
+                            };
+                            await _db.saveNiveau(data);
                             Navigator.pop(context);
                             _loadData();
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
                           ),
-                        ),
-                        child: Text(
-                          cycle == null ? 'CRÉER LE CYCLE' : 'METTRE À JOUR',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
+                          child: Text(
+                            level == null ? 'AJOUTER' : 'ENREGISTRER',
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -931,223 +790,6 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
           ),
         ),
       ],
-    );
-  }
-
-  void _showLevelManagementDialog(Map<String, dynamic> cycle) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final nom = cycle['nom_cycle'];
-    final min = cycle['niveau_min'] ?? 1;
-    final max = cycle['niveau_max'] ?? 6;
-
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          width: 450,
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.cardDark : Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 30,
-                offset: const Offset(0, 15),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.05),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(28),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.format_list_bulleted,
-                        color: AppTheme.primaryColor,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Niveaux - $nom',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Text(
-                          'Gérez la liste des niveaux rattachés',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, size: 20),
-                      color: Colors.grey,
-                    ),
-                  ],
-                ),
-              ),
-
-              // Liste des niveaux
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'NIVEAUX ACTUELS',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.2,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: List.generate(
-                        max - min + 1,
-                        (index) => _buildManageLevelChip(
-                          (min + index).toString(),
-                          isDark,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Text(
-                      'CONFIGURER LA PLAGE',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.2,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildDialogTextField(
-                            controller: TextEditingController(
-                              text: min.toString(),
-                            ),
-                            label: 'DE',
-                            hint: '1',
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildDialogTextField(
-                            controller: TextEditingController(
-                              text: max.toString(),
-                            ),
-                            label: 'À',
-                            hint: '6',
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Actions
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text(
-                          'FERMER',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showAddCycleDialog(cycle: cycle);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor.withOpacity(
-                            0.1,
-                          ),
-                          foregroundColor: AppTheme.primaryColor,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('AJUSTER LA PLAGE'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildManageLevelChip(String label, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[900] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-          const SizedBox(width: 8),
-          Icon(Icons.remove_circle_outline, size: 14, color: Colors.red[300]),
-        ],
-      ),
     );
   }
 }

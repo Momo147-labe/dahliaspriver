@@ -9,6 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../core/database/database_helper.dart';
 import '../models/student.dart';
 import '../models/ecole.dart';
+import '../widgets/student_card_design.dart';
 
 class BulkCardPrintPage extends StatefulWidget {
   const BulkCardPrintPage({super.key});
@@ -232,7 +233,10 @@ class _BulkCardPrintPageState extends State<BulkCardPrintPage> {
                             'Né(e) le:',
                             '${student.dateNaissance} à ${student.lieuNaissance}',
                           ),
-                          _pdfInfoLine('Sexe:', student.sexe),
+                          _pdfInfoLine(
+                            'Sexe:',
+                            student.sexe == 'M' ? 'Homme' : 'Femme',
+                          ),
                           _pdfInfoLine('Classe:', student.classe),
                         ],
                       ),
@@ -451,194 +455,11 @@ class _BulkCardPrintPageState extends State<BulkCardPrintPage> {
   }
 
   Widget _buildCard(Student student) {
-    return Container(
-      width: 320,
-      height: 204,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey[300]!),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 45,
-              decoration: const BoxDecoration(
-                color: Color(0xFFce1126),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(4),
-                  bottomRight: Radius.circular(4),
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    ecole?.nom.toUpperCase() ?? 'GUINÉE ÉCOLE',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const Text(
-                    'Travail - Justice - Solidarité',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 6,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (ecole?.logo != null && ecole!.logo!.isNotEmpty)
-            Positioned(
-              top: 8,
-              left: 8,
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
-                ),
-                child: ClipOval(
-                  child: Image.file(
-                    File(ecole!.logo!),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.school, size: 16),
-                  ),
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFce1126),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'CARTE D\'IDENTITÉ SCOLAIRE',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFfcd116),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.black12),
-                    ),
-                    child: Text(
-                      'ANNÉE SCOLAIRE ${anneeLibelle ?? '2023-2024'}',
-                      style: const TextStyle(
-                        fontSize: 7,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 75,
-                      height: 90,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!, width: 2),
-                        color: Colors.grey[100],
-                      ),
-                      child: student.photo.isNotEmpty
-                          ? Image.file(
-                              File(student.photo),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  const Icon(Icons.person, size: 40),
-                            )
-                          : const Icon(
-                              Icons.person,
-                              size: 40,
-                              color: Colors.grey,
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _infoLine('Matricule:', student.matricule),
-                          _infoLine(
-                            'Nom & Prénom:',
-                            student.fullName.toUpperCase(),
-                          ),
-                          _infoLine(
-                            'Né(e) le:',
-                            '${student.dateNaissance} à ${student.lieuNaissance}',
-                          ),
-                          _infoLine('Sexe:', student.sexe),
-                          _infoLine('Classe:', student.classe),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoLine(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(fontSize: 7.5, color: Colors.black),
-          children: [
-            TextSpan(
-              text: '$label ',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
-            ),
-            TextSpan(
-              text: value,
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ],
-        ),
-      ),
+    return StudentCardDesign(
+      student: student,
+      ecole: ecole,
+      anneeLibelle: anneeLibelle,
+      scale: 1.0,
     );
   }
 }

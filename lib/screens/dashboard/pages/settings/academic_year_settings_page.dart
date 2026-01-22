@@ -20,6 +20,8 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _academicYears = [];
   int? _editingYearId;
+  int? _selectedPreviousYearId;
+  String _etat = 'EN_COURS';
 
   @override
   void initState() {
@@ -91,17 +93,21 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
         'libelle': _yearNameController.text,
         'date_debut': DateFormat('yyyy-MM-dd').format(_startDate!),
         'date_fin': DateFormat('yyyy-MM-dd').format(_endDate!),
-        'statut': _isActive ? 'Active' : 'Inactive',
+        'active': _isActive ? 1 : 0,
+        'etat': _etat,
+        'annee_precedente_id': _selectedPreviousYearId,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
+      int savedId;
       if (_editingYearId != null) {
         // Mise à jour
+        savedId = _editingYearId!;
         await db.update(
           'annee_scolaire',
           data,
           where: 'id = ?',
-          whereArgs: [_editingYearId],
+          whereArgs: [savedId],
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -114,7 +120,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
       } else {
         // Création
         data['created_at'] = DateTime.now().toIso8601String();
-        await db.insert('annee_scolaire', data);
+        savedId = await db.insert('annee_scolaire', data);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -129,9 +135,9 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
       if (_isActive) {
         await db.update(
           'annee_scolaire',
-          {'statut': 'Inactive'},
+          {'active': 0},
           where: 'id != ?',
-          whereArgs: [_editingYearId ?? 0],
+          whereArgs: [savedId],
         );
         await DatabaseHelper.instance.ensureActiveAnneeCached(
           forceRefresh: true,
@@ -148,6 +154,9 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
       }
     }
   }
+
+  // Refined helper to get ID on insert.
+  // ...
 
   Future<void> _deleteAcademicYear(int id) async {
     final confirm = await showDialog<bool>(
@@ -200,7 +209,9 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
       _yearNameController.text = year['libelle'] as String;
       _startDate = DateTime.parse(year['date_debut'] as String);
       _endDate = DateTime.parse(year['date_fin'] as String);
-      _isActive = year['statut'] == 'Active';
+      _isActive = (year['active'] == 1);
+      _etat = year['etat'] ?? 'EN_COURS'; // Default if null
+      _selectedPreviousYearId = year['annee_precedente_id'] as int?;
     });
   }
 
@@ -211,7 +222,9 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
       _startDate = null;
       _endDate = null;
       _isActive = false;
+      _etat = 'EN_COURS';
       _editingYearId = null;
+      _selectedPreviousYearId = null;
     });
   }
 
@@ -339,6 +352,116 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                                     setDialogState(() => _endDate = d);
                                   }
                                 },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        // Dropdown for Previous Year
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'ANNÉE PRÉCÉDENTE',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.2,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.grey[900]
+                                    : Colors.grey[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark
+                                      ? Colors.grey[800]!
+                                      : Colors.grey[200]!,
+                                ),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: _selectedPreviousYearId,
+                                  isExpanded: true,
+                                  hint: const Text(
+                                    'Sélectionner l\'année précédente',
+                                  ),
+                                  items: _academicYears
+                                      .where((y) => y['id'] != _editingYearId)
+                                      .map(
+                                        (y) => DropdownMenuItem<int>(
+                                          value: y['id'] as int,
+                                          child: Text(y['libelle'] as String),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (val) {
+                                    setDialogState(
+                                      () => _selectedPreviousYearId = val,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        // Dropdown for Etat
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'ÉTAT',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.2,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.grey[900]
+                                    : Colors.grey[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark
+                                      ? Colors.grey[800]!
+                                      : Colors.grey[200]!,
+                                ),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _etat,
+                                  isExpanded: true,
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'EN_COURS',
+                                      child: Text('En Cours'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'TERMINEE',
+                                      child: Text('Terminée'),
+                                    ),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setDialogState(() => _etat = val);
+                                    }
+                                  },
+                                ),
                               ),
                             ),
                           ],
@@ -688,11 +811,12 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                     columns: const [
                       DataColumn(label: Text('STATUT')),
                       DataColumn(label: Text('LIBELLÉ')),
+                      DataColumn(label: Text('ÉTAT')),
                       DataColumn(label: Text('PÉRIODE')),
                       DataColumn(label: Text('ACTIONS')),
                     ],
                     rows: _academicYears.map((year) {
-                      final isActive = year['statut'] == 'Active';
+                      final isActive = year['active'] == 1;
                       return DataRow(
                         cells: [
                           DataCell(
@@ -723,6 +847,12 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                               ),
+                            ),
+                          ),
+                          DataCell(
+                            Text(
+                              year['etat'] ?? '-',
+                              style: const TextStyle(fontSize: 12),
                             ),
                           ),
                           DataCell(

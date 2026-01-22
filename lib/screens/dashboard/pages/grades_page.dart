@@ -31,8 +31,19 @@ class _GradesPageState extends State<GradesPage> {
   List<Map<String, dynamic>> _filteredGrades = [];
   Map<String, dynamic>? _selectedClass;
   Map<String, dynamic>? _selectedSubject;
+
+  // Dynamic Configuration
+  List<Map<String, dynamic>> _sequences = [];
+  List<int> _trimesters = [];
+  List<Map<String, dynamic>> _mentions =
+      []; // Mentions for selected class cycle
+
   int _selectedTrimestre = 1;
   int _selectedSequence = 1;
+
+  double _currentCycleMin = 0.0;
+  double _currentCycleMax = 20.0;
+  double _currentCyclePassage = 10.0;
 
   Map<String, dynamic>? _assignedTeacher;
 
@@ -94,7 +105,22 @@ class _GradesPageState extends State<GradesPage> {
     setState(() => _isLoading = true);
     try {
       final db = await _dbHelper.database;
-      final classes = await db.query('classe', orderBy: 'nom ASC');
+
+      // Load Configuration
+      await _loadConfig(anneeId);
+
+      // Load Classes with cycle info
+      final classes = await db.rawQuery(
+        '''
+        SELECT c.*, cy.nom as cycle_nom, cy.note_min, cy.note_max, cy.moyenne_passage
+        FROM classe c
+        LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+        WHERE c.annee_scolaire_id = ?
+        ORDER BY c.nom ASC
+      ''',
+        [anneeId],
+      );
+
       setState(() {
         _classes = classes;
         if (_classes.isNotEmpty && _selectedClass == null) {
@@ -102,7 +128,11 @@ class _GradesPageState extends State<GradesPage> {
         }
       });
 
-      await _loadSubjectsForSelectedClass(anneeId);
+      if (_classes.isNotEmpty) {
+        // Load mentions for initial class
+        await _loadMentionsForClass();
+        await _loadSubjectsForSelectedClass(anneeId);
+      }
 
       if (_classes.isEmpty) {
         setState(() => _isLoading = false);
@@ -114,6 +144,54 @@ class _GradesPageState extends State<GradesPage> {
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('Erreur initialisation saisie: $e');
+    }
+  }
+
+  Future<void> _loadConfig(int anneeId) async {
+    final seqs = await _dbHelper.getSequences(anneeId);
+    final trim = await _dbHelper.getTrimesters(anneeId);
+
+    setState(() {
+      _sequences = seqs;
+      _trimesters = trim;
+
+      // Set default selections if available
+      if (!_trimesters.contains(_selectedTrimestre)) {
+        _selectedTrimestre = _trimesters.isNotEmpty ? _trimesters.first : 1;
+      }
+
+      bool seqExists = _sequences.any(
+        (s) => s['numero_sequence'] == _selectedSequence,
+      );
+      if (!seqExists) {
+        _selectedSequence = _sequences.isNotEmpty
+            ? (_sequences.first['numero_sequence'] as int)
+            : 1;
+      }
+    });
+  }
+
+  Future<void> _loadMentionsForClass() async {
+    if (_selectedClass == null) return;
+
+    final int? cycleId = _selectedClass!['cycle_id'] as int?;
+
+    setState(() {
+      _currentCycleMin =
+          (_selectedClass!['note_min'] as num?)?.toDouble() ?? 0.0;
+      _currentCycleMax =
+          (_selectedClass!['note_max'] as num?)?.toDouble() ?? 20.0;
+      _currentCyclePassage =
+          (_selectedClass!['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
+    });
+
+    final mentions = await _dbHelper.getMentionsByCycle(cycleId);
+    // Fallback to global mentions if empty
+    if (mentions.isEmpty && cycleId != null) {
+      final global = await _dbHelper.getMentionsByCycle(null);
+      setState(() => _mentions = global);
+    } else {
+      setState(() => _mentions = mentions);
     }
   }
 
@@ -161,6 +239,7 @@ class _GradesPageState extends State<GradesPage> {
         _selectedTrimestre,
         _selectedSequence,
         anneeId,
+        passingGrade: _currentCyclePassage,
       );
 
       final teacher = await _dbHelper.getAssignedTeacher(
@@ -170,19 +249,48 @@ class _GradesPageState extends State<GradesPage> {
       );
 
       final Map<String, dynamic> finalStats = Map<String, dynamic>.from(stats);
-      int r1 = 0, r2 = 0, r3 = 0, r4 = 0;
-      for (var g in grades) {
-        final note = (g['note'] as num?)?.toDouble() ?? -1.0;
-        if (note >= 0 && note < 5)
-          r1++;
-        else if (note >= 5 && note < 10)
-          r2++;
-        else if (note >= 10 && note < 15)
-          r3++;
-        else if (note >= 15 && note < 20.00000001)
-          r4++;
+
+      // Calculate distribution
+      if (_mentions.isNotEmpty) {
+        final Map<int, int> mentionCounts = {};
+        for (var m in _mentions) {
+          mentionCounts[m['id']] = 0;
+        }
+
+        for (var g in grades) {
+          final note = (g['note'] as num?)?.toDouble() ?? -1.0;
+          if (note >= 0) {
+            for (var m in _mentions) {
+              final double min = (m['note_min'] as num).toDouble();
+              final double max = (m['note_max'] as num).toDouble();
+              if (note >= min && note <= max) {
+                mentionCounts[m['id']] = (mentionCounts[m['id']] ?? 0) + 1;
+                break;
+              }
+            }
+          }
+        }
+        finalStats['ranges'] = mentionCounts;
+      } else {
+        int r1 = 0, r2 = 0, r3 = 0, r4 = 0;
+        for (var g in grades) {
+          final note = (g['note'] as num?)?.toDouble() ?? -1.0;
+          if (note >= 0 && note < 5)
+            r1++;
+          else if (note >= 5 && note < 10)
+            r2++;
+          else if (note >= 10 && note < 15)
+            r3++;
+          else if (note >= 15 && note < 20.00000001)
+            r4++;
+        }
+        finalStats['ranges'] = {
+          '0-5': r1,
+          '5-10': r2,
+          '10-15': r3,
+          '15-20': r4,
+        };
       }
-      finalStats['ranges'] = {'0-5': r1, '5-10': r2, '10-15': r3, '15-20': r4};
 
       for (var controller in _controllers.values) controller.dispose();
       _controllers.clear();
@@ -231,7 +339,9 @@ class _GradesPageState extends State<GradesPage> {
         final value = entry.value.text;
         if (value.isNotEmpty) {
           final note = double.tryParse(value.replaceAll(',', '.'));
-          if (note != null && note >= 0 && note <= 20) {
+          if (note != null &&
+              note >= _currentCycleMin &&
+              note <= _currentCycleMax) {
             await _dbHelper.saveGrade({
               'eleve_id': eleveId,
               'matiere_id': _selectedSubject!['id'],
@@ -241,6 +351,12 @@ class _GradesPageState extends State<GradesPage> {
               'note': note,
               'coefficient': _selectedSubject!['coefficient'] ?? 1.0,
             });
+          } else if (note != null) {
+            _showError(
+              'Note invalide pour l\'élève ID $eleveId (doit être entre $_currentCycleMin et $_currentCycleMax)',
+            );
+            setState(() => _isLoading = false);
+            return;
           }
         }
       }
@@ -254,12 +370,26 @@ class _GradesPageState extends State<GradesPage> {
 
   String _getAppreciation(double note, String cycle) {
     if (note < 0) return '-';
-    if (note < 5) return 'Très Faible';
-    if (note < 10) return 'Insuffisant';
-    if (note < 12) return 'Passable';
-    if (note < 14) return 'Assez Bien';
-    if (note < 16) return 'Bien';
-    if (note < 18) return 'Très Bien';
+
+    // Use loaded mentions from mention_config table as requested
+    if (_mentions.isNotEmpty) {
+      for (var mention in _mentions) {
+        final double min = (mention['note_min'] as num).toDouble();
+        final double max = (mention['note_max'] as num).toDouble();
+        if (note >= min && note <= max) {
+          return mention['label']
+              as String; // "la mention est reprenter par label"
+        }
+      }
+    }
+
+    // Comprehensive fallback built from standard school appreciations
+    if (note < (_currentCycleMax * 0.25)) return 'Très Faible';
+    if (note < (_currentCycleMax * 0.5)) return 'Insuffisant';
+    if (note < (_currentCycleMax * 0.6)) return 'Passable';
+    if (note < (_currentCycleMax * 0.7)) return 'Assez Bien';
+    if (note < (_currentCycleMax * 0.8)) return 'Bien';
+    if (note < (_currentCycleMax * 0.9)) return 'Très Bien';
     return 'Excellent';
   }
 
@@ -696,6 +826,9 @@ class _GradesPageState extends State<GradesPage> {
               setState(
                 () => _selectedClass = _classes.firstWhere((c) => c['id'] == v),
               );
+              // Reload mentions for new class cycle
+              _loadMentionsForClass();
+
               if (_lastLoadedAnneeId != null) {
                 _loadSubjectsForSelectedClass(
                   _lastLoadedAnneeId!,
@@ -750,9 +883,21 @@ class _GradesPageState extends State<GradesPage> {
           _buildOptionToggle(
             'Trimestre',
             _selectedTrimestre,
-            [1, 2, 3],
+            _trimesters.isNotEmpty ? _trimesters : [1, 2, 3],
             (v) {
-              setState(() => _selectedTrimestre = v);
+              setState(() {
+                _selectedTrimestre = v;
+                if (_sequences.isNotEmpty) {
+                  final validSeqs = _sequences
+                      .where((s) => s['trimestre'] == v)
+                      .map((s) => s['numero_sequence'] as int)
+                      .toList();
+                  if (validSeqs.isNotEmpty &&
+                      !validSeqs.contains(_selectedSequence)) {
+                    _selectedSequence = validSeqs.first;
+                  }
+                }
+              });
               if (_lastLoadedAnneeId != null) {
                 _loadGrades(_lastLoadedAnneeId!);
               }
@@ -763,7 +908,12 @@ class _GradesPageState extends State<GradesPage> {
           _buildOptionToggle(
             'Séquence',
             _selectedSequence,
-            [1, 2, 3, 4, 5, 6],
+            _sequences.isNotEmpty
+                ? _sequences
+                      .where((s) => s['trimestre'] == _selectedTrimestre)
+                      .map((s) => s['numero_sequence'] as int)
+                      .toList()
+                : [1, 2, 3, 4, 5, 6],
             (v) {
               setState(() => _selectedSequence = v);
               if (_lastLoadedAnneeId != null) {
@@ -932,23 +1082,23 @@ class _GradesPageState extends State<GradesPage> {
           isDark,
         ),
         _buildStatCard(
-          'Plus Haute Note',
-          _stats['maxNote'].toStringAsFixed(1),
-          Icons.trending_up_rounded,
+          'Taux de Réussite',
+          '${_stats['successRate'].toStringAsFixed(1)}%',
+          Icons.pie_chart_rounded,
           const Color(0xFF10B981),
           isDark,
         ),
         _buildStatCard(
-          'Plus Basse Note',
-          _stats['minNote'].toStringAsFixed(1),
-          Icons.trending_down_rounded,
+          'Barème (Min - Max)',
+          '${_currentCycleMin.toStringAsFixed(0)} - ${_currentCycleMax.toStringAsFixed(0)}',
+          Icons.straighten_rounded,
           const Color(0xFFEF4444),
           isDark,
         ),
         _buildStatCard(
-          'Taux de Réussite',
-          '${_stats['successRate'].toStringAsFixed(1)}%',
-          Icons.pie_chart_rounded,
+          'Note de Passage',
+          _currentCyclePassage.toStringAsFixed(1),
+          Icons.flag_rounded,
           const Color(0xFFF59E0B),
           isDark,
         ),
@@ -1018,43 +1168,63 @@ class _GradesPageState extends State<GradesPage> {
 
   Widget _buildDistributionCards(bool isDark) {
     final total = (_stats['total'] ?? 0) as int;
-    final ranges =
-        (_stats['ranges'] ?? {'0-5': 0, '5-10': 0, '10-15': 0, '15-20': 0})
-            as Map<String, int>;
+    final ranges = (_stats['ranges'] ?? {}) as Map;
+
+    List<Widget> distributionItems = [];
+
+    if (_mentions.isNotEmpty) {
+      distributionItems = _mentions.map((m) {
+        final count = (ranges[m['id']] ?? 0) as int;
+        final colorCode = m['couleur'] as String?;
+        Color color = AppTheme.primaryColor;
+        if (colorCode != null && colorCode.isNotEmpty) {
+          try {
+            color = Color(int.parse(colorCode.replaceFirst('#', '0xFF')));
+          } catch (e) {
+            debugPrint('Error parsing color: $e');
+          }
+        }
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: _buildDistributionItem(
+            '${m['label']} (${m['note_min']}-${m['note_max']})',
+            count,
+            total,
+            color,
+          ),
+        );
+      }).toList();
+    } else {
+      final legacyRanges = {
+        'Excellent (15-20)': ranges['15-20'] ?? 0,
+        'Bien/Moyen (10-15)': ranges['10-15'] ?? 0,
+        'Faible (5-10)': ranges['5-10'] ?? 0,
+        'Trés Faible (0-5)': ranges['0-5'] ?? 0,
+      };
+      final colors = [Colors.green, Colors.blue, Colors.orange, Colors.red];
+      int i = 0;
+      legacyRanges.forEach((label, count) {
+        distributionItems.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: _buildDistributionItem(
+              label,
+              count as int,
+              total,
+              colors[i % colors.length],
+            ),
+          ),
+        );
+        i++;
+      });
+    }
+
     return Row(
       children: [
         Expanded(
           child: _buildDistributionCard(
             'Répartition des Performances',
-            [
-              _buildDistributionItem(
-                'Excellent (15-20)',
-                ranges['15-20'] ?? 0,
-                total,
-                Colors.green,
-              ),
-              const SizedBox(height: 12),
-              _buildDistributionItem(
-                'Bien/Moyen (10-15)',
-                ranges['10-15'] ?? 0,
-                total,
-                Colors.blue,
-              ),
-              const SizedBox(height: 12),
-              _buildDistributionItem(
-                'Faible (5-10)',
-                ranges['5-10'] ?? 0,
-                total,
-                Colors.orange,
-              ),
-              const SizedBox(height: 12),
-              _buildDistributionItem(
-                'Trés Faible (0-5)',
-                ranges['0-5'] ?? 0,
-                total,
-                Colors.red,
-              ),
-            ],
+            distributionItems,
             isDark,
             Icons.bar_chart_rounded,
             AppTheme.primaryColor,
@@ -1227,8 +1397,11 @@ class _GradesPageState extends State<GradesPage> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: (note >= 10 ? Colors.green : Colors.red)
-                                .withOpacity(0.1),
+                            color:
+                                (note >= _currentCyclePassage
+                                        ? Colors.green
+                                        : Colors.red)
+                                    .withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -1236,7 +1409,9 @@ class _GradesPageState extends State<GradesPage> {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: note >= 10 ? Colors.green : Colors.red,
+                              color: note >= _currentCyclePassage
+                                  ? Colors.green
+                                  : Colors.red,
                             ),
                           ),
                         ),
@@ -1295,15 +1470,37 @@ class _GradesPageState extends State<GradesPage> {
                           ),
                           textAlign: TextAlign.center,
                           onChanged: (v) => setState(() {}),
+                          style: TextStyle(
+                            color:
+                                (note != -1.0 &&
+                                    (note < _currentCycleMin ||
+                                        note > _currentCycleMax))
+                                ? Colors.red
+                                : (isDark ? Colors.white : Colors.black),
+                            fontWeight: FontWeight.bold,
+                          ),
                           decoration: InputDecoration(
                             hintText: '-',
                             filled: true,
-                            fillColor: isDark
-                                ? AppTheme.cardDark
-                                : const Color(0xFFF3F4F6),
+                            fillColor:
+                                (note != -1.0 &&
+                                    (note < _currentCycleMin ||
+                                        note > _currentCycleMax))
+                                ? Colors.red.withOpacity(0.1)
+                                : (isDark
+                                      ? AppTheme.cardDark
+                                      : const Color(0xFFF3F4F6)),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
+                              borderSide:
+                                  (note != -1.0 &&
+                                      (note < _currentCycleMin ||
+                                          note > _currentCycleMax))
+                                  ? const BorderSide(
+                                      color: Colors.red,
+                                      width: 2,
+                                    )
+                                  : BorderSide.none,
                             ),
                             contentPadding: const EdgeInsets.symmetric(
                               vertical: 0,
@@ -1394,10 +1591,15 @@ class _GradesDetailModal extends StatefulWidget {
 class _GradesDetailModalState extends State<_GradesDetailModal> {
   List<Map<String, dynamic>> _students = [];
   List<Map<String, dynamic>> _filteredStudents = [];
+  List<Map<String, dynamic>> _mentions = [];
   bool _isLoading = true;
   final Map<int, TextEditingController> _controllers = {};
   Map<String, dynamic>? _assignedTeacher;
   final TextEditingController _searchController = TextEditingController();
+
+  double _currentCycleMin = 0.0;
+  double _currentCycleMax = 20.0;
+  double _currentCyclePassage = 10.0;
 
   @override
   void initState() {
@@ -1431,10 +1633,47 @@ class _GradesDetailModalState extends State<_GradesDetailModal> {
         anneeId,
       );
 
+      // Load Configured Mentions and Limits for this Class/Cycle
+      List<Map<String, dynamic>> mentions = [];
+      try {
+        final db = await widget.dbHelper.database;
+        final classe = await db.rawQuery(
+          '''
+          SELECT c.*, cy.id as cycle_id, cy.nom as cycle_nom, cy.note_min, cy.note_max, cy.moyenne_passage
+          FROM classe c
+          LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+          WHERE c.id = ?
+          LIMIT 1
+        ''',
+          [widget.overviewData['classe_id']],
+        );
+
+        int? cycleId;
+        if (classe.isNotEmpty) {
+          cycleId = classe.first['cycle_id'] as int?;
+          setState(() {
+            _currentCycleMin =
+                (classe.first['note_min'] as num?)?.toDouble() ?? 0.0;
+            _currentCycleMax =
+                (classe.first['note_max'] as num?)?.toDouble() ?? 20.0;
+            _currentCyclePassage =
+                (classe.first['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
+          });
+        }
+
+        mentions = await widget.dbHelper.getMentionsByCycle(cycleId);
+        if (mentions.isEmpty && cycleId != null) {
+          mentions = await widget.dbHelper.getMentionsByCycle(null);
+        }
+      } catch (e) {
+        debugPrint('Error loading mentions in modal: $e');
+      }
+
       setState(() {
         _students = grades;
         _filteredStudents = grades;
         _assignedTeacher = teacher;
+        _mentions = mentions;
         for (var g in grades) {
           _controllers[g['eleve_id']] = TextEditingController(
             text: g['note']?.toString() ?? '',
@@ -1471,7 +1710,9 @@ class _GradesDetailModalState extends State<_GradesDetailModal> {
         final val = entry.value.text;
         if (val.isNotEmpty) {
           final note = double.tryParse(val.replaceAll(',', '.'));
-          if (note != null && note >= 0 && note <= 20) {
+          if (note != null &&
+              note >= _currentCycleMin &&
+              note <= _currentCycleMax) {
             await widget.dbHelper.saveGrade({
               'eleve_id': entry.key,
               'matiere_id': widget.overviewData['matiere_id'],
@@ -1481,6 +1722,17 @@ class _GradesDetailModalState extends State<_GradesDetailModal> {
               'note': note,
               'coefficient': widget.overviewData['coefficient'] ?? 1.0,
             });
+          } else if (note != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Note invalide pour l\'élève ID ${entry.key} (doit être entre $_currentCycleMin et $_currentCycleMax)',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+            setState(() => _isLoading = false);
+            return;
           }
         }
       }
@@ -1503,6 +1755,30 @@ class _GradesDetailModalState extends State<_GradesDetailModal> {
         ),
       );
     }
+  }
+
+  String _getAppreciation(double note) {
+    if (note < 0) return '-';
+
+    if (_mentions.isNotEmpty) {
+      for (var mention in _mentions) {
+        final double min = (mention['note_min'] as num).toDouble();
+        final double max = (mention['note_max'] as num).toDouble();
+        if (note >= min && note <= max) {
+          return mention['label']
+              as String; // "la mention est reprenter par label"
+        }
+      }
+    }
+
+    // Comprehensive fallback built from standard school appreciations
+    if (note < (_currentCycleMax * 0.25)) return 'Très Faible';
+    if (note < (_currentCycleMax * 0.5)) return 'Insuffisant';
+    if (note < (_currentCycleMax * 0.6)) return 'Passable';
+    if (note < (_currentCycleMax * 0.7)) return 'Assez Bien';
+    if (note < (_currentCycleMax * 0.8)) return 'Bien';
+    if (note < (_currentCycleMax * 0.9)) return 'Très Bien';
+    return 'Excellent';
   }
 
   @override
@@ -1650,6 +1926,7 @@ class _GradesDetailModalState extends State<_GradesDetailModal> {
       itemBuilder: (context, index) {
         final s = _filteredStudents[index];
         final ctrl = _controllers[s['eleve_id']];
+        final noteValue = double.tryParse(ctrl?.text ?? '') ?? -1.0;
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
@@ -1676,31 +1953,60 @@ class _GradesDetailModalState extends State<_GradesDetailModal> {
                 children: [
                   Builder(
                     builder: (context) {
-                      final noteText = ctrl?.text ?? '';
-                      final noteValue = double.tryParse(noteText) ?? -1.0;
                       final coeff = widget.overviewData['coefficient'] ?? 1.0;
                       if (noteValue >= 0) {
-                        return Container(
-                          margin: const EdgeInsets.only(right: 12),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            (noteValue * coeff).toStringAsFixed(1),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryColor,
-                              fontSize: 12,
+                        final appreciation = _getAppreciation(noteValue);
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    (noteValue >= _currentCyclePassage
+                                            ? Colors.green
+                                            : Colors.red)
+                                        .withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                appreciation,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: noteValue >= _currentCyclePassage
+                                      ? Colors.green
+                                      : Colors.red,
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Container(
+                              margin: const EdgeInsets.only(right: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                (noteValue * coeff).toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryColor,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
                         );
                       }
-                      return const SizedBox.shrink();
+                      return const SizedBox();
                     },
                   ),
                   SizedBox(
@@ -1712,15 +2018,34 @@ class _GradesDetailModalState extends State<_GradesDetailModal> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
+                      style: TextStyle(
+                        color:
+                            (noteValue != -1.0 &&
+                                (noteValue < _currentCycleMin ||
+                                    noteValue > _currentCycleMax))
+                            ? Colors.red
+                            : (widget.isDark ? Colors.white : Colors.black),
+                        fontWeight: FontWeight.bold,
+                      ),
                       decoration: InputDecoration(
                         hintText: '-',
                         filled: true,
-                        fillColor: widget.isDark
-                            ? AppTheme.cardDark
-                            : Colors.grey[100],
+                        fillColor:
+                            (noteValue != -1.0 &&
+                                (noteValue < _currentCycleMin ||
+                                    noteValue > _currentCycleMax))
+                            ? Colors.red.withOpacity(0.1)
+                            : (widget.isDark
+                                  ? AppTheme.cardDark
+                                  : Colors.grey[100]),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
+                          borderSide:
+                              (noteValue != -1.0 &&
+                                  (noteValue < _currentCycleMin ||
+                                      noteValue > _currentCycleMax))
+                              ? const BorderSide(color: Colors.red, width: 2)
+                              : BorderSide.none,
                         ),
                         contentPadding: const EdgeInsets.symmetric(vertical: 0),
                       ),
