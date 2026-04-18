@@ -1488,7 +1488,7 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
         'date_debut': dateDebut.toIso8601String(),
         'date_fin': dateFin.toIso8601String(),
         'active': 1, // 1 pour actif, 0 pour inactif
-        'etat': 'EN_COURS',
+        'statut': 'Active',
         'annee_precedente_id': null,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),

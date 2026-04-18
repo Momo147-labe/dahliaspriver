@@ -3,6 +3,8 @@ import 'dart:io';
 import '../../core/database/database_helper.dart';
 import '../../theme/app_theme.dart';
 import '../auth/login_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/services/license_service.dart';
 
 class FinalReviewPage extends StatefulWidget {
   const FinalReviewPage({super.key});
@@ -17,7 +19,10 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
   bool college = false;
   bool lycee = false;
   bool _isLoading = true;
+  bool _isValidatingLicense = false;
+  bool _isLicenseValidated = false;
   Map<String, dynamic>? schoolData;
+  final TextEditingController _licenseController = TextEditingController();
 
   @override
   void initState() {
@@ -207,12 +212,12 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
             children: [
               _buildSchoolSummary(isDark),
               const SizedBox(height: 24),
+              _buildLicenseSection(isDark),
+              const SizedBox(height: 24),
               _buildReadyCard(isDark),
             ],
           ),
         ),
-        const SizedBox(width: 32),
-        Expanded(flex: 2, child: _buildCyclesSection(isDark)),
       ],
     );
   }
@@ -222,7 +227,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
       children: [
         _buildSchoolSummary(isDark),
         const SizedBox(height: 24),
-        _buildCyclesSection(isDark),
+        _buildLicenseSection(isDark),
         const SizedBox(height: 24),
         _buildReadyCard(isDark),
       ],
@@ -424,6 +429,178 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
     );
   }
 
+  Widget _buildLicenseSection(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(
+          color: _isLicenseValidated
+              ? AppTheme.successColor
+              : (isDark ? AppTheme.borderDark : const Color(0xFFDBE5E6)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _isLicenseValidated ? Icons.verified : Icons.vpn_key,
+                color: _isLicenseValidated
+                    ? AppTheme.successColor
+                    : const Color(0xFF13DAEC),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                "Activation de Licence",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: isDark
+                      ? AppTheme.textDarkPrimary
+                      : const Color(0xFF111718),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Entrez votre clé de 24 caractères (XXXX-XXXX-XXXX) pour activer votre logiciel scolaire.",
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark
+                  ? AppTheme.textDarkSecondary
+                  : const Color(0xFF618689),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _licenseController,
+                  enabled: !_isLicenseValidated && !_isValidatingLicense,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    letterSpacing: 2,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX", // 24 chars
+                    filled: true,
+                    fillColor: isDark
+                        ? AppTheme.surfaceDark
+                        : const Color(0xFFF6F8F8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: (_isLicenseValidated || _isValidatingLicense)
+                      ? null
+                      : _validateLicense,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: _isValidatingLicense
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(_isLicenseValidated ? "ACTIVÉ" : "VALIDER"),
+                ),
+              ),
+            ],
+          ),
+          if (_isLicenseValidated) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(
+                  Icons.check_circle,
+                  color: AppTheme.successColor,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "Licence validée et liée à cet appareil.",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.successColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _validateLicense() async {
+    final key = _licenseController.text.trim();
+    if (key.isEmpty) {
+      _showErrorSnackBar("Veuillez saisir votre clé de licence.");
+      return;
+    }
+
+    setState(() => _isValidatingLicense = true);
+
+    try {
+      final service = LicenseService();
+      final result = await service.verifyAndActivateLicense(
+        licenseKey: key,
+        schoolData: schoolData ?? {},
+      );
+
+      if (result['success'] == true) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLicenseValidated', true);
+        await prefs.setString('licenseKey', key);
+
+        setState(() {
+          _isLicenseValidated = true;
+          _isValidatingLicense = false;
+        });
+        _showSuccessSnackBar(result['message']);
+      } else {
+        setState(() => _isValidatingLicense = false);
+        _showErrorSnackBar(result['message']);
+      }
+    } catch (e) {
+      setState(() => _isValidatingLicense = false);
+      _showErrorSnackBar("Erreur de connexion au serveur de licence.");
+    }
+  }
+
   Widget _buildReadyCard(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -466,91 +643,6 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCyclesSection(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(
-          color: isDark ? AppTheme.borderDark : const Color(0xFFDBE5E6),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Cycles d'enseignement",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: isDark
-                  ? AppTheme.textDarkPrimary
-                  : const Color(0xFF111718),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Sélectionnez les niveaux disponibles dans votre établissement.",
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? AppTheme.textDarkSecondary
-                  : const Color(0xFF618689),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Column(
-            children: [
-              _buildCycleTile(
-                title: "Maternelle",
-                subtitle: "Petite, Moyenne, Grande Section",
-                icon: Icons.child_care,
-                value: maternelle,
-                onChanged: (v) => setState(() => maternelle = v),
-                isDark: isDark,
-              ),
-              const SizedBox(height: 12),
-              _buildCycleTile(
-                title: "Primaire",
-                subtitle: "Du CP au CM2",
-                icon: Icons.menu_book,
-                value: primaire,
-                onChanged: (v) => setState(() => primaire = v),
-                isDark: isDark,
-              ),
-              const SizedBox(height: 12),
-              _buildCycleTile(
-                title: "Collège",
-                subtitle: "De la 7ème à la 10ème",
-                icon: Icons.school,
-                value: college,
-                onChanged: (v) => setState(() => college = v),
-                isDark: isDark,
-              ),
-              const SizedBox(height: 12),
-              _buildCycleTile(
-                title: "Lycée",
-                subtitle: "De la 11ème à la Terminale",
-                icon: Icons.history_edu,
-                value: lycee,
-                onChanged: (v) => setState(() => lycee = v),
-                isDark: isDark,
-              ),
-            ],
           ),
         ],
       ),
@@ -770,6 +862,12 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
     setState(() {
       _isLoading = true;
     });
+
+    if (!_isLicenseValidated) {
+      _showErrorSnackBar("Veuillez d'abord valider votre licence.");
+      setState(() => _isLoading = false);
+      return;
+    }
 
     try {
       // Simuler la finalisation de la configuration

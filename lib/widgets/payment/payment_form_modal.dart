@@ -477,13 +477,9 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
 
   void _fetchInitialResults() async {
     setState(() => _isLoading = true);
-    final db = DatabaseHelper.instance;
-    final results = await db.rawQuery('''
-      SELECT e.*, c.nom as classe_nom 
-      FROM eleve e
-      LEFT JOIN classe c ON e.classe_id = c.id
-      LIMIT 20
-    ''');
+    setState(() => _isLoading = true);
+    final results = await DatabaseHelper.instance.eleveDao
+        .getInitialSearchData();
     setState(() {
       _results = results;
       _isLoading = false;

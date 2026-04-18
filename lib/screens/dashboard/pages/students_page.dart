@@ -7,8 +7,8 @@ import '../../../models/student.dart';
 import '../../../providers/academic_year_provider.dart';
 import '../../../widgets/student/add_student_modal.dart';
 import '../../../widgets/student/edit_student_modal.dart';
-import '../../badge_generator_page.dart';
 import './student_detail_page.dart';
+import '../../carte_scolaire_page.dart';
 
 class StudentsPage extends StatefulWidget {
   const StudentsPage({super.key});
@@ -21,6 +21,10 @@ class _StudentsPageState extends State<StudentsPage> {
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
   bool _showFilters = false;
+
+  // Pagination
+  int _currentPage = 0;
+  static const int _itemsPerPage = 50;
 
   List<Map<String, dynamic>> _students = [];
   List<Map<String, dynamic>> _filteredStudents = [];
@@ -155,6 +159,7 @@ class _StudentsPageState extends State<StudentsPage> {
 
         return matchesSearch && matchesClass && matchesStatus && matchesGender;
       }).toList();
+      _currentPage = 0;
     });
   }
 
@@ -183,99 +188,110 @@ class _StudentsPageState extends State<StudentsPage> {
                   _buildSearchAndFilters(isDark),
                   const SizedBox(height: 24),
                   _buildStudentsList(context, isDark),
+                  const SizedBox(height: 16),
+                  _buildPaginationControls(isDark),
                 ],
               ),
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openAddModal(),
-        backgroundColor: AppTheme.primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
     );
   }
 
   Widget _buildHeader(BuildContext context, bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final isDesktop = MediaQuery.of(context).size.width > 900;
+
+    Widget titleContent = Row(
       children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF3B82F6), Color(0xFF9333EA)],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF3B82F6), Color(0xFF9333EA)],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-              child: const Icon(Icons.school, color: Colors.white, size: 32),
-            ),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Gestion des Élèves',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    foreground: Paint()
-                      ..shader =
-                          const LinearGradient(
-                            colors: [
-                              Color(0xFF2563EB),
-                              Color(0xFF9333EA),
-                              Color(0xFFDB2777),
-                            ],
-                          ).createShader(
-                            const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0),
-                          ),
-                  ),
-                ),
-                Text(
-                  'Gérez et suivez les informations de tous vos élèves.',
-                  style: TextStyle(
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
+          child: const Icon(Icons.school, color: Colors.white, size: 32),
         ),
-        Row(
-          children: [
-            _buildActionButton(
-              'Inscrire un élève',
-              Icons.person_add,
-              const Color(0xFF9333EA),
-              _openAddModal,
-            ),
-            const SizedBox(width: 12),
-            _buildActionButton(
-              'Tableau d\'honneur',
-              Icons.stars,
-              const Color(0xFF10B981),
-              () {},
-            ),
-            const SizedBox(width: 12),
-            _buildActionButton(
-              'Générer Cartes',
-              Icons.badge,
-              const Color(0xFF22C3C3),
-              _openCardsModal,
-            ),
-          ],
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Gestion des Élèves',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  foreground: Paint()
+                    ..shader = const LinearGradient(
+                      colors: [
+                        Color(0xFF2563EB),
+                        Color(0xFF9333EA),
+                        Color(0xFFDB2777),
+                      ],
+                    ).createShader(const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
+                ),
+              ),
+              Text(
+                'Gérez et suivez les informations de tous vos élèves.',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
+
+    Widget buttonsContent = Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        _buildActionButton(
+          'Inscrire un élève',
+          Icons.person_add,
+          const Color(0xFF9333EA),
+          _openAddModal,
+        ),
+        _buildActionButton(
+          'Tableau d\'honneur',
+          Icons.stars,
+          const Color(0xFF10B981),
+          () {},
+        ),
+        _buildActionButton(
+          'Générer Cartes',
+          Icons.badge,
+          const Color(0xFF22C3C3),
+          _openCardsModal,
+        ),
+      ],
+    );
+
+    if (isDesktop) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(child: titleContent),
+          const SizedBox(width: 16),
+          buttonsContent,
+        ],
+      );
+    } else {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [titleContent, const SizedBox(height: 16), buttonsContent],
+      );
+    }
   }
 
   Widget _buildActionButton(
@@ -299,13 +315,15 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   Widget _buildStatsGrid(bool isDark) {
-    return GridView.count(
+    return GridView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: MediaQuery.of(context).size.width > 900 ? 4 : 2,
-      crossAxisSpacing: 20,
-      mainAxisSpacing: 20,
-      childAspectRatio: 2.5,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: MediaQuery.of(context).size.width > 900 ? 4 : 2,
+        crossAxisSpacing: 20,
+        mainAxisSpacing: 20,
+        mainAxisExtent: 110,
+      ),
       children: [
         _buildStatCard(
           'Total Élèves',
@@ -375,26 +393,28 @@ class _StudentsPageState extends State<StudentsPage> {
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(width: 16),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                  fontSize: 14,
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    fontSize: 14,
+                  ),
                 ),
-              ),
-              Text(
-                value,
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -796,71 +816,93 @@ class _StudentsPageState extends State<StudentsPage> {
                 ),
               ),
             ],
-            rows: _filteredStudents.map((eleve) {
-              final s = Student.fromMap(eleve);
-              return DataRow(
-                cells: [
-                  DataCell(
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundImage: s.photo.isNotEmpty
-                          ? (s.photo.startsWith('/') || s.photo.contains(':\\')
-                                ? FileImage(File(s.photo)) as ImageProvider
-                                : AssetImage(s.photo))
-                          : null,
-                      child: s.photo.isEmpty
-                          ? const Icon(Icons.person, size: 20)
-                          : null,
-                    ),
-                  ),
-                  DataCell(
-                    Text(s.matricule, style: const TextStyle(fontSize: 14)),
-                  ),
-                  DataCell(
-                    Text(
-                      s.fullName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+            rows: _filteredStudents
+                .skip(_currentPage * _itemsPerPage)
+                .take(_itemsPerPage)
+                .map((eleve) {
+                  final s = Student.fromMap(eleve);
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundImage: s.photo.isNotEmpty
+                              ? (s.photo.startsWith('/') ||
+                                        s.photo.contains(':\\')
+                                    ? FileImage(File(s.photo)) as ImageProvider
+                                    : AssetImage(s.photo))
+                              : null,
+                          child: s.photo.isEmpty
+                              ? const Icon(Icons.person, size: 20)
+                              : null,
+                        ),
                       ),
-                    ),
-                  ),
-                  DataCell(Text(s.dateNaissance)),
-                  DataCell(Text(s.classe)),
-                  DataCell(_buildStatusBadge(s.statut)),
-                  DataCell(
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.edit_outlined,
-                            size: 20,
-                            color: Colors.blue,
+                      DataCell(
+                        Text(s.matricule, style: const TextStyle(fontSize: 14)),
+                      ),
+                      DataCell(
+                        Text(
+                          s.fullName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
-                          onPressed: () => _openEditModal(s),
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            size: 20,
-                            color: Colors.red,
-                          ),
-                          onPressed: () => _handleDelete(s),
+                      ),
+                      DataCell(Text(s.dateNaissance)),
+                      DataCell(Text(s.classe)),
+                      DataCell(_buildStatusBadge(s.statut)),
+                      DataCell(
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                size: 20,
+                                color: Colors.blue,
+                              ),
+                              onPressed: () => _openEditModal(s),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: Colors.red,
+                              ),
+                              onPressed: () => _handleDelete(s),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.visibility_outlined,
+                                size: 20,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () => _openDetail(int.parse(s.id)),
+                            ),
+                            Tooltip(
+                              message: 'Carte Scolaire',
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.badge,
+                                  size: 20,
+                                  color: Color(0xFF22C3C3),
+                                ),
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        CarteScolairePage(student: s),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.visibility_outlined,
-                            size: 20,
-                            color: Colors.grey,
-                          ),
-                          onPressed: () => _openDetail(int.parse(s.id)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
+                      ),
+                    ],
+                  );
+                })
+                .toList(),
           ),
         ),
       ),
@@ -1009,9 +1051,12 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   void _openCardsModal() {
+    if (_students.isEmpty) return;
+    final studentMap = _students.first;
+    final student = Student.fromMap(studentMap);
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const BadgeGeneratorPage()),
+      MaterialPageRoute(builder: (_) => CarteScolairePage(student: student)),
     );
   }
 
@@ -1072,6 +1117,69 @@ class _StudentsPageState extends State<StudentsPage> {
       context,
       MaterialPageRoute(
         builder: (context) => StudentDetailPage(studentId: studentId),
+      ),
+    );
+  }
+
+  Widget _buildPaginationControls(bool isDark) {
+    if (_filteredStudents.isEmpty) return const SizedBox.shrink();
+
+    final int totalPages = (_filteredStudents.length / _itemsPerPage).ceil();
+    final int startItem = (_currentPage * _itemsPerPage) + 1;
+    final int endItem = ((_currentPage + 1) * _itemsPerPage).clamp(
+      0,
+      _filteredStudents.length,
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Affichage $startItem à $endItem sur ${_filteredStudents.length} élèves',
+            style: TextStyle(
+              color: isDark ? Colors.white70 : AppTheme.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: _currentPage > 0
+                    ? () => setState(() => _currentPage--)
+                    : null,
+                icon: const Icon(Icons.chevron_left),
+                color: AppTheme.primaryColor,
+                disabledColor: Colors.grey,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Page ${_currentPage + 1} / $totalPages',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _currentPage < totalPages - 1
+                    ? () => setState(() => _currentPage++)
+                    : null,
+                icon: const Icon(Icons.chevron_right),
+                color: AppTheme.primaryColor,
+                disabledColor: Colors.grey,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

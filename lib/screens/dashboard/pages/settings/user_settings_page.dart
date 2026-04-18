@@ -753,103 +753,116 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
     final pwdCtrl = TextEditingController();
     final secretCtrl = TextEditingController();
     String role = 'enseignant';
+    bool obscurePwd = true;
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Ajouter un utilisateur'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Nom d\'utilisateur',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Ajouter un utilisateur'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom d\'utilisateur',
+                  ),
+                  validator: (v) => v!.isEmpty ? 'Requis' : null,
                 ),
-                validator: (v) => v!.isEmpty ? 'Requis' : null,
-              ),
-              TextFormField(
-                controller: emailCtrl,
-                decoration: const InputDecoration(labelText: 'Email'),
-                validator: (v) => v!.isEmpty ? 'Requis' : null,
-              ),
-              TextFormField(
-                controller: pwdCtrl,
-                decoration: const InputDecoration(labelText: 'Mot de passe'),
-                obscureText: true,
-                validator: (v) => v!.isEmpty ? 'Requis' : null,
-              ),
-              TextFormField(
-                controller: secretCtrl,
-                decoration: const InputDecoration(labelText: 'Code Secret'),
-                validator: (v) => v!.isEmpty ? 'Requis' : null,
-              ),
-              DropdownButtonFormField<String>(
-                value: role,
-                items: const [
-                  DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                  DropdownMenuItem(
-                    value: 'enseignant',
-                    child: Text('Enseignant'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'comptable',
-                    child: Text('Comptable'),
-                  ),
-                ],
-                onChanged: (v) => role = v!,
-                decoration: const InputDecoration(labelText: 'Rôle'),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context);
-                setState(() => _isLoading = true);
-                try {
-                  await DatabaseHelper.instance.addUser({
-                    'pseudo': nameCtrl.text.trim(),
-                    'email': emailCtrl.text.trim(),
-                    'password': SecurityUtils.hashPassword(pwdCtrl.text),
-                    'role': role,
-                    'codesecret': secretCtrl.text,
-                  });
-                  await _loadData();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Utilisateur créé'),
-                        backgroundColor: Colors.green,
+                TextFormField(
+                  controller: emailCtrl,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                  validator: (v) => v!.isEmpty ? 'Requis' : null,
+                ),
+                TextFormField(
+                  controller: pwdCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Mot de passe',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscurePwd ? Icons.visibility : Icons.visibility_off,
+                        size: 18,
                       ),
-                    );
+                      onPressed: () =>
+                          setDialogState(() => obscurePwd = !obscurePwd),
+                    ),
+                  ),
+                  obscureText: obscurePwd,
+                  validator: (v) => v!.isEmpty ? 'Requis' : null,
+                ),
+                TextFormField(
+                  controller: secretCtrl,
+                  decoration: const InputDecoration(labelText: 'Code Secret'),
+                  validator: (v) => v!.isEmpty ? 'Requis' : null,
+                ),
+                DropdownButtonFormField<String>(
+                  value: role,
+                  items: const [
+                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                    DropdownMenuItem(
+                      value: 'enseignant',
+                      child: Text('Enseignant'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'comptable',
+                      child: Text('Comptable'),
+                    ),
+                  ],
+                  onChanged: (v) => role = v!,
+                  decoration: const InputDecoration(labelText: 'Rôle'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(context);
+                  setState(() => _isLoading = true);
+                  try {
+                    await DatabaseHelper.instance.addUser({
+                      'pseudo': nameCtrl.text.trim(),
+                      'email': emailCtrl.text.trim(),
+                      'password': SecurityUtils.hashPassword(pwdCtrl.text),
+                      'role': role,
+                      'codesecret': secretCtrl.text,
+                    });
+                    await _loadData();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Utilisateur créé'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Erreur : $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isLoading = false);
                   }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Erreur : $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                } finally {
-                  if (mounted) setState(() => _isLoading = false);
                 }
-              }
-            },
-            child: const Text('Ajouter'),
-          ),
-        ],
+              },
+              child: const Text('Ajouter'),
+            ),
+          ],
+        ),
       ),
     );
   }

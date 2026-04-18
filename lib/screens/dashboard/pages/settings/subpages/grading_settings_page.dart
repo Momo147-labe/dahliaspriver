@@ -211,11 +211,13 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
                   ),
                 ),
                 const SizedBox(width: 15),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],

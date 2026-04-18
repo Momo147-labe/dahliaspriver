@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as Math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -28,7 +29,14 @@ class _PaymentsPageState extends State<PaymentsPage>
   List<Map<String, dynamic>> _recentTransactions = [];
 
   bool _isLoading = true;
+  bool _isLoadingPayments = false;
   int? _lastLoadedAnneeId;
+  int _currentPage = 1;
+  final int _itemsPerPage = 50;
+  int _totalPayments = 0;
+  String _searchQuery = '';
+  String _selectedModeFilter = 'Tous';
+  final TextEditingController _searchController = TextEditingController();
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -56,18 +64,29 @@ class _PaymentsPageState extends State<PaymentsPage>
   }
 
   Future<void> _refreshDashboard(int anneeId) async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _currentPage = 1; // Reset to first page
+    });
     try {
       final summary = await dbHelper.getFinancialSummary(anneeId);
       final recovery = await dbHelper.getRecoveryByClass(anneeId);
       final methods = await dbHelper.getPaymentMethodsBreakdown(anneeId);
-      final transactions = await dbHelper.getRecentTransactions(anneeId);
+
+      // Load first page of transactions and total count
+      final total = await dbHelper.countPayments(anneeId);
+      final transactions = await dbHelper.getRecentTransactions(
+        anneeId,
+        limit: _itemsPerPage,
+        offset: 0,
+      );
 
       setState(() {
         _summary = summary;
         _recoveryByClass = recovery;
         _paymentMethods = methods;
         _recentTransactions = transactions;
+        _totalPayments = total;
         _isLoading = false;
       });
       _fadeController.forward(from: 0.0);
@@ -77,9 +96,51 @@ class _PaymentsPageState extends State<PaymentsPage>
     }
   }
 
+  Future<void> _loadPaginatedPayments() async {
+    if (_lastLoadedAnneeId == null) return;
+
+    setState(() => _isLoadingPayments = true);
+    try {
+      final offset = (_currentPage - 1) * _itemsPerPage;
+
+      // Update totals in case filters changed
+      final total = await dbHelper.countPayments(
+        _lastLoadedAnneeId!,
+        searchQuery: _searchQuery,
+        modeFilter: _selectedModeFilter,
+      );
+
+      final transactions = await dbHelper.getRecentTransactions(
+        _lastLoadedAnneeId!,
+        limit: _itemsPerPage,
+        offset: offset,
+        searchQuery: _searchQuery,
+        modeFilter: _selectedModeFilter,
+      );
+
+      setState(() {
+        _recentTransactions = transactions;
+        _totalPayments = total;
+        _isLoadingPayments = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading paginated payments: $e');
+      setState(() => _isLoadingPayments = false);
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() {
+      _searchQuery = value;
+      _currentPage = 1;
+    });
+    _loadPaginatedPayments();
+  }
+
   @override
   void dispose() {
     _fadeController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -126,92 +187,99 @@ class _PaymentsPageState extends State<PaymentsPage>
   }
 
   Widget _buildHeader(bool isDark, ThemeData theme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final isDesktop = MediaQuery.of(context).size.width > 900;
+
+    final titleSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Vue d'ensemble des paiements",
-              style: theme.textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: isDark ? Colors.white : AppTheme.textPrimary,
-              ),
-            ),
-            Text(
-              'Gestion financière et recouvrement des frais de scolarité',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
-            ),
-          ],
+        Text(
+          "Vue d'ensemble des paiements",
+          style: theme.textTheme.displaySmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: isDark ? Colors.white : AppTheme.textPrimary,
+          ),
         ),
-        Row(
-          children: [
-            ElevatedButton.icon(
-              onPressed: _showNewPaymentForm,
-              icon: const Icon(Symbols.add, size: 24),
-              label: const Text('Nouveau paiement'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 4,
-                shadowColor: AppTheme.primaryColor.withOpacity(0.4),
-              ),
-            ),
-            const SizedBox(width: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PaymentControlPage(),
-                  ),
-                );
-              },
-              icon: const Icon(Symbols.assignment_ind, size: 24),
-              label: const Text('Contrôle de paiement'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppTheme.primaryColor,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppTheme.primaryColor),
-                ),
-                elevation: 2,
-              ),
-            ),
-            const SizedBox(width: 16),
-            OutlinedButton.icon(
-              onPressed: () {}, // Implementation later
-              icon: const Icon(Symbols.download),
-              label: const Text('Exporter'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ],
+        Text(
+          'Gestion financière et recouvrement des frais de scolarité',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: AppTheme.textSecondary,
+          ),
         ),
       ],
     );
+
+    final actionButtons = Wrap(
+      spacing: 16,
+      runSpacing: 16,
+      alignment: isDesktop ? WrapAlignment.end : WrapAlignment.start,
+      children: [
+        ElevatedButton.icon(
+          onPressed: _showNewPaymentForm,
+          icon: const Icon(Symbols.add, size: 24),
+          label: const Text('Nouveau paiement'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 4,
+            shadowColor: AppTheme.primaryColor.withOpacity(0.4),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PaymentControlPage(),
+              ),
+            );
+          },
+          icon: const Icon(Symbols.assignment_ind, size: 24),
+          label: const Text('Contrôle de paiement'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: AppTheme.primaryColor,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: AppTheme.primaryColor),
+            ),
+            elevation: 2,
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: () {}, // Implementation later
+          icon: const Icon(Symbols.download),
+          label: const Text('Exporter'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (isDesktop) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: titleSection),
+          const SizedBox(width: 24),
+          actionButtons,
+        ],
+      );
+    } else {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [titleSection, const SizedBox(height: 24), actionButtons],
+      );
+    }
   }
 
   Widget _buildStatsGrid(bool isDark, ThemeData theme) {
@@ -636,31 +704,211 @@ class _PaymentsPageState extends State<PaymentsPage>
                       ),
                     ),
                     Text(
-                      'Historique des ${_recentTransactions.length} derniers paiements enregistrés',
+                      _searchQuery.isEmpty && _selectedModeFilter == 'Tous'
+                          ? 'Historique des $_totalPayments paiements enregistrés'
+                          : '$_totalPayments résultats trouvés',
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ],
                 ),
-                OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Symbols.tune, size: 18),
-                  label: const Text('Filtres'),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 250,
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _onSearchChanged,
+                        decoration: InputDecoration(
+                          hintText: 'Rechercher un élève...',
+                          prefixIcon: const Icon(Symbols.search, size: 20),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDark
+                                  ? Colors.white10
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDark
+                                  ? Colors.white10
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 16),
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        setState(() {
+                          _selectedModeFilter = value;
+                          _currentPage = 1;
+                        });
+                        _loadPaginatedPayments();
+                      },
+                      itemBuilder: (context) =>
+                          [
+                            'Tous',
+                            'Espèces',
+                            'Orange Money',
+                            'Virement',
+                            'Chèque',
+                          ].map((mode) {
+                            return PopupMenuItem(
+                              value: mode,
+                              child: Row(
+                                children: [
+                                  if (_selectedModeFilter == mode)
+                                    const Icon(
+                                      Symbols.check,
+                                      size: 18,
+                                      color: AppTheme.primaryColor,
+                                    )
+                                  else
+                                    const SizedBox(width: 18),
+                                  const SizedBox(width: 8),
+                                  Text(mode),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _selectedModeFilter != 'Tous'
+                                ? AppTheme.primaryColor
+                                : (isDark
+                                      ? Colors.white10
+                                      : Colors.grey.shade300),
+                          ),
+                          color: _selectedModeFilter != 'Tous'
+                              ? AppTheme.primaryColor.withOpacity(0.1)
+                              : null,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Symbols.tune, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              _selectedModeFilter == 'Tous'
+                                  ? 'Filtres'
+                                  : _selectedModeFilter,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           _buildTransactionTable(isDark, theme),
+          _buildPaginationControls(isDark),
         ],
       ),
     );
   }
 
+  Widget _buildPaginationControls(bool isDark) {
+    if (_totalPayments == 0) return const SizedBox.shrink();
+
+    final totalPages = (_totalPayments / _itemsPerPage).ceil();
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Affichage de ${(_currentPage - 1) * _itemsPerPage + 1} à ${Math.min(_currentPage * _itemsPerPage, _totalPayments)} sur $_totalPayments transactions',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          Row(
+            children: [
+              _pageBtn(
+                icon: Symbols.chevron_left,
+                onPressed: _currentPage > 1 && !_isLoadingPayments
+                    ? () {
+                        setState(() => _currentPage--);
+                        _loadPaginatedPayments();
+                      }
+                    : null,
+                isDark: isDark,
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Page $_currentPage sur $totalPages',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _pageBtn(
+                icon: Symbols.chevron_right,
+                onPressed: _currentPage < totalPages && !_isLoadingPayments
+                    ? () {
+                        setState(() => _currentPage++);
+                        _loadPaginatedPayments();
+                      }
+                    : null,
+                isDark: isDark,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pageBtn({
+    required IconData icon,
+    required VoidCallback? onPressed,
+    required bool isDark,
+  }) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      style: IconButton.styleFrom(
+        backgroundColor: isDark
+            ? Colors.white.withOpacity(0.05)
+            : Colors.grey.shade100,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
   Widget _buildTransactionTable(bool isDark, ThemeData theme) {
+    if (_isLoadingPayments) {
+      return const SizedBox(
+        height: 300,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: ConstrainedBox(

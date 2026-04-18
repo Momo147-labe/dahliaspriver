@@ -496,11 +496,17 @@ class _SubjectsPageState extends State<SubjectsPage>
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 6,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.1,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: MediaQuery.of(context).size.width > 1200
+            ? 4
+            : MediaQuery.of(context).size.width > 900
+            ? 3
+            : MediaQuery.of(context).size.width > 600
+            ? 2
+            : 1,
+        crossAxisSpacing: 20,
+        mainAxisSpacing: 20,
+        mainAxisExtent: 160,
       ),
       itemCount: _filteredSubjects.length,
       itemBuilder: (context, index) {
@@ -571,6 +577,7 @@ class _SubjectsPageState extends State<SubjectsPage>
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
                         padding: const EdgeInsets.all(8),
@@ -588,42 +595,47 @@ class _SubjectsPageState extends State<SubjectsPage>
                           size: 20,
                         ),
                       ),
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () => _openEditModal(subject),
-                            icon: const Icon(
-                              Icons.edit_rounded,
-                              color: Colors.blue,
-                              size: 18,
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.blue.withOpacity(0.1),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: [
+                            IconButton(
+                              onPressed: () => _openEditModal(subject),
+                              icon: const Icon(
+                                Icons.edit_rounded,
+                                color: Colors.blue,
+                                size: 18,
                               ),
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(32, 32),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            onPressed: () => _handleDelete(subject),
-                            icon: const Icon(
-                              Icons.delete_rounded,
-                              color: Colors.red,
-                              size: 18,
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.red.withOpacity(0.1),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.blue.withOpacity(0.1),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(32, 32),
                               ),
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(32, 32),
                             ),
-                          ),
-                        ],
+                            IconButton(
+                              onPressed: () => _handleDelete(subject),
+                              icon: const Icon(
+                                Icons.delete_rounded,
+                                color: Colors.red,
+                                size: 18,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.red.withOpacity(0.1),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(32, 32),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),

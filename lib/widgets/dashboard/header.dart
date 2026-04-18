@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/academic_year_provider.dart';
 import '../../core/database/database_helper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../screens/auth/login_page.dart';
 import 'notification_modal.dart';
 
@@ -78,7 +79,7 @@ class _HeaderState extends State<Header> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      height: 90,
+      height: 70,
       decoration: BoxDecoration(
         color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
         border: Border(
@@ -98,231 +99,254 @@ class _HeaderState extends State<Header> {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Row(
-          children: [
-            // Loading state
-            if (_isLoading)
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: isDark ? AppTheme.cardDark : AppTheme.cardLight,
+        padding: EdgeInsets.symmetric(
+          horizontal: MediaQuery.of(context).size.width < 600 ? 12 : 24,
+          vertical: 10,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Row(
+            children: [
+              // Loading state
+              if (_isLoading)
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: isDark ? AppTheme.cardDark : AppTheme.cardLight,
+                  ),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isDark
+                              ? AppTheme.textDarkPrimary
+                              : AppTheme.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                child: Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        isDark
+
+              // Titre de la page
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.pageTitle,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: constraints.maxWidth < 600 ? 18 : null,
+                        color: isDark
                             ? AppTheme.textDarkPrimary
                             : AppTheme.textPrimary,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Consumer<AcademicYearProvider>(
+                      builder: (context, provider, child) {
+                        if (provider.isLoading) {
+                          return const SizedBox(
+                            height: 2,
+                            width: 100,
+                            child: LinearProgressIndicator(),
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              size: 10,
+                              color: isDark ? Colors.white70 : Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            if (constraints.maxWidth > 500) ...[
+                              Text(
+                                "Année active : ",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? Colors.white70 : Colors.grey,
+                                ),
+                              ),
+                            ],
+                            DropdownButtonHideUnderline(
+                              child: DropdownButton(
+                                isDense: true,
+                                value: provider.selectedAnneeId,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? Colors.white70 : Colors.grey,
+                                ),
+                                dropdownColor: isDark
+                                    ? AppTheme.cardDark
+                                    : Colors.white,
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    provider.setSelectedAnnee(value as int);
+                                  }
+                                },
+                                items: provider.allAnnees.map((annee) {
+                                  return DropdownMenuItem(
+                                    value: annee['id'],
+                                    child: Text(annee['libelle']),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // Bouton Déconnexion
+              Container(
+                margin: EdgeInsets.only(
+                  right: constraints.maxWidth < 600 ? 8 : 16,
+                ),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppTheme.errorColor.withOpacity(0.1)
+                      : AppTheme.errorColor.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.errorColor.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: IconButton(
+                  onPressed: () => _showLogoutDialog(context),
+                  icon: Icon(
+                    Icons.logout,
+                    color: AppTheme.errorColor,
+                    size: 15,
+                  ),
+                  tooltip: "Déconnexion",
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
               ),
 
-            // Titre de la page
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    widget.pageTitle,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isDark
-                          ? AppTheme.textDarkPrimary
-                          : AppTheme.textPrimary,
+              // Bouton de changement de thème
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.cardDark : AppTheme.cardLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                    width: 1,
+                  ),
+                ),
+                child: IconButton(
+                  onPressed: () {
+                    Provider.of<ThemeProvider>(
+                      context,
+                      listen: false,
+                    ).toggleTheme();
+                  },
+                  icon: Icon(
+                    isDark ? Icons.light_mode : Icons.dark_mode,
+                    color: isDark
+                        ? AppTheme.textDarkPrimary
+                        : AppTheme.textPrimary,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  Consumer<AcademicYearProvider>(
-                    builder: (context, provider, child) {
-                      if (provider.isLoading) {
-                        return const SizedBox(
-                          height: 2,
-                          width: 100,
-                          child: LinearProgressIndicator(),
-                        );
-                      }
-                      return Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today,
-                            size: 12,
-                            color: isDark ? Colors.white70 : Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          DropdownButtonHideUnderline(
-                            child: DropdownButton(
-                              isDense: true,
-                              value: provider.selectedAnneeId,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isDark ? Colors.white70 : Colors.grey,
-                              ),
-                              dropdownColor: isDark
-                                  ? AppTheme.cardDark
-                                  : Colors.white,
-                              onChanged: (value) {
-                                if (value != null) {
-                                  provider.setSelectedAnnee(value as int);
-                                }
-                              },
-                              items: provider.allAnnees.map((annee) {
-                                return DropdownMenuItem(
-                                  value: annee['id'],
-                                  child: Text(annee['libelle']),
-                                );
-                              }).toList(),
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // Notifications
+              Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDark : AppTheme.cardLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark
+                            ? AppTheme.borderDark
+                            : AppTheme.borderLight,
+                        width: 1,
+                      ),
+                    ),
+                    child: IconButton(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => Dialog(
+                            backgroundColor: Colors.transparent,
+                            child: NotificationModal(
+                              overdueStudents: overdueStudents,
+                              onRefresh: _loadOverdueStudents,
                             ),
                           ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Bouton Déconnexion
-            Container(
-              margin: const EdgeInsets.only(right: 16),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppTheme.errorColor.withOpacity(0.1)
-                    : AppTheme.errorColor.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppTheme.errorColor.withOpacity(0.2),
-                  width: 1,
-                ),
-              ),
-              child: IconButton(
-                onPressed: () => _showLogoutDialog(context),
-                icon: Icon(Icons.logout, color: AppTheme.errorColor, size: 20),
-                tooltip: "Déconnexion",
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-
-            // Bouton de changement de thème
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.cardDark : AppTheme.cardLight,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
-                  width: 1,
-                ),
-              ),
-              child: IconButton(
-                onPressed: () {
-                  Provider.of<ThemeProvider>(
-                    context,
-                    listen: false,
-                  ).toggleTheme();
-                },
-                icon: Icon(
-                  isDark ? Icons.light_mode : Icons.dark_mode,
-                  color: isDark
-                      ? AppTheme.textDarkPrimary
-                      : AppTheme.textPrimary,
-                ),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 16),
-
-            // Notifications
-            Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTheme.cardDark : AppTheme.cardLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isDark
-                          ? AppTheme.borderDark
-                          : AppTheme.borderLight,
-                      width: 1,
+                        );
+                      },
+                      icon: Icon(
+                        Icons.notifications,
+                        color: isDark
+                            ? AppTheme.textDarkPrimary
+                            : AppTheme.textPrimary,
+                        size: 15,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
-                  child: IconButton(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => Dialog(
-                          backgroundColor: Colors.transparent,
-                          child: NotificationModal(
-                            overdueStudents: overdueStudents,
-                            onRefresh: _loadOverdueStudents,
+                  if (overdueStudents.isNotEmpty)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.errorColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark
+                                ? AppTheme.surfaceDark
+                                : AppTheme.surfaceLight,
+                            width: 2,
                           ),
                         ),
-                      );
-                    },
-                    icon: Icon(
-                      Icons.notifications,
-                      color: isDark
-                          ? AppTheme.textDarkPrimary
-                          : AppTheme.textPrimary,
-                      size: 20,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                if (overdueStudents.isNotEmpty)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: AppTheme.errorColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark
-                              ? AppTheme.surfaceDark
-                              : AppTheme.surfaceLight,
-                          width: 2,
-                        ),
-                      ),
-                      child: Text(
-                        '${overdueStudents.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
+                        child: Text(
+                          '${overdueStudents.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
+                ],
+              ),
 
-            const SizedBox(width: 16),
-          ],
+              const SizedBox(width: 16),
+            ],
+          ),
         ),
       ),
     );
@@ -347,12 +371,18 @@ class _HeaderState extends State<Header> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginPage()),
-                (route) => false,
-              );
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('userId');
+              await prefs.setBool('rememberMe', false);
+
+              if (context.mounted) {
+                Navigator.pop(context); // Close dialog
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.errorColor,

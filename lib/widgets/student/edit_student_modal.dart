@@ -32,6 +32,10 @@ class _EditStudentModalState extends State<EditStudentModal> {
   late TextEditingController _lieuNaissanceController;
   late TextEditingController _personneAPrevenirController;
   late TextEditingController _contactUrgenceController;
+  late TextEditingController _nomPereController;
+  late TextEditingController _prenomPereController;
+  late TextEditingController _nomMereController;
+  late TextEditingController _prenomMereController;
 
   late String _selectedSexe;
   File? _selectedImage;
@@ -50,6 +54,14 @@ class _EditStudentModalState extends State<EditStudentModal> {
     );
     _lieuNaissanceController = TextEditingController(
       text: widget.student.lieuNaissance,
+    );
+    _nomPereController = TextEditingController(text: widget.student.nomPere);
+    _prenomPereController = TextEditingController(
+      text: widget.student.prenomPere,
+    );
+    _nomMereController = TextEditingController(text: widget.student.nomMere);
+    _prenomMereController = TextEditingController(
+      text: widget.student.prenomMere,
     );
     _personneAPrevenirController = TextEditingController(
       text: widget.student.personneAPrevenir,
@@ -74,6 +86,10 @@ class _EditStudentModalState extends State<EditStudentModal> {
     _lieuNaissanceController.dispose();
     _personneAPrevenirController.dispose();
     _contactUrgenceController.dispose();
+    _nomPereController.dispose();
+    _prenomPereController.dispose();
+    _nomMereController.dispose();
+    _prenomMereController.dispose();
     super.dispose();
   }
 
@@ -156,6 +172,10 @@ class _EditStudentModalState extends State<EditStudentModal> {
         'photo': _selectedImage?.path ?? widget.student.photo,
         'personne_a_prevenir': _personneAPrevenirController.text.trim(),
         'contact_urgence': _contactUrgenceController.text.trim(),
+        'nom_pere': _nomPereController.text.trim(),
+        'prenom_pere': _prenomPereController.text.trim(),
+        'nom_mere': _nomMereController.text.trim(),
+        'prenom_mere': _prenomMereController.text.trim(),
       };
 
       await db.update(
@@ -221,6 +241,8 @@ class _EditStudentModalState extends State<EditStudentModal> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildPersonalInfo(),
+                      const SizedBox(height: 32),
+                      _buildParentsInfo(),
                       const SizedBox(height: 32),
                     ],
                   ),
@@ -784,6 +806,64 @@ class _EditStudentModalState extends State<EditStudentModal> {
               : null,
         ),
       ],
+    );
+  }
+
+  Widget _buildParentsInfo() {
+    return _buildSection(
+      title: 'Informations des Parents',
+      icon: Icons.family_restroom,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: _nomPereController,
+                  label: 'Nom du Père',
+                  hintText: 'Nom',
+                  icon: Icons.person,
+                  isRequired: false,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildTextField(
+                  controller: _prenomPereController,
+                  label: 'Prénom du Père',
+                  hintText: 'Prénom',
+                  icon: Icons.person_outline,
+                  isRequired: false,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: _nomMereController,
+                  label: 'Nom de la Mère',
+                  hintText: 'Nom',
+                  icon: Icons.person,
+                  isRequired: false,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildTextField(
+                  controller: _prenomMereController,
+                  label: 'Prénom de la Mère',
+                  hintText: 'Prénom',
+                  icon: Icons.person_outline,
+                  isRequired: false,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

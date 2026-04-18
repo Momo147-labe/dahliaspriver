@@ -19,6 +19,7 @@ class _CoursesPageState extends State<CoursesPage>
   late Timer _timer;
   late AnimationController _animationController;
   DateTime _currentTime = DateTime.now();
+  String _lastStatusTime = '';
 
   @override
   void initState() {
@@ -41,10 +42,16 @@ class _CoursesPageState extends State<CoursesPage>
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
-        setState(() {
-          _currentTime = DateTime.now();
-        });
-        _updateCourseStatus();
+        final now = DateTime.now();
+        if (now.weekday != _currentTime.weekday) {
+          _currentTime = now;
+          _loadData(); // Recharger si on change de jour
+        } else {
+          setState(() {
+            _currentTime = now;
+          });
+          _updateCourseStatus();
+        }
       }
     });
   }
@@ -88,6 +95,10 @@ class _CoursesPageState extends State<CoursesPage>
     final now = DateTime.now();
     final currentTime =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    // Eviter de recalculer les listes chaque seconde si la minute n'a pas changé!
+    if (_lastStatusTime == currentTime) return;
+    _lastStatusTime = currentTime;
 
     final currentCourses = <Map<String, dynamic>>[];
     final upcomingCourses = <Map<String, dynamic>>[];
@@ -446,11 +457,15 @@ class _CoursesPageState extends State<CoursesPage>
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: MediaQuery.of(context).size.width > 1200
+                  ? 3
+                  : (MediaQuery.of(context).size.width > 800 ? 2 : 1),
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 2.0,
+              childAspectRatio: MediaQuery.of(context).size.width > 800
+                  ? 2.0
+                  : 2.5,
             ),
             itemCount: _currentCourses.length,
             itemBuilder: (context, index) {
@@ -540,11 +555,15 @@ class _CoursesPageState extends State<CoursesPage>
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: MediaQuery.of(context).size.width > 1200
+                  ? 3
+                  : (MediaQuery.of(context).size.width > 800 ? 2 : 1),
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 2.0,
+              childAspectRatio: MediaQuery.of(context).size.width > 800
+                  ? 2.0
+                  : 2.5,
             ),
             itemCount: _upcomingCourses.length,
             itemBuilder: (context, index) {

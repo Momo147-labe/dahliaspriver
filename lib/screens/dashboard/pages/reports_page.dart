@@ -6,6 +6,7 @@ import '../../../widgets/reports/bulletin_preview.dart';
 import '../../../widgets/reports/bulletin_pdf_helper.dart';
 import '../../../models/ecole.dart';
 import '../../grades/result_sheet_selection_modal.dart';
+import '../../../theme/app_theme.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -22,6 +23,10 @@ class _ReportsPageState extends State<ReportsPage> {
   Ecole? _ecole;
   double _zoomLevel = 0.85;
   bool _isLoading = true;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _leftPanelScrollController = ScrollController();
+  final ScrollController _rightPanelScrollController = ScrollController();
 
   final List<String> _trimestres = [
     '1er Trimestre',
@@ -33,6 +38,7 @@ class _ReportsPageState extends State<ReportsPage> {
   List<Map<String, dynamic>> _students = [];
   List<Map<String, dynamic>> _grades = [];
   Map<String, dynamic> _bulletinStats = {};
+  Map<int, bool> _studentCompletionStatus = {};
 
   String? _anneeLibelle;
 
@@ -78,7 +84,28 @@ class _ReportsPageState extends State<ReportsPage> {
 
   Future<void> _loadStudentsForClass(int classId) async {
     setState(() => _isLoading = true);
+
+    // Load students
     final students = await _dbHelper.getStudentsByClasse(classId);
+
+    // Load completion status for current term
+    final anneeId = await _dbHelper.ensureActiveAnneeCached();
+    if (anneeId != null) {
+      final statusList = await _dbHelper.getStudentsCompletionStatus(
+        classId,
+        _selectedTrimestre + 1,
+        anneeId,
+      );
+
+      _studentCompletionStatus = {
+        for (var item in statusList)
+          (item['eleve_id'] as int):
+              (item['total_subjects'] as int) > 0 &&
+              (item['subjects_with_notes'] as int) >=
+                  (item['total_subjects'] as int),
+      };
+    }
+
     if (mounted) {
       setState(() {
         _students = List<Map<String, dynamic>>.from(students);
@@ -144,9 +171,11 @@ class _ReportsPageState extends State<ReportsPage> {
         anneeId,
       );
 
+      final formattedGrades = _groupGradesBySubject(notes);
+
       if (mounted) {
         setState(() {
-          _grades = List<Map<String, dynamic>>.from(notes);
+          _grades = formattedGrades;
           _bulletinStats = stats;
           _isLoading = false;
         });
@@ -164,30 +193,42 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    _leftPanelScrollController.dispose();
+    _rightPanelScrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Couleurs du design HTML
-    const primaryColor = Color(0xFF13DAEC);
-    const backgroundLight = Color(0xFFF6F8F8);
-    const backgroundDark = Color(0xFF102022);
-    const surfaceDark = Color(0xFF1A2B2D);
-    const borderLight = Color(0xFFDBE5E6);
-    const borderDark = Color(0xFF2A3A3C);
-    const textPrimary = Color(0xFF111718);
-    const textSecondary = Color(0xFF618689);
-    const textSecondaryDark = Color(0xFFA1B6B8);
-    const surfaceSecondary = Color(0xFFF0F4F4);
-    const surfaceSecondaryDark = Color(0xFF243537);
+    // Use AppTheme constants instead of local hardcoded colors
+    final primaryColor = AppTheme.primaryColor;
+    final textPrimary = isDark
+        ? AppTheme.textDarkPrimary
+        : AppTheme.textPrimary;
+    final textSecondary = isDark
+        ? AppTheme.textDarkSecondary
+        : AppTheme.textSecondary;
+    final borderMain = isDark ? AppTheme.borderDark : AppTheme.borderLight;
+    final surfaceMain = isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight;
+    final backgroundMain = isDark
+        ? AppTheme.backgroundDark
+        : AppTheme.backgroundLight;
+    final surfaceSecondary = isDark
+        ? AppTheme.cardDark.withOpacity(0.5)
+        : AppTheme.cardLight;
 
     return Container(
-      color: isDark ? backgroundDark : backgroundLight,
+      color: backgroundMain,
       child: Column(
         children: [
           // Fixed Header Section
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -197,12 +238,10 @@ class _ReportsPageState extends State<ReportsPage> {
                   primaryColor,
                   textPrimary,
                   textSecondary,
-                  textSecondaryDark,
-                  borderLight,
-                  borderDark,
-                  surfaceDark,
+                  borderMain,
+                  surfaceMain,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
 
                 // Academic Term Tabs
                 _buildTrimestreTabs(
@@ -210,9 +249,7 @@ class _ReportsPageState extends State<ReportsPage> {
                   primaryColor,
                   textPrimary,
                   textSecondary,
-                  textSecondaryDark,
-                  borderLight,
-                  borderDark,
+                  borderMain,
                 ),
               ],
             ),
@@ -222,46 +259,42 @@ class _ReportsPageState extends State<ReportsPage> {
           Expanded(
             child: _isLoading && _classes.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 0,
-                    ),
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Left Panel: Classes & Students
-                        Flexible(
-                          flex: 4,
+                        SizedBox(
+                          width: 320,
                           child: _buildLeftPanel(
                             isDark,
                             primaryColor,
                             textPrimary,
                             textSecondary,
-                            textSecondaryDark,
-                            borderLight,
-                            borderDark,
-                            surfaceDark,
+                            borderMain,
+                            surfaceMain,
                             surfaceSecondary,
-                            surfaceSecondaryDark,
                           ),
                         ),
                         const SizedBox(width: 24),
                         // Right Panel: Preview
-                        Flexible(
-                          flex: 8,
+                        Expanded(
                           child: _selectedStudent == null
-                              ? Center(child: Text('Aucun élève sélectionné'))
+                              ? Center(
+                                  child: Text(
+                                    'Aucun élève sélectionné',
+                                    style: TextStyle(color: textSecondary),
+                                  ),
+                                )
                               : _buildRightPanel(
                                   isDark,
                                   primaryColor,
                                   textPrimary,
                                   textSecondary,
-                                  borderLight,
-                                  borderDark,
-                                  surfaceDark,
+                                  borderMain,
+                                  surfaceMain,
                                   surfaceSecondary,
-                                  surfaceSecondaryDark,
                                 ),
                         ),
                       ],
@@ -278,10 +311,8 @@ class _ReportsPageState extends State<ReportsPage> {
     Color primaryColor,
     Color textPrimary,
     Color textSecondary,
-    Color textSecondaryDark,
-    Color borderLight,
-    Color borderDark,
-    Color surfaceDark,
+    Color borderMain,
+    Color surfaceMain,
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -289,10 +320,9 @@ class _ReportsPageState extends State<ReportsPage> {
         if (constraints.maxWidth > 800) {
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Flexible(
-                flex: 2,
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -300,7 +330,7 @@ class _ReportsPageState extends State<ReportsPage> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: primaryColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
@@ -311,9 +341,10 @@ class _ReportsPageState extends State<ReportsPage> {
                             size: 24,
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             ShaderMask(
                               shaderCallback: (bounds) => LinearGradient(
@@ -325,7 +356,7 @@ class _ReportsPageState extends State<ReportsPage> {
                               child: const Text(
                                 'Gestion des Rapports',
                                 style: TextStyle(
-                                  fontSize: 28,
+                                  fontSize: 24,
                                   fontWeight: FontWeight.w900,
                                   color: Colors.white,
                                   letterSpacing: -0.5,
@@ -335,10 +366,8 @@ class _ReportsPageState extends State<ReportsPage> {
                             Text(
                               'Générez et visualisez les bulletins scolaires',
                               style: TextStyle(
-                                fontSize: 14,
-                                color: isDark
-                                    ? textSecondaryDark
-                                    : textSecondary,
+                                fontSize: 13,
+                                color: textSecondary,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -346,98 +375,52 @@ class _ReportsPageState extends State<ReportsPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
-              Flexible(
-                flex: 1,
-                child: Wrap(
-                  alignment: WrapAlignment.end,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: isDark ? surfaceDark : Colors.white,
+              Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _showResultSheetModal,
+                    icon: const Icon(Icons.analytics_outlined, size: 18),
+                    label: const Text('Rapport de Classe'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDark ? surfaceMain : Colors.white,
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: primaryColor),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(
-                              isDark ? 0.3 : 0.05,
-                            ),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                        border: Border.all(
-                          color: isDark ? borderDark : borderLight,
-                          width: 1,
-                        ),
                       ),
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Exportation CSV en cours...'),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.file_download, size: 18),
-                        label: const Text('Exporter CSV'),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          foregroundColor: isDark ? Colors.white : textPrimary,
-                          side: BorderSide.none,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                        ),
-                      ),
+                      elevation: 0,
                     ),
-                    ElevatedButton.icon(
-                      onPressed: _showResultSheetModal,
-                      icon: const Icon(Icons.analytics_outlined, size: 18),
-                      label: const Text('Rapport de Classe'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: primaryColor,
-                        side: BorderSide(color: primaryColor),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        elevation: 0,
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _exportBatchPdf,
+                    icon: const Icon(Icons.print, size: 18),
+                    label: const Text('Générer Bulletins (PDF)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: textPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
                       ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: _exportBatchPdf,
-                      icon: const Icon(Icons.print, size: 18),
-                      label: const Text('Générer Bulletins (PDF)'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: textPrimary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
                       ),
+                      elevation: 2,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           );
@@ -457,45 +440,41 @@ class _ReportsPageState extends State<ReportsPage> {
               const SizedBox(height: 8),
               Text(
                 'Sélectionnez une classe et un élève pour prévisualiser ou imprimer les rapports.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDark ? textSecondaryDark : textSecondary,
-                ),
+                style: TextStyle(fontSize: 14, color: textSecondary),
               ),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.file_download, size: 18),
-                    label: const Text('Exporter CSV'),
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: isDark ? surfaceDark : Colors.white,
-                      foregroundColor: isDark ? Colors.white : textPrimary,
-                      side: BorderSide(
-                        color: isDark ? borderDark : borderLight,
-                      ),
+                  ElevatedButton.icon(
+                    onPressed: _showResultSheetModal,
+                    icon: const Icon(Icons.analytics_outlined, size: 18),
+                    label: const Text('Rapport de Classe'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDark ? surfaceMain : Colors.white,
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: primaryColor),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 12,
+                        vertical: 10,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      elevation: 0,
                     ),
                   ),
                   ElevatedButton.icon(
                     onPressed: _exportBatchPdf,
                     icon: const Icon(Icons.print, size: 18),
-                    label: const Text('Générer Tous (PDF)'),
+                    label: const Text('Générer Bulletins (PDF)'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: textPrimary,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
+                        horizontal: 16,
+                        vertical: 10,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -517,15 +496,11 @@ class _ReportsPageState extends State<ReportsPage> {
     Color primaryColor,
     Color textPrimary,
     Color textSecondary,
-    Color textSecondaryDark,
-    Color borderLight,
-    Color borderDark,
+    Color borderMain,
   ) {
     return Container(
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: isDark ? borderDark : borderLight),
-        ),
+        border: Border(bottom: BorderSide(color: borderMain)),
       ),
       child: IntrinsicWidth(
         child: Row(
@@ -537,18 +512,20 @@ class _ReportsPageState extends State<ReportsPage> {
               child: InkWell(
                 onTap: () {
                   setState(() => _selectedTrimestre = index);
-                  _loadBulletinData();
+                  if (_selectedClasse != null) {
+                    _loadStudentsForClass(_selectedClasse!['id']);
+                  }
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    vertical: 12,
+                    vertical: 8,
                     horizontal: 16,
                   ),
                   decoration: BoxDecoration(
                     border: Border(
                       bottom: BorderSide(
                         color: isSelected ? primaryColor : Colors.transparent,
-                        width: 3,
+                        width: 2,
                       ),
                     ),
                   ),
@@ -561,7 +538,7 @@ class _ReportsPageState extends State<ReportsPage> {
                         letterSpacing: 0.015,
                         color: isSelected
                             ? (isDark ? Colors.white : textPrimary)
-                            : (isDark ? textSecondaryDark : textSecondary),
+                            : textSecondary,
                       ),
                     ),
                   ),
@@ -579,209 +556,154 @@ class _ReportsPageState extends State<ReportsPage> {
     Color primaryColor,
     Color textPrimary,
     Color textSecondary,
-    Color textSecondaryDark,
-    Color borderLight,
-    Color borderDark,
-    Color surfaceDark,
+    Color borderMain,
+    Color surfaceMain,
     Color surfaceSecondary,
-    Color surfaceSecondaryDark,
   ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Class Selection Grid
+        // Class Selection List
         Container(
-          padding: const EdgeInsets.all(16),
+          height: 140,
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isDark ? surfaceDark : Colors.white,
+            color: surfaceMain,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isDark ? borderDark : borderLight),
+            border: Border.all(color: borderMain),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.groups, color: primaryColor, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Classes Disponibles',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: isDark ? Colors.white : textPrimary,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: _classes.length,
+            itemBuilder: (context, index) {
+              final classe = _classes[index];
+              final isSelected = _selectedClasse?['id'] == classe['id'];
+              return Container(
+                width: 140,
+                margin: const EdgeInsets.only(right: 12),
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedClasse = classe;
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                    _loadStudentsForClass(classe['id']);
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? primaryColor.withOpacity(0.08)
+                          : surfaceSecondary,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected ? primaryColor : Colors.transparent,
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 200,
-                child: ListView.builder(
-                  itemCount: _classes.length,
-                  itemBuilder: (context, index) {
-                    final classe = _classes[index];
-                    final isSelected = _selectedClasse?['id'] == classe['id'];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: InkWell(
-                        onTap: () {
-                          setState(() => _selectedClasse = classe);
-                          _loadStudentsForClass(classe['id']);
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? primaryColor.withOpacity(0.08)
-                                : (isDark
-                                      ? surfaceSecondaryDark
-                                      : surfaceSecondary),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? primaryColor
-                                  : Colors.transparent,
-                              width: 1.5,
-                            ),
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: primaryColor.withOpacity(0.1),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ]
-                                : [],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? primaryColor
-                                      : Colors.grey.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  Icons.class_outlined,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : (isDark
-                                            ? Colors.white70
-                                            : textSecondary),
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      classe['nom'] as String,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 15,
-                                        color: isSelected
-                                            ? primaryColor
-                                            : (isDark
-                                                  ? Colors.white
-                                                  : textPrimary),
-                                      ),
-                                    ),
-                                    Text(
-                                      '${classe['student_count'] ?? 0} Élèves',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isDark
-                                            ? textSecondaryDark
-                                            : textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (isSelected)
-                                Icon(
-                                  Icons.check_circle,
-                                  color: primaryColor,
-                                  size: 20,
-                                ),
-                            ],
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.class_outlined,
+                          color: isSelected ? primaryColor : textSecondary,
+                          size: 24,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          classe['nom'] as String,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: isSelected ? primaryColor : textPrimary,
                           ),
                         ),
-                      ),
-                    );
-                  },
+                        Text(
+                          '${classe['student_count'] ?? 0} Élèves',
+                          style: TextStyle(fontSize: 10, color: textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
         ),
-        const SizedBox(height: 24),
-        // Student List
-        SizedBox(
-          height: 500, // Hauteur fixe pour éviter le problème avec Expanded
+        const SizedBox(height: 16),
+        // Student List with Search
+        Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: isDark ? surfaceDark : Colors.white,
+              color: surfaceMain,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isDark ? borderDark : borderLight),
+              border: Border.all(color: borderMain),
             ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
+                // Header + Search
+                Padding(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: isDark ? borderDark : borderLight,
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
                     children: [
-                      Text(
-                        'Liste des Élèves (${_selectedClasse?['nom'] ?? ""})',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: isDark ? Colors.white : textPrimary,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Élèves',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: isDark ? Colors.white : textPrimary,
+                            ),
+                          ),
+                          Text(
+                            '${_students.length} au total',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          'COMPLET',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.green.shade700,
-                            letterSpacing: 0.5,
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _searchController,
+                        onChanged: (v) => setState(() => _searchQuery = v),
+                        decoration: InputDecoration(
+                          hintText: 'Rechercher un élève...',
+                          prefixIcon: const Icon(Icons.search, size: 18),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.all(10),
+                          fillColor: surfaceSecondary,
+                          filled: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
+                const Divider(height: 1),
                 Expanded(
                   child: ListView.builder(
+                    padding: EdgeInsets.zero,
                     itemCount: _students.length,
                     itemBuilder: (context, index) {
                       final student = _students[index];
+                      final fullName = '${student['nom']} ${student['prenom']}'
+                          .toLowerCase();
+                      if (_searchQuery.isNotEmpty &&
+                          !fullName.contains(_searchQuery.toLowerCase())) {
+                        return const SizedBox.shrink();
+                      }
+
                       final isSelected =
                           _selectedStudent?['id'] == student['id'];
                       final initiales =
@@ -793,7 +715,10 @@ class _ReportsPageState extends State<ReportsPage> {
                           _loadBulletinData();
                         },
                         child: Container(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? primaryColor.withOpacity(0.05)
@@ -805,82 +730,91 @@ class _ReportsPageState extends State<ReportsPage> {
                                     : Colors.transparent,
                                 width: 4,
                               ),
-                              bottom: BorderSide(
-                                color: isDark ? borderDark : borderLight,
-                                width: index < _students.length - 1 ? 1 : 0,
-                              ),
+                              bottom: BorderSide(color: borderMain),
                             ),
                           ),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? primaryColor.withOpacity(0.2)
-                                          : (isDark
-                                                ? surfaceSecondaryDark
-                                                : surfaceSecondary),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        initiales.toUpperCase(),
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: isSelected
-                                              ? primaryColor
-                                              : (isDark
-                                                    ? Colors.white70
-                                                    : textPrimary),
-                                        ),
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: isSelected
+                                    ? primaryColor.withOpacity(0.2)
+                                    : surfaceSecondary,
+                                child: Text(
+                                  initiales.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected
+                                        ? primaryColor
+                                        : textPrimary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${student['nom']} ${student['prenom']}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                        color: isDark
+                                            ? Colors.white
+                                            : textPrimary,
                                       ),
+                                    ),
+                                    Text(
+                                      student['matricule'] ?? '',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (_studentCompletionStatus[student['id']] ??
+                                  false)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Prêt',
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${student['nom']} ${student['prenom']}',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 14,
-                                          color: isDark
-                                              ? Colors.white
-                                              : textPrimary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Matricule: ${student['matricule']}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: isDark
-                                              ? textSecondaryDark
-                                              : textSecondary,
-                                        ),
-                                      ),
-                                    ],
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
                                   ),
-                                ],
-                              ),
-                              Icon(
-                                isSelected
-                                    ? Icons.visibility
-                                    : Icons.description,
-                                color: isSelected
-                                    ? primaryColor
-                                    : (isDark
-                                          ? textSecondaryDark
-                                          : textSecondary),
-                                size: 20,
-                              ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Incomplet',
+                                    style: TextStyle(
+                                      color: Colors.orange,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -901,11 +835,9 @@ class _ReportsPageState extends State<ReportsPage> {
     Color primaryColor,
     Color textPrimary,
     Color textSecondary,
-    Color borderLight,
-    Color borderDark,
-    Color surfaceDark,
+    Color borderMain,
+    Color surfaceMain,
     Color surfaceSecondary,
-    Color surfaceSecondaryDark,
   ) {
     bool isAnnual = _selectedTrimestre == 3;
 
@@ -916,9 +848,9 @@ class _ReportsPageState extends State<ReportsPage> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? surfaceDark : Colors.white,
+            color: surfaceMain,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isDark ? borderDark : borderLight),
+            border: Border.all(color: borderMain),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -940,7 +872,7 @@ class _ReportsPageState extends State<ReportsPage> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: isDark ? surfaceSecondaryDark : surfaceSecondary,
+                      color: surfaceSecondary,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -983,12 +915,12 @@ class _ReportsPageState extends State<ReportsPage> {
                   IconButton(
                     icon: const Icon(Icons.print, size: 20),
                     onPressed: _exportIndividualPdf,
-                    color: isDark ? Colors.white70 : textPrimary,
+                    color: isDark ? AppTheme.textDarkSecondary : textPrimary,
                   ),
                   IconButton(
                     icon: const Icon(Icons.picture_as_pdf, size: 20),
                     onPressed: _exportIndividualPdf,
-                    color: isDark ? Colors.white70 : textPrimary,
+                    color: isDark ? AppTheme.textDarkSecondary : textPrimary,
                   ),
                   IconButton(
                     icon: const Icon(Icons.edit, size: 20),
@@ -1002,16 +934,19 @@ class _ReportsPageState extends State<ReportsPage> {
         ),
         const SizedBox(height: 24),
         // The Actual Bulletin Document
-        SizedBox(
-          height: 900,
+        Expanded(
           child: Container(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0C1A1C) : const Color(0xFFE2E8E9),
+              color: isDark
+                  ? AppTheme.backgroundDark.withOpacity(0.5)
+                  : AppTheme.backgroundLight,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderMain),
             ),
             child: Center(
               child: SingleChildScrollView(
+                controller: _rightPanelScrollController,
                 child: BulletinPreview(
                   zoomLevel: _zoomLevel,
                   trimestre: _trimestres[_selectedTrimestre].toUpperCase(),
@@ -1022,21 +957,7 @@ class _ReportsPageState extends State<ReportsPage> {
                     ...Map<String, dynamic>.from(_selectedStudent ?? {}),
                     'classe_nom': _selectedClasse?['nom'] ?? '',
                   },
-                  grades: isAnnual
-                      ? _grades // Already in correct format for annual
-                      : _grades.map((n) {
-                          final double note =
-                              (n['note'] as num?)?.toDouble() ?? 0.0;
-                          final double coeff =
-                              (n['coefficient'] as num?)?.toDouble() ?? 1.0;
-                          return {
-                            'matiere': n['matiere_nom'],
-                            'coeff': coeff,
-                            'note': note,
-                            'total': note * coeff,
-                            'obs': _getObservation(note),
-                          };
-                        }).toList(),
+                  grades: _grades,
                   summary: {
                     'moyenne':
                         ((_bulletinStats['average'] as num?)?.toDouble())
@@ -1048,6 +969,7 @@ class _ReportsPageState extends State<ReportsPage> {
                         ((_bulletinStats['classAverage'] as num?)?.toDouble())
                             ?.toStringAsFixed(2) ??
                         '0.00',
+                    'moyennePassage': _bulletinStats['moyenne_passage'],
                     'observations': _getFinalObservation(
                       (_bulletinStats['average'] as num?)?.toDouble() ?? 0.0,
                     ),
@@ -1087,17 +1009,7 @@ class _ReportsPageState extends State<ReportsPage> {
                 ..._selectedStudent!,
                 'classe_nom': _selectedClasse!['nom'],
               },
-              grades: _grades
-                  .map(
-                    (n) => {
-                      'matiere_nom': n['matiere_nom'],
-                      // Note mapping is different for BulletinPdfHelper._buildGradesTable
-                      // It expects 'note' and 'coefficient'
-                      'note': n['note'],
-                      'coefficient': n['coefficient'],
-                    },
-                  )
-                  .toList(),
+              grades: _grades,
               stats: _bulletinStats,
               ecole: _ecole,
               trimestre: _trimestres[_selectedTrimestre],
@@ -1173,15 +1085,7 @@ class _ReportsPageState extends State<ReportsPage> {
 
           allData.add({
             'student': {...student, 'classe_nom': _selectedClasse!['nom']},
-            'grades': notes
-                .map(
-                  (n) => {
-                    'matiere_nom': n['matiere_nom'],
-                    'note': n['note'],
-                    'coefficient': n['coefficient'],
-                  },
-                )
-                .toList(),
+            'grades': _groupGradesBySubject(notes),
             'stats': stats,
           });
         }
@@ -1236,5 +1140,55 @@ class _ReportsPageState extends State<ReportsPage> {
     if (average >= 12) return 'Bon travail, peut encore mieux faire.';
     if (average >= 10) return 'Résultats passables, redoublez d\'effort.';
     return 'Résultats insuffisants, doit travailler davantage.';
+  }
+
+  List<Map<String, dynamic>> _groupGradesBySubject(
+    List<Map<String, dynamic>> rawNotes,
+  ) {
+    Map<String, Map<String, dynamic>> grouped = {};
+    for (var n in rawNotes) {
+      String mId = n['matiere_id']?.toString() ?? n['matiere_nom'];
+      if (!grouped.containsKey(mId)) {
+        grouped[mId] = {
+          'matiere': n['matiere_nom'],
+          'coeff': (n['coefficient'] as num?)?.toDouble() ?? 1.0,
+          'control': null,
+          'comp': null,
+        };
+      }
+
+      double val = (n['note'] as num?)?.toDouble() ?? 0.0;
+      int seq = n['sequence'] ?? 1;
+
+      if (seq % 3 == 0) {
+        grouped[mId]!['comp'] = val;
+      } else {
+        if (grouped[mId]!['control'] == null) {
+          grouped[mId]!['control'] = val;
+        } else {
+          grouped[mId]!['control'] = (grouped[mId]!['control'] + val) / 2;
+        }
+      }
+    }
+
+    return grouped.values.map((g) {
+      double? ctrl = g['control'] as double?;
+      double? comp = g['comp'] as double?;
+      double? avg;
+      if (ctrl != null && comp != null) {
+        avg = (ctrl + comp) / 2;
+      } else {
+        avg = ctrl ?? comp;
+      }
+      return {
+        'matiere': g['matiere'],
+        'coeff': g['coeff'],
+        'note_ctrl': ctrl,
+        'note_comp': comp,
+        'note': avg,
+        'total': (avg ?? 0) * (g['coeff'] as double),
+        'obs': _getObservation(avg ?? 0.0),
+      };
+    }).toList();
   }
 }

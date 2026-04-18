@@ -182,7 +182,7 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
                         ),
                       ),
                       Text(
-                        'Notes ${cycle['note_min']} à ${cycle['note_max']} • Moyenne passage: ${cycle['moyenne_passage']}/20',
+                        'Notes ${cycle['note_min']} à ${cycle['note_max']} • Moyenne passage: ${cycle['moyenne_passage']}/${cycle['note_max']}',
                         style: TextStyle(color: Colors.grey[500], fontSize: 12),
                       ),
                     ],

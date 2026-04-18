@@ -31,20 +31,23 @@ class _PaiementModalState extends State<PaiementModal> {
 
   // Calcul des montants
   double get _montantInscription {
-    return widget.typeInscription == 'inscription' 
+    return widget.typeInscription == 'inscription'
         ? (widget.frais['inscription'] ?? 0.0).toDouble()
         : (widget.frais['reinscription'] ?? 0.0).toDouble();
   }
 
   double get _montantTotal {
-    return _montantInscription + 
-           (widget.frais['tranche1'] ?? 0.0).toDouble() +
-           (widget.frais['tranche2'] ?? 0.0).toDouble() +
-           (widget.frais['tranche3'] ?? 0.0).toDouble();
+    return _montantInscription +
+        (widget.frais['tranche1'] ?? 0.0).toDouble() +
+        (widget.frais['tranche2'] ?? 0.0).toDouble() +
+        (widget.frais['tranche3'] ?? 0.0).toDouble();
   }
 
   double get _montantRestant {
-    return _montantTotal - (_montantController.text.isNotEmpty ? double.parse(_montantController.text) : 0.0);
+    return _montantTotal -
+        (_montantController.text.isNotEmpty
+            ? double.parse(_montantController.text)
+            : 0.0);
   }
 
   @override
@@ -54,24 +57,24 @@ class _PaiementModalState extends State<PaiementModal> {
   }
 
   Future<void> _effectuerPaiement() async {
-    if (_montantController.text.isEmpty || 
+    if (_montantController.text.isEmpty ||
         double.parse(_montantController.text) <= 0) {
       _showError('Veuillez entrer un montant valide');
       return;
     }
 
     if (double.parse(_montantController.text) < _montantInscription) {
-      _showError('Le montant minimum pour ${widget.typeInscription} est de ${_montantInscription.toStringAsFixed(2)}');
+      _showError(
+        'Le montant minimum pour ${widget.typeInscription} est de ${_montantInscription.toStringAsFixed(2)}',
+      );
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final db = await DatabaseHelper.instance.database;
-      
       // Créer l'enregistrement de paiement
-      await db.insert('paiements', {
+      await DatabaseHelper.instance.addPaiement({
         'eleve_id': widget.eleve['id'],
         'classe_id': widget.classe['id'],
         'frais_id': widget.frais['id'],
@@ -87,21 +90,21 @@ class _PaiementModalState extends State<PaiementModal> {
       });
 
       // Mettre à jour le statut de l'élève
-      await db.update(
-        'eleve',
-        {'statut': widget.typeInscription == 'inscription' ? 'inscrit' : 'reinscrit'},
-        where: 'id = ?',
-        whereArgs: [widget.eleve['id']],
+      await DatabaseHelper.instance.eleveDao.updateEleveStatut(
+        widget.eleve['id'],
+        widget.typeInscription == 'inscription' ? 'inscrit' : 'reinscrit',
       );
 
       setState(() => _isLoading = false);
-      
+
       if (mounted) {
         Navigator.pop(context);
         widget.onPaiementComplete();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Paiement de ${_montantController.text} enregistré avec succès'),
+            content: Text(
+              'Paiement de ${_montantController.text} enregistré avec succès',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -114,10 +117,7 @@ class _PaiementModalState extends State<PaiementModal> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -205,11 +205,23 @@ class _PaiementModalState extends State<PaiementModal> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _buildFraisItem('Frais d\'${widget.typeInscription}', _montantInscription),
+                  _buildFraisItem(
+                    'Frais d\'${widget.typeInscription}',
+                    _montantInscription,
+                  ),
                   if (widget.typeInscription == 'inscription') ...[
-                    _buildFraisItem('Tranche 1', (widget.frais['tranche1'] ?? 0.0).toDouble()),
-                    _buildFraisItem('Tranche 2', (widget.frais['tranche2'] ?? 0.0).toDouble()),
-                    _buildFraisItem('Tranche 3', (widget.frais['tranche3'] ?? 0.0).toDouble()),
+                    _buildFraisItem(
+                      'Tranche 1',
+                      (widget.frais['tranche1'] ?? 0.0).toDouble(),
+                    ),
+                    _buildFraisItem(
+                      'Tranche 2',
+                      (widget.frais['tranche2'] ?? 0.0).toDouble(),
+                    ),
+                    _buildFraisItem(
+                      'Tranche 3',
+                      (widget.frais['tranche3'] ?? 0.0).toDouble(),
+                    ),
                   ],
                   const Divider(),
                   _buildFraisItem('Total', _montantTotal, isTotal: true),
@@ -227,9 +239,12 @@ class _PaiementModalState extends State<PaiementModal> {
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       labelText: 'Montant à payer *',
-                      hintText: 'Montant minimum: ${_montantInscription.toStringAsFixed(2)}',
+                      hintText:
+                          'Montant minimum: ${_montantInscription.toStringAsFixed(2)}',
                       prefixIcon: const Icon(Icons.attach_money),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -237,14 +252,22 @@ class _PaiementModalState extends State<PaiementModal> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _modePaiement,
-                    onChanged: (value) => setState(() => _modePaiement = value!),
+                    onChanged: (value) =>
+                        setState(() => _modePaiement = value!),
                     decoration: InputDecoration(
                       labelText: 'Mode de paiement',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    items: ['Espèces', 'Chèque', 'Virement', 'Mobile Money'].map((mode) {
-                      return DropdownMenuItem(value: mode, child: Text(mode));
-                    }).toList(),
+                    items: ['Espèces', 'Chèque', 'Virement', 'Mobile Money']
+                        .map((mode) {
+                          return DropdownMenuItem(
+                            value: mode,
+                            child: Text(mode),
+                          );
+                        })
+                        .toList(),
                   ),
                 ),
               ],
@@ -256,7 +279,9 @@ class _PaiementModalState extends State<PaiementModal> {
               decoration: InputDecoration(
                 labelText: 'Référence de paiement',
                 hintText: 'Numéro de chèque, référence virement...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -266,7 +291,9 @@ class _PaiementModalState extends State<PaiementModal> {
               maxLines: 2,
               decoration: InputDecoration(
                 labelText: 'Observations',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -276,7 +303,9 @@ class _PaiementModalState extends State<PaiementModal> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _montantRestant <= 0 ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                  color: _montantRestant <= 0
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.orange.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -294,7 +323,9 @@ class _PaiementModalState extends State<PaiementModal> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
-                        color: _montantRestant <= 0 ? Colors.green : Colors.orange,
+                        color: _montantRestant <= 0
+                            ? Colors.green
+                            : Colors.orange,
                       ),
                     ),
                   ],
@@ -316,14 +347,22 @@ class _PaiementModalState extends State<PaiementModal> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryColor,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: _isLoading
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Text('Confirmer le paiement'),
                 ),
@@ -356,7 +395,9 @@ class _PaiementModalState extends State<PaiementModal> {
             style: TextStyle(
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
               fontSize: isTotal ? 16 : 14,
-              color: isTotal ? AppTheme.primaryColor : (isDark ? Colors.white70 : Colors.black54),
+              color: isTotal
+                  ? AppTheme.primaryColor
+                  : (isDark ? Colors.white70 : Colors.black54),
             ),
           ),
         ],

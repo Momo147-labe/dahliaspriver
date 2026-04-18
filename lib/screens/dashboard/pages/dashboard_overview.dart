@@ -7,6 +7,10 @@ import '../../../core/database/database_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/academic_year_provider.dart';
+import '../../../services/pdf/dashboard_pdf_service.dart';
+import '../../../widgets/student/add_student_modal.dart';
+import './payment/new_payment_page.dart';
+import './settings_page.dart';
 
 class DashboardOverview extends StatefulWidget {
   final Function(int)? onNavigate;
@@ -25,6 +29,17 @@ class _DashboardOverviewState extends State<DashboardOverview> {
     symbol: 'GNF',
     decimalDigits: 0,
   );
+
+  String _formatAbbreviatedAmount(double value) {
+    if (value >= 1000000000) {
+      return '${(value / 1000000000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')} Md GNF';
+    } else if (value >= 1000000) {
+      return '${(value / 1000000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')} M GNF';
+    } else if (value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')} k GNF';
+    }
+    return '${value.toStringAsFixed(0)} GNF';
+  }
 
   @override
   void initState() {
@@ -88,7 +103,12 @@ class _DashboardOverviewState extends State<DashboardOverview> {
             const SizedBox(height: 32),
 
             // Statistics Cards
-            _buildStatsGrid(context, financial, recoveryRate),
+            _buildStatsGrid(
+              context,
+              financial,
+              recoveryRate,
+              _stats?['academic'] ?? {},
+            ),
 
             const SizedBox(height: 40),
 
@@ -108,18 +128,18 @@ class _DashboardOverviewState extends State<DashboardOverview> {
             const SizedBox(height: 48),
 
             // Bottom Content: Attendance & Reports
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Wrap(
+              spacing: 32,
+              runSpacing: 32,
+              crossAxisAlignment: WrapCrossAlignment.start,
               children: [
-                Expanded(flex: 2, child: _buildGraphsGrid(theme, isDark)),
-                const SizedBox(width: 32),
-                Expanded(
-                  child: Container(
-                    height: 1050,
-                    child: RecentReports(
-                      recentPayments: List<Map<String, dynamic>>.from(
-                        _stats?['recentPayments'] ?? [],
-                      ),
+                SizedBox(width: 800, child: _buildGraphsGrid(theme, isDark)),
+                SizedBox(
+                  width: 400,
+                  height: 800,
+                  child: RecentReports(
+                    recentPayments: List<Map<String, dynamic>>.from(
+                      _stats?['recentPayments'] ?? [],
                     ),
                   ),
                 ),
@@ -136,29 +156,42 @@ class _DashboardOverviewState extends State<DashboardOverview> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Tableau de Bord Global',
-              style: theme.textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: isDark ? Colors.white : AppTheme.textPrimary,
-                fontSize: 28,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tableau de Bord Global',
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? Colors.white : AppTheme.textPrimary,
+                  fontSize: 28,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Aperçu en temps réel des statistiques de l\'établissement',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: AppTheme.textSecondary,
+              const SizedBox(height: 8),
+              Text(
+                'Aperçu en temps réel des statistiques de l\'établissement',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         Row(
           children: [
-            _buildHeaderButton(Icons.download_rounded, 'Exporter', isDark),
+            _buildHeaderButton(
+              Icons.download_rounded,
+              'Exporter',
+              isDark,
+              onTap: () async {
+                if (_stats != null) {
+                  await DashboardPdfService.generateDashboardReport(_stats!);
+                }
+              },
+            ),
             const SizedBox(width: 12),
             _buildHeaderButton(
               Icons.refresh_rounded,
@@ -216,14 +249,17 @@ class _DashboardOverviewState extends State<DashboardOverview> {
     BuildContext context,
     Map financial,
     double recoveryRate,
+    Map academic,
   ) {
-    return GridView.count(
+    return GridView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: _getCrossAxisCount(context),
-      crossAxisSpacing: 24,
-      mainAxisSpacing: 24,
-      childAspectRatio: 1.3,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: _getCrossAxisCount(context),
+        crossAxisSpacing: 24,
+        mainAxisSpacing: 24,
+        mainAxisExtent: 190,
+      ),
       children: [
         StatsCard(
           title: 'Effectif Total',
@@ -253,7 +289,10 @@ class _DashboardOverviewState extends State<DashboardOverview> {
         ),
         StatsCard(
           title: 'Collecte Mensuelle',
-          value: _currencyFormat.format(financial['thisMonth'] ?? 0),
+          value: _formatAbbreviatedAmount(
+            financial['thisMonth']?.toDouble() ?? 0.0,
+          ),
+          tooltipMessage: _currencyFormat.format(financial['thisMonth'] ?? 0),
           subtitle:
               '${(financial['growth'] ?? 0) >= 0 ? '+' : ''}${financial['growth']?.toStringAsFixed(1)}% vs mois dernier',
           icon: Icons.payments_rounded,
@@ -262,6 +301,54 @@ class _DashboardOverviewState extends State<DashboardOverview> {
           subtitleColor: (financial['growth'] ?? 0) >= 0
               ? Colors.green
               : Colors.red,
+        ),
+        StatsCard(
+          title: 'Moyenne Générale',
+          value:
+              '${(academic['average'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+          subtitle: 'Moyenne de l\'école',
+          icon: Icons.analytics_rounded,
+          iconColor: Colors.white,
+          iconBackgroundColor: Colors.purple,
+        ),
+        StatsCard(
+          title: 'Taux de Réussite',
+          value:
+              '${(academic['successRate'] as num?)?.toStringAsFixed(1) ?? '0.0'}%',
+          subtitle: 'Global (Matières)',
+          icon: Icons.auto_graph_rounded,
+          iconColor: Colors.white,
+          iconBackgroundColor: Colors.teal,
+          showProgress: true,
+          progressValue:
+              ((academic['successRate'] as num?)?.toDouble() ?? 0.0) / 100,
+        ),
+        StatsCard(
+          title: 'Réussite Hommes',
+          value:
+              '${(academic['maleSuccessRate'] as num?)?.toStringAsFixed(1) ?? '0.0'}%',
+          subtitle:
+              '${academic['malePassed'] ?? 0}/${academic['maleTotal'] ?? 0} garçons admis',
+          icon: Icons.male_rounded,
+          iconColor: Colors.white,
+          iconBackgroundColor: Colors.blue.shade700,
+          showProgress: true,
+          progressValue:
+              ((academic['maleSuccessRate'] as num?)?.toDouble() ?? 0.0) / 100,
+        ),
+        StatsCard(
+          title: 'Réussite Femmes',
+          value:
+              '${(academic['femaleSuccessRate'] as num?)?.toStringAsFixed(1) ?? '0.0'}%',
+          subtitle:
+              '${academic['femalePassed'] ?? 0}/${academic['femaleTotal'] ?? 0} filles admises',
+          icon: Icons.female_rounded,
+          iconColor: Colors.white,
+          iconBackgroundColor: Colors.pink.shade400,
+          showProgress: true,
+          progressValue:
+              ((academic['femaleSuccessRate'] as num?)?.toDouble() ?? 0.0) /
+              100,
         ),
       ],
     );
@@ -278,14 +365,32 @@ class _DashboardOverviewState extends State<DashboardOverview> {
             'Nouvel Élève',
             Colors.blue,
             isDark,
-            targetIndex: 1,
+            onTap: () {
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => AddStudentModal(
+                  onSuccess: () {
+                    if (_lastLoadedAnneeId != null) {
+                      _loadDashboardData(_lastLoadedAnneeId!);
+                    }
+                  },
+                  onClose: () => Navigator.pop(context),
+                ),
+              );
+            },
           ),
           _buildActionItem(
             Icons.add_card_rounded,
-            'Comptabilité',
+            'Nouveau Paiement',
             Colors.green,
             isDark,
-            targetIndex: 7,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NewPaymentPage()),
+              );
+            },
           ),
           _buildActionItem(
             Icons.class_rounded,
@@ -313,7 +418,15 @@ class _DashboardOverviewState extends State<DashboardOverview> {
             'Paramètres',
             Colors.grey,
             isDark,
-            targetIndex: 11,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      SettingsPage(onRetour: () => Navigator.pop(context)),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -326,6 +439,7 @@ class _DashboardOverviewState extends State<DashboardOverview> {
     Color color,
     bool isDark, {
     int? targetIndex,
+    VoidCallback? onTap,
   }) {
     return Container(
       width: 160,
@@ -334,11 +448,13 @@ class _DashboardOverviewState extends State<DashboardOverview> {
         color: isDark ? AppTheme.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          onTap: () {
-            if (targetIndex != null && widget.onNavigate != null) {
-              widget.onNavigate!(targetIndex);
-            }
-          },
+          onTap:
+              onTap ??
+              () {
+                if (targetIndex != null && widget.onNavigate != null) {
+                  widget.onNavigate!(targetIndex);
+                }
+              },
           borderRadius: BorderRadius.circular(16),
           child: Container(
             padding: const EdgeInsets.all(16),
@@ -380,17 +496,20 @@ class _DashboardOverviewState extends State<DashboardOverview> {
   Widget _buildGraphsGrid(ThemeData theme, bool isDark) {
     return Column(
       children: [
-        Row(
+        Wrap(
+          spacing: 24,
+          runSpacing: 24,
           children: [
-            Expanded(
+            SizedBox(
+              width: 380,
               child: _buildPieChartCard(
                 'Répartition par Sexe',
                 _stats?['genderStats'] ?? [],
                 isGender: true,
               ),
             ),
-            const SizedBox(width: 24),
-            Expanded(
+            SizedBox(
+              width: 380,
               child: _buildPieChartCard(
                 'Répartition par Cycle',
                 _stats?['cycleStats'] ?? [],
@@ -709,29 +828,29 @@ class _DashboardOverviewState extends State<DashboardOverview> {
                   ),
           ),
           const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 16,
+            runSpacing: 8,
             children: data.map((e) {
               final formatter = NumberFormat.currency(
                 locale: 'fr_FR',
                 symbol: 'GNF',
                 decimalDigits: 0,
               );
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Container(width: 12, height: 12, color: e['color']),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${e['label']}: ${formatter.format(e['value'])}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 12, height: 12, color: e['color']),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${e['label']}: ${formatter.format(e['value'])}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               );
             }).toList(),
           ),

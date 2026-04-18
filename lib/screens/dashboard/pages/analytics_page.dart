@@ -583,10 +583,6 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         (_classData['cycleDistribution'] as List<dynamic>?)
             ?.cast<Map<String, dynamic>>() ??
         [];
-    final levelDistribution =
-        (_classData['levelDistribution'] as List<dynamic>?)
-            ?.cast<Map<String, dynamic>>() ??
-        [];
 
     return _buildSection(
       title: 'Classes',

@@ -17,7 +17,8 @@ class _TeachersPageState extends State<TeachersPage>
     with SingleTickerProviderStateMixin {
   List<Enseignant> _teachers = [];
   List<Enseignant> _filteredTeachers = [];
-  Map<int, List<Map<String, dynamic>>> _teacherClasses = {}; // enseignant_id -> classes
+  Map<int, List<Map<String, dynamic>>> _teacherClasses =
+      {}; // enseignant_id -> classes
   Map<String, dynamic> _stats = {
     'total_enseignants': 0,
     'total_specialites': 0,
@@ -64,7 +65,10 @@ class _TeachersPageState extends State<TeachersPage>
       Map<int, List<Map<String, dynamic>>> teacherClasses = {};
       if (anneeId != null) {
         for (var teacherData in teachersData) {
-          final classes = await db.getClassesByTeacher(teacherData['id'], anneeId);
+          final classes = await db.getClassesByTeacher(
+            teacherData['id'],
+            anneeId,
+          );
           teacherClasses[teacherData['id']] = classes;
         }
       }
@@ -277,13 +281,15 @@ class _TeachersPageState extends State<TeachersPage>
   }
 
   Widget _buildStatsSection(bool isDark) {
-    return GridView.count(
+    return GridView(
       shrinkWrap: true,
-      crossAxisCount: 4,
-      crossAxisSpacing: 24,
-      mainAxisSpacing: 24,
-      childAspectRatio: 2.2,
       physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: MediaQuery.of(context).size.width > 900 ? 4 : 2,
+        crossAxisSpacing: 24,
+        mainAxisSpacing: 24,
+        mainAxisExtent: 140,
+      ),
       children: [
         _buildStatCard(
           'Total Enseignants',
@@ -485,29 +491,32 @@ class _TeachersPageState extends State<TeachersPage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           Icon(icon, color: Colors.white, size: 32),
         ],
       ),
@@ -747,7 +756,8 @@ class _TeachersPageState extends State<TeachersPage>
             ),
             const Spacer(),
             // Afficher les classes assignées
-            if (_teacherClasses[teacher.id] != null && _teacherClasses[teacher.id]!.isNotEmpty) ...[
+            if (_teacherClasses[teacher.id] != null &&
+                _teacherClasses[teacher.id]!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 'Classes assignées:',
@@ -763,28 +773,30 @@ class _TeachersPageState extends State<TeachersPage>
                 runSpacing: 4,
                 children: _teacherClasses[teacher.id]!
                     .take(3) // Limiter à 3 classes pour éviter l'overflow
-                    .map((classe) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
+                    .map(
+                      (classe) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: color.withOpacity(0.3),
+                            width: 0.5,
                           ),
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: color.withOpacity(0.3),
-                              width: 0.5,
-                            ),
+                        ),
+                        child: Text(
+                          classe['nom'],
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: color,
+                            fontWeight: FontWeight.w500,
                           ),
-                          child: Text(
-                            classe['nom'],
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: color,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ))
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
               if (_teacherClasses[teacher.id]!.length > 3)
@@ -903,7 +915,8 @@ class _TeachersPageState extends State<TeachersPage>
                   teacher.specialite ?? 'Sans spécialité',
                   style: TextStyle(color: color, fontSize: 12),
                 ),
-                if (_teacherClasses[teacher.id] != null && _teacherClasses[teacher.id]!.isNotEmpty)
+                if (_teacherClasses[teacher.id] != null &&
+                    _teacherClasses[teacher.id]!.isNotEmpty)
                   Text(
                     'Classes: ${_teacherClasses[teacher.id]!.map((c) => c['nom']).join(', ')}',
                     style: TextStyle(

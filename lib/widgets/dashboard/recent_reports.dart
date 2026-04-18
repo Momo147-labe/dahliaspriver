@@ -79,11 +79,14 @@ class RecentReports extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Activités Récentes',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : AppTheme.textPrimary,
+                      Expanded(
+                        child: Text(
+                          'Activités Récentes',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : AppTheme.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Icon(
@@ -141,6 +144,8 @@ class RecentReports extends StatelessWidget {
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 12,
                                               ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
@@ -150,6 +155,8 @@ class RecentReports extends StatelessWidget {
                                                 color: AppTheme.textSecondary,
                                                 fontSize: 10,
                                               ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
                                     ),
@@ -230,11 +237,14 @@ class RecentReports extends StatelessWidget {
                   children: [
                     Icon(Icons.offline_pin, color: Colors.green, size: 20),
                     const SizedBox(width: 12),
-                    Text(
-                      'Mode Hors Ligne Actif',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: Colors.green.shade800,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        'Mode Hors Ligne Actif',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: Colors.green.shade800,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

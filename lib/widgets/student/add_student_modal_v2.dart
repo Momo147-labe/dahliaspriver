@@ -27,7 +27,9 @@ class _AddStudentModalState extends State<AddStudentModal>
   final _dateNaissanceController = TextEditingController();
   final _lieuNaissanceController = TextEditingController();
   final _nomPereController = TextEditingController();
+  final _prenomPereController = TextEditingController();
   final _nomMereController = TextEditingController();
+  final _prenomMereController = TextEditingController();
 
   // Variables
   String? _selectedSexe;
@@ -140,7 +142,9 @@ class _AddStudentModalState extends State<AddStudentModal>
         'lieu_naissance': _lieuNaissanceController.text.trim(),
         'sexe': _selectedSexe,
         'nom_pere': _nomPereController.text.trim(),
+        'prenom_pere': _prenomPereController.text.trim(),
         'nom_mere': _nomMereController.text.trim(),
+        'prenom_mere': _prenomMereController.text.trim(),
         'classe_id': _selectedClasseId,
         'statut': _selectedStatut,
         'photo': _selectedImage?.path ?? '',
@@ -151,7 +155,7 @@ class _AddStudentModalState extends State<AddStudentModal>
       final studentId = await db.insert('eleve', studentData);
 
       // Créer le parcours de l'étudiant
-      await db.insert('parcours_eleve', {
+      await db.insert('eleve_parcours', {
         'eleve_id': studentId,
         'classe_id': _selectedClasseId,
         'annee_scolaire_id': DatabaseHelper.activeAnneeId!,
@@ -195,7 +199,9 @@ class _AddStudentModalState extends State<AddStudentModal>
     _dateNaissanceController.dispose();
     _lieuNaissanceController.dispose();
     _nomPereController.dispose();
+    _prenomPereController.dispose();
     _nomMereController.dispose();
+    _prenomMereController.dispose();
     super.dispose();
   }
 
@@ -442,17 +448,39 @@ class _AddStudentModalState extends State<AddStudentModal>
                         child: _buildTextField(
                           _nomPereController,
                           'Nom du père',
-                          'Nom complet du père',
+                          'Nom',
                           icon: Icons.person,
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: _buildTextField(
+                          _prenomPereController,
+                          'Prénom du père',
+                          'Prénom',
+                          icon: Icons.person_outline,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
                           _nomMereController,
                           'Nom de la mère',
-                          'Nom complet de la mère',
+                          'Nom',
                           icon: Icons.person,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildTextField(
+                          _prenomMereController,
+                          'Prénom de la mère',
+                          'Prénom',
+                          icon: Icons.person_outline,
                         ),
                       ),
                     ],

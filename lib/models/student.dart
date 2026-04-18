@@ -9,7 +9,9 @@ class Student {
   final String lieuNaissance;
   final String sexe;
   final String? nomPere;
+  final String? prenomPere;
   final String? nomMere;
+  final String? prenomMere;
   final String classe;
   final String annee;
   final String statut;
@@ -26,7 +28,9 @@ class Student {
     required this.lieuNaissance,
     required this.sexe,
     this.nomPere,
+    this.prenomPere,
     this.nomMere,
+    this.prenomMere,
     required this.classe,
     this.annee = '',
     required this.statut,
@@ -46,7 +50,9 @@ class Student {
       lieuNaissance: map['lieu_naissance']?.toString() ?? '',
       sexe: map['sexe']?.toString() ?? 'M',
       nomPere: map['nom_pere']?.toString(),
+      prenomPere: map['prenom_pere']?.toString(),
       nomMere: map['nom_mere']?.toString(),
+      prenomMere: map['prenom_mere']?.toString(),
       classe: map['classe_nom']?.toString() ?? '',
       annee: map['annee']?.toString() ?? '',
       statut: map['statut']?.toString() ?? 'inscrit',
@@ -67,7 +73,9 @@ class Student {
       'lieu_naissance': lieuNaissance,
       'sexe': sexe,
       'nom_pere': nomPere,
+      'prenom_pere': prenomPere,
       'nom_mere': nomMere,
+      'prenom_mere': prenomMere,
       'classe': classe,
       'annee': annee,
       'statut': statut,
@@ -87,7 +95,9 @@ class Student {
     String? lieuNaissance,
     String? sexe,
     String? nomPere,
+    String? prenomPere,
     String? nomMere,
+    String? prenomMere,
     String? classe,
     String? annee,
     String? statut,
@@ -104,7 +114,9 @@ class Student {
       lieuNaissance: lieuNaissance ?? this.lieuNaissance,
       sexe: sexe ?? this.sexe,
       nomPere: nomPere ?? this.nomPere,
+      prenomPere: prenomPere ?? this.prenomPere,
       nomMere: nomMere ?? this.nomMere,
+      prenomMere: prenomMere ?? this.prenomMere,
       classe: classe ?? this.classe,
       annee: annee ?? this.annee,
       statut: statut ?? this.statut,
@@ -116,6 +128,15 @@ class Student {
 
   // Getter pour le nom complet
   String get fullName => '$nom $prenom';
+
+  String get fatherFullName => '${prenomPere ?? ''} ${nomPere ?? ''}'.trim();
+  String get motherFullName => '${prenomMere ?? ''} ${nomMere ?? ''}'.trim();
+
+  String get parentName {
+    if (fatherFullName.isNotEmpty) return fatherFullName;
+    if (motherFullName.isNotEmpty) return motherFullName;
+    return 'Non défini';
+  }
 
   // Getter pour l'affichage du sexe
   String get sexeDisplay => sexe == 'M' ? 'Masculin' : 'Féminin';

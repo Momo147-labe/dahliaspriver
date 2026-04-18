@@ -98,6 +98,8 @@ class BulletinPreview extends StatelessWidget {
               moyenne: summary['moyenne'] ?? '',
               rang: summary['rang'] ?? '',
               moyenneGenerale: summary['moyenneGenerale'] ?? '',
+              moyennePassage:
+                  (summary['moyennePassage'] as num?)?.toDouble() ?? 10.0,
             ),
             const SizedBox(height: 24),
 

@@ -18,6 +18,8 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
   final confirmCtrl = TextEditingController();
   final secretCtrl = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
 
   @override
   Widget build(BuildContext context) {
@@ -140,8 +142,23 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                                         controller: passwordCtrl,
                                         placeholder: "••••••••",
                                         prefixIcon: Icons.lock,
-                                        obscureText: true,
+                                        obscureText: _obscurePassword,
                                         isDark: isDark,
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _obscurePassword
+                                                ? Icons.visibility
+                                                : Icons.visibility_off,
+                                            size: 20,
+                                            color: isDark
+                                                ? AppTheme.textDarkSecondary
+                                                : const Color(0xFF618689),
+                                          ),
+                                          onPressed: () => setState(
+                                            () => _obscurePassword =
+                                                !_obscurePassword,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 24),
@@ -151,8 +168,23 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                                         controller: confirmCtrl,
                                         placeholder: "••••••••",
                                         prefixIcon: Icons.key,
-                                        obscureText: true,
+                                        obscureText: _obscureConfirm,
                                         isDark: isDark,
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _obscureConfirm
+                                                ? Icons.visibility
+                                                : Icons.visibility_off,
+                                            size: 20,
+                                            color: isDark
+                                                ? AppTheme.textDarkSecondary
+                                                : const Color(0xFF618689),
+                                          ),
+                                          onPressed: () => setState(
+                                            () => _obscureConfirm =
+                                                !_obscureConfirm,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -164,8 +196,23 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                                       controller: passwordCtrl,
                                       placeholder: "••••••••",
                                       prefixIcon: Icons.lock,
-                                      obscureText: true,
+                                      obscureText: _obscurePassword,
                                       isDark: isDark,
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _obscurePassword
+                                              ? Icons.visibility
+                                              : Icons.visibility_off,
+                                          size: 20,
+                                          color: isDark
+                                              ? AppTheme.textDarkSecondary
+                                              : const Color(0xFF618689),
+                                        ),
+                                        onPressed: () => setState(
+                                          () => _obscurePassword =
+                                              !_obscurePassword,
+                                        ),
+                                      ),
                                     ),
                                     const SizedBox(height: 24),
                                     _buildTextField(
@@ -173,8 +220,23 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                                       controller: confirmCtrl,
                                       placeholder: "••••••••",
                                       prefixIcon: Icons.key,
-                                      obscureText: true,
+                                      obscureText: _obscureConfirm,
                                       isDark: isDark,
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _obscureConfirm
+                                              ? Icons.visibility
+                                              : Icons.visibility_off,
+                                          size: 20,
+                                          color: isDark
+                                              ? AppTheme.textDarkSecondary
+                                              : const Color(0xFF618689),
+                                        ),
+                                        onPressed: () => setState(
+                                          () => _obscureConfirm =
+                                              !_obscureConfirm,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -431,6 +493,7 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
     required IconData prefixIcon,
     required bool isDark,
     bool obscureText = false,
+    Widget? suffixIcon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,6 +523,7 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                   ? AppTheme.textDarkSecondary
                   : const Color(0xFF618689),
             ),
+            suffixIcon: suffixIcon,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(

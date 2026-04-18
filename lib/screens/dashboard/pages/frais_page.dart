@@ -350,37 +350,13 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
           if (_showEditModal) _buildEditModal(),
         ],
       ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton.extended(
-            onPressed: _showMultiClassModal,
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
-            heroTag: "multi",
-            label: const Text('Multi-Classes'),
-            icon: const Icon(Symbols.school),
-          ),
-          const SizedBox(height: 12),
-          FloatingActionButton.extended(
-            onPressed: () {
-              _initializeNewFrais();
-              setState(() => _showAddModal = true);
-            },
-            backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
-            heroTag: "single",
-            label: const Text('Classe unique'),
-            icon: const Icon(Symbols.add),
-          ),
-        ],
-      ),
     );
   }
 
   Widget _buildHeader(bool isDark) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
@@ -437,7 +413,73 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
             ),
           ],
         ),
+        Row(
+          children: [
+            _headerActionBtn(
+              label: 'Multi-Classes',
+              icon: Symbols.school,
+              onTap: _showMultiClassModal,
+              color: AppTheme.primaryColor,
+              isDark: isDark,
+            ),
+            const SizedBox(width: 16),
+            _headerActionBtn(
+              label: 'Classe unique',
+              icon: Symbols.add,
+              onTap: () {
+                _initializeNewFrais();
+                setState(() => _showAddModal = true);
+              },
+              color: Colors.orange.shade700,
+              isDark: isDark,
+            ),
+          ],
+        ),
       ],
+    );
+  }
+
+  Widget _headerActionBtn({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+    required Color color,
+    required bool isDark,
+  }) {
+    return Container(
+      height: 54,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
     );
   }
 
@@ -452,13 +494,19 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
         ? totalMontant / _frais.length
         : 0.0;
 
-    return GridView.count(
+    return GridView(
       shrinkWrap: true,
-      crossAxisCount: 4,
-      crossAxisSpacing: 24,
-      mainAxisSpacing: 24,
-      childAspectRatio: 1.8,
       physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: MediaQuery.of(context).size.width > 1200
+            ? 4
+            : MediaQuery.of(context).size.width > 800
+            ? 2
+            : 1,
+        crossAxisSpacing: 24,
+        mainAxisSpacing: 24,
+        mainAxisExtent: 140,
+      ),
       children: [
         _buildStatCard(
           'Total Classes',

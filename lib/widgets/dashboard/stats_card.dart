@@ -13,6 +13,7 @@ class StatsCard extends StatelessWidget {
   final double? progressValue;
   final bool showProgress;
   final Color? subtitleColor;
+  final String? tooltipMessage;
 
   const StatsCard({
     super.key,
@@ -27,6 +28,7 @@ class StatsCard extends StatelessWidget {
     this.progressValue,
     this.showProgress = false,
     this.subtitleColor,
+    this.tooltipMessage,
   });
 
   @override
@@ -34,8 +36,34 @@ class StatsCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    Widget valueWidget = Text(
+      value,
+      style: theme.textTheme.headlineMedium?.copyWith(
+        fontWeight: FontWeight.w900,
+        color: isDark ? Colors.white : AppTheme.textPrimary,
+        fontSize: 20,
+      ),
+    );
+
+    if (tooltipMessage != null) {
+      valueWidget = Tooltip(
+        message: tooltipMessage!,
+        textStyle: const TextStyle(
+          fontSize: 14,
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black87,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: valueWidget,
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
         borderRadius: BorderRadius.circular(16),
@@ -84,7 +112,7 @@ class StatsCard extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Titre
           Text(
@@ -92,24 +120,19 @@ class StatsCard extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppTheme.textSecondary,
               fontWeight: FontWeight.w500,
-              fontSize: 14,
+              fontSize: 13,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
 
           // Valeur et sous-titre
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                value,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: isDark ? Colors.white : AppTheme.textPrimary,
-                  fontSize: 20,
-                ),
-              ),
+              valueWidget,
               if (subtitle != null) ...[
                 const SizedBox(width: 8),
                 Flexible(

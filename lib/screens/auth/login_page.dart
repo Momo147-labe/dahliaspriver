@@ -19,6 +19,7 @@ class _LoginPageState extends State<LoginPage> {
   final passwordCtrl = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _rememberMe = false;
   Map<String, dynamic>? schoolData;
 
   @override
@@ -389,32 +390,58 @@ class _LoginPageState extends State<LoginPage> {
                       ],
                     ),
 
-                    const SizedBox(height: 16),
-
-                    // Forgot Password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ForgotPasswordPage(),
+                    // Remember Me & Forgot Password Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _rememberMe,
+                              onChanged: (val) {
+                                setState(() {
+                                  _rememberMe = val ?? false;
+                                });
+                              },
+                              activeColor: const Color(0xFF13DAEC),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
                             ),
-                          );
-                        },
-                        child: const Text(
-                          "Mot de passe oublié ?",
-                          style: TextStyle(
-                            color: Color(0xFF13DAEC),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                            Text(
+                              "Se souvenir de moi",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark
+                                    ? AppTheme.textDarkSecondary
+                                    : const Color(0xFF618689),
+                              ),
+                            ),
+                          ],
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const ForgotPasswordPage(),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            "Mot de passe oublié ?",
+                            style: TextStyle(
+                              color: Color(0xFF13DAEC),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
                     // Login Button
                     SizedBox(
@@ -622,6 +649,7 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setInt('userId', user['id'] as int);
         await prefs.setString('userRole', user['role'] as String);
         await prefs.setString('userName', user['pseudo'] as String);
+        await prefs.setBool('rememberMe', _rememberMe);
 
         // Vérifier si c'est un administrateur
         if (user['role'] == 'admin') {

@@ -15,6 +15,7 @@ class _EvaluationPlanningSettingsPageState
     extends State<EvaluationPlanningSettingsPage> {
   final _db = DatabaseHelper.instance;
   bool _isLoading = true;
+  bool _isLocked = true;
   List<Map<String, dynamic>> _sequences = [];
   int? _anneeId;
 
@@ -31,11 +32,7 @@ class _EvaluationPlanningSettingsPageState
       if (annee != null) {
         _anneeId = annee['id'];
         final data = await _db.getSequencesPlanification(_anneeId!);
-        if (data.isEmpty) {
-          _sequences = [];
-        } else {
-          _sequences = data.map((e) => Map<String, dynamic>.from(e)).toList();
-        }
+        _sequences = data.map((e) => Map<String, dynamic>.from(e)).toList();
       } else {
         _anneeId = null;
         _sequences = [];
@@ -64,37 +61,134 @@ class _EvaluationPlanningSettingsPageState
         'date_fin': DateTime.now()
             .add(const Duration(days: 30))
             .toIso8601String(),
-        'poids': 50.0,
         'statut': 'Planifiée',
       });
     });
   }
 
-  void _deleteSequence(int index) {
-    setState(() {
-      _sequences.removeAt(index);
-    });
+  void _addTrimester() {
+    int maxTrimester = _sequences.isEmpty
+        ? 0
+        : _sequences
+              .map((s) => s['trimestre'] as int)
+              .reduce((a, b) => a > b ? a : b);
+    _addSequence(maxTrimester + 1);
   }
 
-  void _resetToDefaults() {
-    if (_anneeId == null) return;
-    setState(() {
-      _sequences = List.generate(6, (index) {
-        int trimester = (index ~/ 2) + 1;
-        return {
-          'annee_scolaire_id': _anneeId,
-          'trimestre': trimester,
-          'numero_sequence': index + 1,
-          'nom': 'Séquence ${index + 1}',
-          'date_debut': DateTime.now().toIso8601String(),
-          'date_fin': DateTime.now()
-              .add(const Duration(days: 30))
-              .toIso8601String(),
-          'poids': 50.0,
-          'statut': index == 0 ? 'Ouverte' : 'Planifiée',
-        };
-      });
-    });
+  Future<void> _deleteSequence(int index) async {
+    final seq = _sequences[index];
+    if (seq['id'] != null) {
+      final hasGrades = await _db.hasGradesForSequence(
+        _anneeId!,
+        seq['trimestre'],
+        seq['numero_sequence'],
+      );
+
+      if (hasGrades) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Impossible de supprimer : cette séquence contient déjà des notes saisies.',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // Confirmation modal
+    if (mounted) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirmer la suppression'),
+          content: Text('Voulez-vous vraiment supprimer la "${seq['nom']}" ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text(
+                'Supprimer',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        setState(() {
+          _sequences.removeAt(index);
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteTrimester(int trimester) async {
+    final trimesterSeqs = _sequences
+        .where((s) => s['trimestre'] == trimester)
+        .toList();
+
+    // Check if any sequence has grades
+    for (final seq in trimesterSeqs) {
+      if (seq['id'] != null) {
+        final hasGrades = await _db.hasGradesForSequence(
+          _anneeId!,
+          seq['trimestre'],
+          seq['numero_sequence'],
+        );
+        if (hasGrades) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Impossible de supprimer le Trimestre $trimester : la "${seq['nom']}" contient déjà des notes.',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+    }
+
+    if (mounted) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Supprimer le Trimestre'),
+          content: Text(
+            'Voulez-vous vraiment supprimer tout le Trimestre $trimester ainsi que ses séquences ?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text(
+                'Supprimer tout',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        setState(() {
+          _sequences.removeWhere((s) => s['trimestre'] == trimester);
+        });
+      }
+    }
   }
 
   Future<void> _saveSettings() async {
@@ -110,6 +204,7 @@ class _EvaluationPlanningSettingsPageState
         );
       }
       await _loadData();
+      setState(() => _isLocked = true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -119,12 +214,6 @@ class _EvaluationPlanningSettingsPageState
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  double _getTrimesterTotal(int trimester) {
-    return _sequences
-        .where((s) => s['trimestre'] == trimester)
-        .fold(0.0, (sum, s) => sum + (s['poids'] ?? 0.0));
   }
 
   @override
@@ -156,6 +245,9 @@ class _EvaluationPlanningSettingsPageState
       );
     }
 
+    final trimesters =
+        _sequences.map((s) => s['trimestre'] as int).toSet().toList()..sort();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -163,28 +255,88 @@ class _EvaluationPlanningSettingsPageState
         children: [
           _buildHeader(),
           const SizedBox(height: 32),
-          // Grid des trimestres
           LayoutBuilder(
             builder: (context, constraints) {
               return Wrap(
                 spacing: 24,
                 runSpacing: 24,
                 children: [
-                  _buildTrimesterColumn(1, constraints.maxWidth, isDark),
-                  _buildTrimesterColumn(2, constraints.maxWidth, isDark),
-                  _buildTrimesterColumn(3, constraints.maxWidth, isDark),
+                  ...trimesters.map(
+                    (t) =>
+                        _buildTrimesterColumn(t, constraints.maxWidth, isDark),
+                  ),
+                  if (!_isLocked) _buildAddTrimesterCard(isDark),
                 ],
               );
             },
           ),
           const SizedBox(height: 40),
-          _buildBottomActionCard(isDark),
+          if (!_isLocked) _buildBottomActionCard(isDark),
         ],
       ),
     );
   }
 
   Widget _buildHeader() {
+    final isDesktop = MediaQuery.of(context).size.width > 900;
+
+    final titleSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Planification des Séquences',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Icon(
+              _isLocked ? Icons.lock_outline : Icons.lock_open_outlined,
+              color: _isLocked ? Colors.grey : AppTheme.primaryColor,
+              size: 24,
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _isLocked
+              ? 'Mode consultation. Déverrouillez pour modifier le calendrier.'
+              : 'Mode édition activé. Gérez les dates des évaluations.',
+          style: TextStyle(
+            color: _isLocked ? Colors.grey[500] : AppTheme.primaryColor,
+            fontSize: 16,
+            fontWeight: _isLocked ? FontWeight.normal : FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+
+    final actionButtons = Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      alignment: isDesktop ? WrapAlignment.end : WrapAlignment.start,
+      children: [
+        _buildHeaderButton(
+          _isLocked ? 'Déverrouiller' : 'Verrouiller',
+          _isLocked ? Icons.edit_outlined : Icons.lock_outline,
+          onPressed: () {
+            setState(() => _isLocked = !_isLocked);
+          },
+          isPrimary: !_isLocked,
+        ),
+        _buildHeaderButton(
+          'Aperçu global',
+          Icons.visibility_outlined,
+          onPressed: () {},
+          isPrimary: false,
+        ),
+      ],
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -202,61 +354,21 @@ class _EvaluationPlanningSettingsPageState
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Planification des Séquences',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Configurez les dates charnières et les coefficients pour chaque évaluation.',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 16),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                if (_sequences.isEmpty)
-                  _buildHeaderButton(
-                    'Générer par défaut',
-                    Icons.auto_awesome_outlined,
-                    onPressed: _resetToDefaults,
-                    isPrimary: true,
-                  )
-                else
-                  _buildHeaderButton(
-                    'Réinitialiser',
-                    Icons.refresh,
-                    onPressed: _resetToDefaults,
-                    isPrimary: false,
-                  ),
-                const SizedBox(width: 12),
-                _buildHeaderButton(
-                  'Aperçu global',
-                  Icons.visibility_outlined,
-                  onPressed: () {},
-                  isPrimary: false,
-                ),
-                const SizedBox(width: 12),
-                _buildHeaderButton(
-                  'Enregistrer le calendrier',
-                  Icons.save_outlined,
-                  onPressed: _saveSettings,
-                  isPrimary: true,
-                ),
-              ],
-            ),
-          ],
-        ),
+        if (isDesktop)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: titleSection),
+              const SizedBox(width: 24),
+              actionButtons,
+            ],
+          )
+        else
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [titleSection, const SizedBox(height: 16), actionButtons],
+          ),
       ],
     );
   }
@@ -304,8 +416,6 @@ class _EvaluationPlanningSettingsPageState
     final trimesterSeqs = _sequences
         .where((s) => s['trimestre'] == trimester)
         .toList();
-    final total = _getTrimesterTotal(trimester);
-    final isValid = total == 100.0;
 
     return SizedBox(
       width: columnWidth,
@@ -327,17 +437,31 @@ class _EvaluationPlanningSettingsPageState
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  trimester == 1
-                      ? 'Premier Trimestre'
-                      : (trimester == 2
-                            ? 'Deuxième Trimestre'
-                            : 'Troisième Trimestre'),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    trimester == 1
+                        ? 'Premier Trimestre'
+                        : (trimester == 2
+                              ? 'Deuxième Trimestre'
+                              : (trimester == 3
+                                    ? 'Troisième Trimestre'
+                                    : 'Trimestre $trimester')),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
+                if (!_isLocked)
+                  IconButton(
+                    icon: Icon(
+                      Icons.delete_sweep_outlined,
+                      color: Colors.red[300],
+                      size: 20,
+                    ),
+                    onPressed: () => _deleteTrimester(trimester),
+                    tooltip: 'Supprimer le trimestre',
+                  ),
               ],
             ),
           ),
@@ -345,10 +469,51 @@ class _EvaluationPlanningSettingsPageState
             final index = _sequences.indexOf(seq);
             return _buildSequenceCard(seq, index, isDark);
           }).toList(),
-          _buildAddSequenceButton(trimester, isDark),
+          if (!_isLocked) ...[
+            const SizedBox(height: 8),
+            _buildAddSequenceButton(trimester, isDark),
+          ],
           const SizedBox(height: 12),
-          _buildTrimesterFooter(total, isValid, isDark),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAddTrimesterCard(bool isDark) {
+    return InkWell(
+      onTap: _addTrimester,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 300,
+        height: 150,
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.surfaceDark : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppTheme.primaryColor.withOpacity(0.3),
+            style: BorderStyle.solid,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.add_to_photos_outlined,
+              size: 32,
+              color: AppTheme.primaryColor,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Ajouter un Trimestre',
+              style: TextStyle(
+                color: AppTheme.primaryColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -375,7 +540,7 @@ class _EvaluationPlanningSettingsPageState
               size: 20,
               color: AppTheme.primaryColor,
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
               'Ajouter une séquence',
               style: TextStyle(
@@ -412,7 +577,6 @@ class _EvaluationPlanningSettingsPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Carte
           Padding(
             padding: const EdgeInsets.all(20),
             child: Row(
@@ -433,67 +597,62 @@ class _EvaluationPlanningSettingsPageState
                         ),
                       ),
                       const SizedBox(height: 4),
-                      TextFormField(
-                        initialValue: seq['nom'],
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      if (_isLocked)
+                        Text(
+                          seq['nom'] ?? '',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      else
+                        TextFormField(
+                          initialValue: seq['nom'],
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                            border: InputBorder.none,
+                          ),
+                          onChanged: (v) => seq['nom'] = v,
                         ),
-                        decoration: const InputDecoration(
-                          hintText: 'Nom de la séquence',
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onChanged: (v) => seq['nom'] = v,
-                      ),
                     ],
                   ),
                 ),
-                _buildStatusBadge(seq['statut']),
-                IconButton(
-                  onPressed: () => _deleteSequence(index),
-                  icon: Icon(
-                    Icons.delete_outline,
-                    color: Colors.red[400],
-                    size: 20,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  visualDensity: VisualDensity.compact,
-                ),
+                if (!_isLocked)
+                  IconButton(
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: Colors.red[300],
+                      size: 20,
+                    ),
+                    onPressed: () => _deleteSequence(index),
+                  )
+                else
+                  _buildStatusBadge(seq['statut']),
               ],
             ),
           ),
           const Divider(height: 1),
-          // Formulaire
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildDateField(
-                        'Date début',
-                        seq,
-                        'date_debut',
-                        isDark,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildDateField(
-                        'Date fin',
-                        seq,
-                        'date_fin',
-                        isDark,
-                      ),
-                    ),
-                  ],
+                Expanded(
+                  child: _buildDateField(
+                    'Date début',
+                    seq,
+                    'date_debut',
+                    isDark,
+                  ),
                 ),
-                const SizedBox(height: 24),
-                _buildWeightSlider(seq, isDark),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildDateField('Date fin', seq, 'date_fin', isDark),
+                ),
               ],
             ),
           ),
@@ -567,25 +726,32 @@ class _EvaluationPlanningSettingsPageState
         ),
         const SizedBox(height: 8),
         InkWell(
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: date,
-              firstDate: DateTime(2020),
-              lastDate: DateTime(2030),
-            );
-            if (picked != null) {
-              setState(() {
-                seq[field] = picked.toIso8601String();
-              });
-            }
-          },
+          onTap: _isLocked
+              ? null
+              : () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: date,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      seq[field] = picked.toIso8601String();
+                    });
+                  }
+                },
+          borderRadius: BorderRadius.circular(10),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
               color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey[50],
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.withOpacity(0.1)),
+              border: Border.all(
+                color: _isLocked
+                    ? Colors.grey.withOpacity(0.1)
+                    : AppTheme.primaryColor.withOpacity(0.2),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -600,105 +766,13 @@ class _EvaluationPlanningSettingsPageState
                 Icon(
                   Icons.calendar_today_outlined,
                   size: 16,
-                  color: Colors.grey[400],
+                  color: _isLocked ? Colors.grey[400] : AppTheme.primaryColor,
                 ),
               ],
             ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildWeightSlider(Map<String, dynamic> seq, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Poids dans le trimestre (%)',
-          style: TextStyle(
-            color: Colors.grey[500],
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 4,
-                  activeTrackColor: AppTheme.primaryColor,
-                  inactiveTrackColor: AppTheme.primaryColor.withOpacity(0.1),
-                  thumbColor: Colors.white,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 8,
-                    elevation: 2,
-                  ),
-                  overlayColor: AppTheme.primaryColor.withOpacity(0.1),
-                ),
-                child: Slider(
-                  value: (seq['poids'] ?? 0.0).toDouble(),
-                  min: 0,
-                  max: 100,
-                  divisions: 20,
-                  onChanged: (v) {
-                    setState(() {
-                      seq['poids'] = v;
-                    });
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              width: 50,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withOpacity(0.05)
-                    : Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '${(seq['poids'] ?? 0).toInt()}%',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTrimesterFooter(double total, bool isValid, bool isDark) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      margin: const EdgeInsets.only(bottom: 24),
-      decoration: BoxDecoration(
-        color: (isValid ? Colors.green : Colors.red).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        isValid
-            ? 'TOTAL TRIMESTRE: 100% ✓'
-            : 'ERREUR: TOTAL ${total.toInt()}% (DOIT ÊTRE 100%)',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: isValid
-              ? (isDark ? Colors.green[400] : Colors.green[700])
-              : (isDark ? Colors.red[400] : Colors.red[700]),
-          fontWeight: FontWeight.w900,
-          fontSize: 10,
-          letterSpacing: 0.5,
-        ),
-      ),
     );
   }
 
@@ -726,12 +800,12 @@ class _EvaluationPlanningSettingsPageState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Information Importante',
+                  'Enregistrement requis',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Toute modification impactera le calcul automatique des moyennes de fin d\'année.',
+                  'Les modifications ne seront effectives qu\'après avoir cliqué sur Enregistrer.',
                   style: TextStyle(color: Colors.grey[500], fontSize: 14),
                 ),
               ],
@@ -750,7 +824,7 @@ class _EvaluationPlanningSettingsPageState
               shadowColor: AppTheme.primaryColor.withOpacity(0.4),
             ),
             child: const Text(
-              'Finaliser le Calendrier',
+              'Enregistrer les modifications',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),

@@ -101,19 +101,11 @@ class _AddStudentModalState extends State<AddStudentModal> {
   }
 
   Future<void> _loadClassesForAnnee() async {
-    if (_selectedAnneeScolaire.isEmpty) return;
-
     try {
       final db = await DatabaseHelper.instance.database;
-      final anneeScolaireId = _getAnneeScolaireId(_selectedAnneeScolaire);
 
-      if (anneeScolaireId == 0) return;
-
-      final classesData = await db.query(
-        'classe',
-        where: 'annee_scolaire_id = ?',
-        whereArgs: [anneeScolaireId],
-      );
+      // Les classes sont globales, indépendantes de l'année scolaire
+      final classesData = await db.query('classe', orderBy: 'nom ASC');
 
       setState(() {
         _classes = classesData;
@@ -147,21 +139,21 @@ class _AddStudentModalState extends State<AddStudentModal> {
       if (fraisData.isNotEmpty) {
         setState(() {
           _fraisId = fraisData.first['id'] as int?;
-          _fraisScolariteTotal =
-              (fraisData.first['montant_total'] as num?)?.toDouble() ?? 0.0;
 
-          // Si le montant total est 0, calculer à partir des tranches
-          if (_fraisScolariteTotal == 0) {
-            final inscription =
-                (fraisData.first['inscription'] as num?)?.toDouble() ?? 0.0;
-            final tranche1 =
-                (fraisData.first['tranche1'] as num?)?.toDouble() ?? 0.0;
-            final tranche2 =
-                (fraisData.first['tranche2'] as num?)?.toDouble() ?? 0.0;
-            final tranche3 =
-                (fraisData.first['tranche3'] as num?)?.toDouble() ?? 0.0;
-            _fraisScolariteTotal = inscription + tranche1 + tranche2 + tranche3;
-          }
+          final bool isReinscrit = _selectedTypePaiement == 'reinscription';
+          final registrationFee = (isReinscrit
+              ? (fraisData.first['reinscription'] as num?)?.toDouble() ?? 0.0
+              : (fraisData.first['inscription'] as num?)?.toDouble() ?? 0.0);
+
+          final tranche1 =
+              (fraisData.first['tranche1'] as num?)?.toDouble() ?? 0.0;
+          final tranche2 =
+              (fraisData.first['tranche2'] as num?)?.toDouble() ?? 0.0;
+          final tranche3 =
+              (fraisData.first['tranche3'] as num?)?.toDouble() ?? 0.0;
+
+          _fraisScolariteTotal =
+              registrationFee + tranche1 + tranche2 + tranche3;
         });
       } else {
         setState(() {
@@ -233,6 +225,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
   }
 
   Future<void> _selectDate() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now().subtract(
@@ -242,21 +235,32 @@ class _AddStudentModalState extends State<AddStudentModal> {
       lastDate: DateTime.now(),
       locale: const Locale('fr', 'FR'),
       builder: (context, child) {
-        return Localizations.override(
-          context: context,
-          locale: const Locale('fr', 'FR'),
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              colorScheme: ColorScheme.light(
-                primary: AppTheme.primaryColor,
-                onPrimary: Colors.white,
-                onSurface: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white
-                    : Colors.black,
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: isDark
+                ? ColorScheme.dark(
+                    primary: AppTheme.primaryColor,
+                    onPrimary: Colors.white,
+                    surface: const Color(0xFF1F2937),
+                    onSurface: Colors.white,
+                  )
+                : ColorScheme.light(
+                    primary: AppTheme.primaryColor,
+                    onPrimary: Colors.white,
+                    onSurface: Colors.black87,
+                  ),
+            dialogBackgroundColor: isDark
+                ? const Color(0xFF1F2937)
+                : Colors.white,
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: isDark
+                    ? Colors.blue.shade300
+                    : AppTheme.primaryColor,
               ),
             ),
-            child: child!,
           ),
+          child: child!,
         );
       },
     );
@@ -963,7 +967,15 @@ class _AddStudentModalState extends State<AddStudentModal> {
               values: ['nouveau', 'redoublant', 'reinscrit'],
               displayValues: ['Nouveau', 'Redoublant', 'Réinscrit'],
               onChanged: (v) {
-                if (v != null) setState(() => _selectedTypeInscription = v);
+                if (v != null) {
+                  setState(() {
+                    _selectedTypeInscription = v;
+                    _selectedTypePaiement = (v == 'reinscrit')
+                        ? 'reinscription'
+                        : 'inscription';
+                  });
+                  _loadFraisScolarite();
+                }
               },
               isRequired: true,
             ),
@@ -1148,7 +1160,10 @@ class _AddStudentModalState extends State<AddStudentModal> {
                   values: ['inscription', 'reinscription'],
                   displayValues: ['Inscription', 'Réinscription'],
                   onChanged: (v) {
-                    if (v != null) setState(() => _selectedTypePaiement = v);
+                    if (v != null) {
+                      setState(() => _selectedTypePaiement = v);
+                      _loadFraisScolarite();
+                    }
                   },
                   isRequired: true,
                 ),

@@ -285,10 +285,7 @@ class BulletinPdfHelper {
             ),
             pw.SizedBox(height: 5),
             pw.Container(
-              padding: pw.EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 4,
-              ),
+              padding: pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: pw.BoxDecoration(
                 color: PdfColors.grey100,
                 borderRadius: pw.BorderRadius.circular(10),
@@ -328,10 +325,7 @@ class BulletinPdfHelper {
             child: photo != null
                 ? pw.Image(photo, fit: pw.BoxFit.cover)
                 : pw.Center(
-                    child: pw.Text(
-                      'PHOTO',
-                      style: pw.TextStyle(fontSize: 8),
-                    ),
+                    child: pw.Text('PHOTO', style: pw.TextStyle(fontSize: 8)),
                   ),
           ),
           pw.SizedBox(width: 20),
@@ -390,35 +384,6 @@ class BulletinPdfHelper {
   }
 
   static pw.Widget _buildGradesTable(List<Map<String, dynamic>> grades) {
-    // Group grades by subject to split Control and Comp
-    Map<String, Map<String, dynamic>> grouped = {};
-    for (var g in grades) {
-      String mId = g['matiere_id']?.toString() ?? g['matiere_nom'];
-      if (!grouped.containsKey(mId)) {
-        grouped[mId] = {
-          'nom': g['matiere_nom'],
-          'coeff': (g['coefficient'] as num?)?.toDouble() ?? 1.0,
-          'control': null,
-          'comp': null,
-        };
-      }
-
-      double note = (g['note'] as num?)?.toDouble() ?? 0.0;
-      int seq = g['sequence'] ?? 1;
-
-      // Heuristic: sequence 3, 6, 9 are usually composition
-      if (seq % 3 == 0) {
-        grouped[mId]!['comp'] = note;
-      } else {
-        // Handle multiple controls by averaging them if needed, or taking one
-        if (grouped[mId]!['control'] == null) {
-          grouped[mId]!['control'] = note;
-        } else {
-          grouped[mId]!['control'] = (grouped[mId]!['control'] + note) / 2;
-        }
-      }
-    }
-
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
       columnWidths: {
@@ -437,35 +402,24 @@ class BulletinPdfHelper {
             _tableHeader('COEFF.'),
             _tableHeader('NOTE DE\nCONTRÔLE'),
             _tableHeader('NOTE DE\nCOMP.'),
-            _tableHeader('MOYENNE\nPONDÉRÉE'),
+            _tableHeader('MOYENNE'),
             _tableHeader('APPRÉCIATIONS'),
           ],
         ),
-        ...grouped.values.map((g) {
-          final noteCtrl = g['control'] as double?;
-          final noteComp = g['comp'] as double?;
-          final coeff = g['coeff'] as double;
-
-          // Calculate weighted average for the subject
-          // Usually (2*Ctrl + Comp) / 3 or just Avg.
-          // If only Ctrl exists, it is the average. If both, depends on school.
-          // In Guinea often: (Ctrl + Comp) / 2 or (Ctrl*2 + Comp)/3.
-          // Let's use simple (Ctrl + Comp)/2 if both exist for now.
-          double? subjectAvg;
-          if (noteCtrl != null && noteComp != null) {
-            subjectAvg = (noteCtrl + noteComp) / 2;
-          } else {
-            subjectAvg = noteCtrl ?? noteComp;
-          }
+        ...grades.map((g) {
+          final noteCtrl = g['note_ctrl'] as double?;
+          final noteComp = g['note_comp'] as double?;
+          final coeff = (g['coeff'] as num?)?.toDouble() ?? 1.0;
+          final moy = (g['note'] as num?)?.toDouble() ?? 0.0;
 
           return pw.TableRow(
             children: [
-              _tableCell(g['nom'] ?? '', alignLeft: true, isBold: true),
+              _tableCell(g['matiere'] ?? '', alignLeft: true, isBold: true),
               _tableCell(coeff.toStringAsFixed(0)),
               _tableCell(noteCtrl?.toStringAsFixed(2) ?? '-'),
               _tableCell(noteComp?.toStringAsFixed(2) ?? '-'),
-              _tableCell(subjectAvg?.toStringAsFixed(2) ?? '-', isBold: true),
-              _tableCell(_getObservation(subjectAvg ?? 0.0), alignLeft: true),
+              _tableCell(moy.toStringAsFixed(2), isBold: true),
+              _tableCell(g['obs'] ?? _getObservation(moy), alignLeft: true),
             ],
           );
         }),
@@ -592,10 +546,7 @@ class BulletinPdfHelper {
                 ),
               ),
               pw.Container(
-                padding: pw.EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
+                padding: pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: pw.BoxDecoration(color: PdfColors.black),
                 child: pw.Text(
                   '${avg.toStringAsFixed(2)} / 20',
@@ -627,10 +578,7 @@ class BulletinPdfHelper {
                 ),
               ),
               pw.Container(
-                padding: pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 2,
-                ),
+                padding: pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: pw.BoxDecoration(
                   color: isAdmis ? PdfColors.green100 : PdfColors.red100,
                   borderRadius: pw.BorderRadius.circular(4),
@@ -662,10 +610,7 @@ class BulletinPdfHelper {
       children: [
         pw.Text(
           label,
-          style: pw.TextStyle(
-            fontSize: 9,
-            fontWeight: pw.FontWeight.bold,
-          ),
+          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
         ),
         pw.Text(
           value,

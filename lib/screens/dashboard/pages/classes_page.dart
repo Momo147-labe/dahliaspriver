@@ -14,7 +14,6 @@ class ClassesPage extends StatefulWidget {
 
 class _ClassesPageState extends State<ClassesPage> {
   List<Map<String, dynamic>> _classes = [];
-  List<Map<String, dynamic>> _academicYears = [];
   bool _isLoading = true;
   String _searchTerm = '';
   int? _filterNiveauId;
@@ -70,11 +69,7 @@ class _ClassesPageState extends State<ClassesPage> {
     setState(() => _isLoading = true);
     try {
       // Charger les années scolaires
-      final db = await DatabaseHelper.instance.database;
-      final years = await db.query(
-        'annee_scolaire',
-        orderBy: 'date_debut DESC',
-      );
+      await DatabaseHelper.instance.anneeScolaireDao.getAnneesScolaires();
 
       await _loadClasses(anneeId);
 
@@ -82,11 +77,10 @@ class _ClassesPageState extends State<ClassesPage> {
       final cycles = await DatabaseHelper.instance.getCyclesScolaires();
 
       // Charger tous les niveaux (pour le filtrage initial)
-      final allNiveaux = await db.query('niveaux', where: 'actif = 1');
+      final allNiveaux = await DatabaseHelper.instance.configDao.getNiveaux();
 
       setState(() {
         _selectedAnneeId = anneeId;
-        _academicYears = years;
         _allCycles = cycles;
         _allNiveaux = allNiveaux;
         _isLoading = false;
@@ -128,21 +122,8 @@ class _ClassesPageState extends State<ClassesPage> {
   }
 
   Future<void> _loadClasses(int anneeId) async {
-    final db = await DatabaseHelper.instance.database;
-    final classes = await db.rawQuery(
-      '''
-      SELECT 
-        c.*, 
-        a.libelle as annee_libelle,
-        cy.nom as cycle_nom,
-        nv.nom as niveau_nom,
-        (SELECT COUNT(*) FROM eleve WHERE classe_id = c.id AND annee_scolaire_id = ?) as eleve_count
-      FROM classe c
-      LEFT JOIN annee_scolaire a ON c.annee_scolaire_id = a.id
-      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      LEFT JOIN niveaux nv ON c.niveau_id = nv.id
-    ''',
-      [anneeId],
+    final classes = await DatabaseHelper.instance.classeDao.getClassesWithStats(
+      anneeId,
     );
     setState(() => _classes = classes);
   }
@@ -818,6 +799,7 @@ class _ClassesPageState extends State<ClassesPage> {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
@@ -827,36 +809,39 @@ class _ClassesPageState extends State<ClassesPage> {
                 ),
                 child: Icon(Icons.school, color: color, size: 24),
               ),
-              Row(
-                children: [
-                  _buildSmallActionBtn(
-                    Icons.person_add_alt_1_outlined,
-                    Colors.purple,
-                    () => _showAssignTeacherModal(c),
-                    isDark,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildSmallActionBtn(
-                    Icons.book_outlined,
-                    Colors.orange,
-                    () => _showManageSubjectsModal(c),
-                    isDark,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildSmallActionBtn(
-                    Icons.edit_outlined,
-                    Colors.blue,
-                    () => _showAddModal(classe: c),
-                    isDark,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildSmallActionBtn(
-                    Icons.delete_outline,
-                    Colors.red,
-                    () => _deleteClass(c['id']),
-                    isDark,
-                  ),
-                ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    _buildSmallActionBtn(
+                      Icons.person_add_alt_1_outlined,
+                      Colors.purple,
+                      () => _showAssignTeacherModal(c),
+                      isDark,
+                    ),
+                    _buildSmallActionBtn(
+                      Icons.book_outlined,
+                      Colors.orange,
+                      () => _showManageSubjectsModal(c),
+                      isDark,
+                    ),
+                    _buildSmallActionBtn(
+                      Icons.edit_outlined,
+                      Colors.blue,
+                      () => _showAddModal(classe: c),
+                      isDark,
+                    ),
+                    _buildSmallActionBtn(
+                      Icons.delete_outline,
+                      Colors.red,
+                      () => _deleteClass(c['id']),
+                      isDark,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -890,13 +875,6 @@ class _ClassesPageState extends State<ClassesPage> {
             Icons.meeting_room_outlined,
             'Salle',
             c['salle'] ?? 'N/A',
-            isDark,
-          ),
-          const SizedBox(height: 8),
-          _buildInfoRow(
-            Icons.calendar_today_outlined,
-            'Année',
-            c['annee_libelle'] ?? 'N/A',
             isDark,
           ),
         ],
@@ -1279,24 +1257,6 @@ class _ClassesPageState extends State<ClassesPage> {
                           ],
                         ),
                         const SizedBox(height: 20),
-                        _buildInputField(
-                          'Année Scolaire',
-                          TextEditingController(
-                            text: _academicYears.isNotEmpty
-                                ? _academicYears
-                                          .firstWhere(
-                                            (a) => a['id'] == _selectedAnneeId,
-                                            orElse: () => {'libelle': 'N/A'},
-                                          )['libelle']
-                                          ?.toString() ??
-                                      'N/A'
-                                : 'N/A',
-                          ),
-                          Icons.calendar_today,
-                          isDark,
-                          readOnly: true,
-                        ),
-                        const SizedBox(height: 20),
                         _buildModalDropdown(
                           'Classe Suivante',
                           _selectedNextClassId != null
@@ -1533,7 +1493,6 @@ class _ClassesPageState extends State<ClassesPage> {
       'eff_max': int.tryParse(_effMaxController.text) ?? 100,
       'next_class_id': _selectedNextClassId,
       'is_final_class': _isFinalClass ? 1 : 0,
-      'annee_scolaire_id': _selectedAnneeId,
     };
 
     try {

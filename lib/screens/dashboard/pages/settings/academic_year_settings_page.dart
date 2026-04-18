@@ -21,7 +21,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
   List<Map<String, dynamic>> _academicYears = [];
   int? _editingYearId;
   int? _selectedPreviousYearId;
-  String _etat = 'EN_COURS';
+  String _statut = 'Active';
 
   @override
   void initState() {
@@ -57,24 +57,6 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, bool isStartDate) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStartDate) {
-          _startDate = picked;
-        } else {
-          _endDate = picked;
-        }
-      });
-    }
-  }
-
   Future<void> _saveAcademicYear() async {
     if (!_formKey.currentState!.validate()) return;
     if (_startDate == null || _endDate == null) {
@@ -94,7 +76,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
         'date_debut': DateFormat('yyyy-MM-dd').format(_startDate!),
         'date_fin': DateFormat('yyyy-MM-dd').format(_endDate!),
         'active': _isActive ? 1 : 0,
-        'etat': _etat,
+        'statut': _statut,
         'annee_precedente_id': _selectedPreviousYearId,
         'updated_at': DateTime.now().toIso8601String(),
       };
@@ -210,7 +192,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
       _startDate = DateTime.parse(year['date_debut'] as String);
       _endDate = DateTime.parse(year['date_fin'] as String);
       _isActive = (year['active'] == 1);
-      _etat = year['etat'] ?? 'EN_COURS'; // Default if null
+      _statut = year['statut'] ?? 'Active'; // Default if null
       _selectedPreviousYearId = year['annee_precedente_id'] as int?;
     });
   }
@@ -222,7 +204,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
       _startDate = null;
       _endDate = null;
       _isActive = false;
-      _etat = 'EN_COURS';
+      _statut = 'Active';
       _editingYearId = null;
       _selectedPreviousYearId = null;
     });
@@ -413,12 +395,12 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                           ],
                         ),
                         const SizedBox(height: 24),
-                        // Dropdown for Etat
+                        // Dropdown for Statut
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'ÉTAT',
+                              'STATUT',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w900,
@@ -444,21 +426,25 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                               ),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
-                                  value: _etat,
+                                  value: _statut,
                                   isExpanded: true,
                                   items: const [
                                     DropdownMenuItem(
-                                      value: 'EN_COURS',
-                                      child: Text('En Cours'),
+                                      value: 'Active',
+                                      child: Text('Active'),
                                     ),
                                     DropdownMenuItem(
-                                      value: 'TERMINEE',
+                                      value: 'Inactive',
+                                      child: Text('Inactive'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Terminée',
                                       child: Text('Terminée'),
                                     ),
                                   ],
                                   onChanged: (val) {
                                     if (val != null) {
-                                      setDialogState(() => _etat = val);
+                                      setDialogState(() => _statut = val);
                                     }
                                   },
                                 ),
@@ -694,6 +680,40 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
     );
   }
 
+  Widget _buildStatusBadge(String statut) {
+    Color color;
+    switch (statut) {
+      case 'Active':
+        color = Colors.green;
+        break;
+      case 'Inactive':
+        color = Colors.orange;
+        break;
+      case 'Terminée':
+        color = Colors.blue;
+        break;
+      default:
+        color = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Text(
+        statut,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -850,10 +870,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                             ),
                           ),
                           DataCell(
-                            Text(
-                              year['etat'] ?? '-',
-                              style: const TextStyle(fontSize: 12),
-                            ),
+                            _buildStatusBadge(year['statut'] ?? 'Inactive'),
                           ),
                           DataCell(
                             Text(

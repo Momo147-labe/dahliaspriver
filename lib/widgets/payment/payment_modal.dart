@@ -76,8 +76,6 @@ class _PaymentModalState extends State<PaymentModal> {
 
     setState(() => _loading = true);
 
-    final db = await DatabaseHelper.instance.database;
-
     final paiement = {
       'eleve_id': _selectedEleveId,
       'classe_id': _selectedClasseId,
@@ -93,16 +91,7 @@ class _PaymentModalState extends State<PaymentModal> {
       'statut': montantPaye == montantTotal ? 'complet' : 'partiel',
     };
 
-    if (widget.payment != null) {
-      await db.update(
-        'paiements',
-        paiement,
-        where: 'id = ?',
-        whereArgs: [widget.payment!['id']],
-      );
-    } else {
-      await db.insert('paiements', paiement);
-    }
+    await DatabaseHelper.instance.addPaiement(paiement);
 
     widget.onSaved();
     if (mounted) Navigator.pop(context);

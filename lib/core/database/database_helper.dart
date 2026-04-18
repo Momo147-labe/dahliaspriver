@@ -5,6 +5,19 @@ import 'package:intl/intl.dart';
 import '../../models/ecole.dart';
 import '../../models/matiere.dart';
 import 'database_path.dart';
+import 'daos/annee_scolaire_dao.dart';
+import 'daos/classe_dao.dart';
+import 'daos/config_dao.dart';
+import 'daos/dashboard_dao.dart';
+import 'daos/ecole_dao.dart';
+import 'daos/eleve_dao.dart';
+import 'daos/enseignant_dao.dart';
+import 'daos/fees_dao.dart';
+import 'daos/matiere_dao.dart';
+import 'daos/notes_dao.dart';
+import 'daos/paiement_dao.dart';
+import 'daos/timetable_dao.dart';
+import 'daos/user_dao.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -13,6 +26,100 @@ class DatabaseHelper {
   static Database? _db;
   static Completer<Database>? _dbCompleter;
   static int? activeAnneeId;
+
+  // DAOs Cache (removed to use sync getters)
+
+  // DAOs Getters
+  AnneeScolaireDao get anneeScolaireDao => AnneeScolaireDao(_db!);
+  ClasseDao get classeDao => ClasseDao(_db!);
+  ConfigDao get configDao => ConfigDao(_db!);
+  DashboardDao get dashboardDao => DashboardDao(_db!);
+  EcoleDao get ecoleDao => EcoleDao(_db!);
+  EleveDao get eleveDao => EleveDao(_db!);
+  EnseignantDao get enseignantDao => EnseignantDao(_db!);
+  FeesDao get feesDao => FeesDao(_db!);
+  MatiereDao get matiereDao => MatiereDao(_db!);
+  NotesDao get notesDao => NotesDao(_db!);
+  PaiementDao get paiementDao => PaiementDao(_db!);
+  TimetableDao get timetableDao => TimetableDao(_db!);
+  UserDao get userDao => UserDao(_db!);
+
+  // ==============================================================================
+  // PROXY METHODS TO DAOs (for UI compatibility)
+  // ==============================================================================
+
+  // PaiementDao Proxies
+  Future<Map<String, dynamic>> getFinancialSummary(int anneeId) =>
+      paiementDao.getFinancialSummary(anneeId);
+  Future<List<Map<String, dynamic>>> getRecoveryByClass(int anneeId) =>
+      paiementDao.getRecoveryByClass(anneeId);
+  Future<List<Map<String, dynamic>>> getPaymentMethodsBreakdown(int anneeId) =>
+      paiementDao.getPaymentMethodsBreakdown(anneeId);
+  Future<int> countPayments(
+    int anneeId, {
+    String? searchQuery,
+    String? modeFilter,
+  }) => paiementDao.countPayments(
+    anneeId,
+    searchQuery: searchQuery,
+    modeFilter: modeFilter,
+  );
+  Future<List<Map<String, dynamic>>> getRecentTransactions(
+    int anneeId, {
+    int? limit,
+    int? offset,
+    String? searchQuery,
+    String? modeFilter,
+  }) => paiementDao.getRecentTransactions(
+    anneeId,
+    limit: limit ?? 10,
+    offset: offset ?? 0,
+    searchQuery: searchQuery,
+    modeFilter: modeFilter,
+  );
+
+  // NotesDao Proxies
+  Future<List<Map<String, dynamic>>> getTrimesterGradesByClassSubject(
+    int classId,
+    int subjectId,
+    int trimestre,
+    int anneeId,
+  ) => notesDao.getTrimesterGradesByClassSubject(
+    classId,
+    subjectId,
+    trimestre,
+    anneeId,
+  );
+  Future<Map<String, dynamic>> getTrimesterGradesStats(
+    int classId,
+    int subjectId,
+    int trimestre,
+    int anneeId, {
+    double passingGrade = 10.0,
+  }) => notesDao.getTrimesterGradesStats(
+    classId,
+    subjectId,
+    trimestre,
+    anneeId,
+    passingGrade: passingGrade,
+  );
+  Future<List<Map<String, dynamic>>> getStudentsCompletionStatus(
+    int classId,
+    int trimestre,
+    int anneeId,
+  ) => notesDao.getStudentsCompletionStatus(classId, trimestre, anneeId);
+  Future<List<Map<String, dynamic>>> getClassGradesData(
+    int anneeId,
+    int classId,
+  ) => notesDao.getClassGradesData(anneeId, classId);
+
+  // ConfigDao Proxies
+  Future<bool> hasGradesForSequence(int anneeId, int trimestre, int sequence) =>
+      configDao.hasGradesForSequence(anneeId, trimestre, sequence);
+  Future<Map<String, dynamic>?> getDocumentTemplate(int anneeId, String type) =>
+      configDao.getDocumentTemplate(anneeId, type);
+  Future<int> saveDocumentTemplate(Map<String, dynamic> template) =>
+      configDao.saveDocumentTemplate(template);
 
   Future<Database> get database async {
     if (_db != null) return _db!;
@@ -37,7 +144,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 42,
+      version: 43,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -112,6 +219,10 @@ class DatabaseHelper {
         annee_scolaire_id INTEGER,
         frais_id INTEGER,
         photo TEXT,
+        nom_pere TEXT,
+        prenom_pere TEXT,
+        nom_mere TEXT,
+        prenom_mere TEXT,
         personne_a_prevenir TEXT,
         contact_urgence TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -1226,6 +1337,18 @@ class DatabaseHelper {
         }
       } catch (e) {
         debugPrint('Error during v42 migration: $e');
+      }
+    }
+
+    if (oldVersion < 43) {
+      try {
+        await _addColumnSafely(db, 'eleve', 'nom_pere', 'TEXT');
+        await _addColumnSafely(db, 'eleve', 'prenom_pere', 'TEXT');
+        await _addColumnSafely(db, 'eleve', 'nom_mere', 'TEXT');
+        await _addColumnSafely(db, 'eleve', 'prenom_mere', 'TEXT');
+        debugPrint('Migration vers la version 43 terminée avec succès.');
+      } catch (e) {
+        debugPrint('Erreur lors de la migration v43 : $e');
       }
     }
   }
@@ -2982,135 +3105,7 @@ class DatabaseHelper {
 
   // --- NEW FINANCIAL ANALYTICS ---
 
-  Future<Map<String, dynamic>> getFinancialSummary(int anneeId) async {
-    final db = await database;
-
-    // Total expected: Sum of class fees for all enrolled students
-    final expectedResult = await db.rawQuery(
-      '''
-      SELECT SUM(fs.montant_total) as total
-      FROM eleve e
-      JOIN frais_scolarite fs ON e.classe_id = fs.classe_id AND e.annee_scolaire_id = fs.annee_scolaire_id
-      WHERE e.annee_scolaire_id = ?
-    ''',
-      [anneeId],
-    );
-
-    // Total collected
-    final collectedResult = await db.rawQuery(
-      '''
-      SELECT SUM(montant_paye) as total
-      FROM paiement
-      WHERE annee_scolaire_id = ?
-    ''',
-      [anneeId],
-    );
-
-    // Growth comparison (this month vs last month)
-    final now = DateTime.now();
-    final firstDayThisMonth = DateTime(
-      now.year,
-      now.month,
-      1,
-    ).toIso8601String();
-    final firstDayLastMonth = DateTime(
-      now.year,
-      now.month - 1,
-      1,
-    ).toIso8601String();
-
-    final thisMonthResult = await db.rawQuery(
-      '''
-      SELECT SUM(montant) as total
-      FROM paiement_detail
-      WHERE annee_scolaire_id = ? AND date_paiement >= ?
-    ''',
-      [anneeId, firstDayThisMonth],
-    );
-
-    final lastMonthResult = await db.rawQuery(
-      '''
-      SELECT SUM(montant) as total
-      FROM paiement_detail
-      WHERE annee_scolaire_id = ? AND date_paiement >= ? AND date_paiement < ?
-    ''',
-      [anneeId, firstDayLastMonth, firstDayThisMonth],
-    );
-
-    double expected =
-        (expectedResult.first['total'] as num?)?.toDouble() ?? 0.0;
-    double collected =
-        (collectedResult.first['total'] as num?)?.toDouble() ?? 0.0;
-    double remaining = expected - collected;
-    double recoveryRate = expected > 0 ? (collected / expected) * 100 : 0.0;
-
-    double thisMonth =
-        (thisMonthResult.first['total'] as num?)?.toDouble() ?? 0.0;
-    double lastMonth =
-        (lastMonthResult.first['total'] as num?)?.toDouble() ?? 0.0;
-    double growth = lastMonth > 0
-        ? ((thisMonth - lastMonth) / lastMonth) * 100
-        : 0.0;
-
-    return {
-      'expected': expected,
-      'collected': collected,
-      'remaining': remaining,
-      'recoveryRate': recoveryRate,
-      'thisMonth': thisMonth,
-      'growth': growth,
-    };
-  }
-
-  Future<List<Map<String, dynamic>>> getRecoveryByClass(int anneeId) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT c.nom, SUM(p.montant_paye) as paid, SUM(p.montant_total) as expected
-      FROM classe c
-      LEFT JOIN eleve e ON e.classe_id = c.id
-      LEFT JOIN paiement p ON p.eleve_id = e.id AND p.annee_scolaire_id = ?
-      WHERE c.annee_scolaire_id = ?
-      GROUP BY c.id
-      ORDER BY c.nom ASC
-    ''',
-      [anneeId, anneeId],
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getPaymentMethodsBreakdown(
-    int anneeId,
-  ) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT COALESCE(mode_paiement, 'Inconnu') as mode, SUM(montant) as total, COUNT(*) as count
-      FROM paiement_detail
-      WHERE annee_scolaire_id = ?
-      GROUP BY mode_paiement
-    ''',
-      [anneeId],
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getRecentTransactions(
-    int anneeId, {
-    int limit = 10,
-  }) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT pd.*, e.nom as eleve_nom, e.prenom as eleve_prenom, e.id as eleve_id, e.photo as eleve_photo, c.nom as classe_nom
-      FROM paiement_detail pd
-      JOIN eleve e ON pd.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
-      WHERE pd.annee_scolaire_id = ?
-      ORDER BY pd.date_paiement DESC
-      LIMIT ?
-    ''',
-      [anneeId, limit],
-    );
-  }
+  // (Removed duplicates replaced by proxy methods at the top of the class)
 
   Future<Map<String, double>> getStudentFinancialStatus(
     int eleveId,

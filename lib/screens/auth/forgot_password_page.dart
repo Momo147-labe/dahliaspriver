@@ -186,6 +186,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     prefixIcon: Icons.lock,
                     isDark: isDark,
                     obscureText: _obscurePassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                        size: 20,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   _buildTextField(
@@ -195,6 +205,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     prefixIcon: Icons.check_circle,
                     isDark: isDark,
                     obscureText: _obscurePassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                        size: 20,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                   ),
                   const SizedBox(height: 32),
                   _buildButton(
@@ -218,6 +238,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     required IconData prefixIcon,
     required bool isDark,
     bool obscureText = false,
+    Widget? suffixIcon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,6 +268,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   ? AppTheme.textDarkSecondary
                   : const Color(0xFF618689),
             ),
+            suffixIcon: suffixIcon,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../models/student.dart';
 
 class StudentDetailPage extends StatefulWidget {
   final int studentId;
@@ -797,6 +798,9 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   }
 
   Widget _buildContactCard(bool isDark) {
+    final studentObj = _student != null ? Student.fromMap(_student!) : null;
+    final parentName = studentObj?.parentName ?? 'Non défini';
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -840,7 +844,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                       ),
                     ),
                     Text(
-                      'Moussa Condé',
+                      parentName,
                       style: TextStyle(color: Colors.grey[400], fontSize: 12),
                     ),
                   ],

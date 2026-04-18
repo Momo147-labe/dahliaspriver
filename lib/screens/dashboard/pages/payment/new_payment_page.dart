@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import '../../../../core/database/database_helper.dart';
 import '../../../../providers/academic_year_provider.dart';
+import '../../../../theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 class NewPaymentPage extends StatefulWidget {
@@ -29,6 +30,24 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
   String _modePaiement = 'Espèces';
 
   bool _isSaving = false;
+  String _schoolName = 'Gestion Scolaire';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSchoolName();
+  }
+
+  Future<void> _loadSchoolName() async {
+    try {
+      final info = await DatabaseHelper.instance.getEcoleInfo();
+      if (mounted) {
+        setState(() {
+          _schoolName = info['nom']?.toString() ?? 'Gestion Scolaire';
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void didChangeDependencies() {
@@ -50,6 +69,13 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
   }
 
   Future<void> _loadStudentFinancials(Map<String, dynamic> eleve) async {
+    setState(() {
+      _selectedEleve = eleve;
+      _fraisClasse = null; // Reset while loading
+      _totalPaid = 0;
+      _lastPaymentInfo = null;
+    });
+
     try {
       if (_selectedAnneeId != null) {
         // Load class fees
@@ -58,19 +84,21 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           _selectedAnneeId!,
         );
 
-        // Load already paid amount for this student
+        // Load individual payment records for this year
         final payments = await dbHelper.getPaiementsByEleve(
           eleve['id'],
           _selectedAnneeId!,
         );
+
         double paid = 0;
         for (var p in payments) {
-          paid += (p['montant'] as num).toDouble();
+          // Individual records from paiement_detail use 'montant'
+          paid += (p['montant'] as num?)?.toDouble() ?? 0.0;
         }
 
         String? lastInfo;
         if (payments.isNotEmpty) {
-          final last = payments.last;
+          final last = payments.first; // Already sorted by date DESC in DAO
           final dateStr = last['date_paiement'];
           if (dateStr != null) {
             final date = DateTime.parse(dateStr);
@@ -80,7 +108,6 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
         }
 
         setState(() {
-          _selectedEleve = eleve;
           _fraisClasse = fees;
           _totalPaid = paid;
           _lastPaymentInfo = lastInfo;
@@ -88,8 +115,6 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
       }
     } catch (e) {
       debugPrint('Error loading student financials: $e');
-    } finally {
-      // Done loading
     }
   }
 
@@ -153,12 +178,11 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = const Color(0xFF13daec);
-    final bgLight = const Color(0xFFf6f8f8);
-    final bgDark = const Color(0xFF102022);
+    final primaryColor = AppTheme.primaryColor;
+    final bgColor = isDark ? AppTheme.backgroundDark : AppTheme.backgroundLight;
 
     return Scaffold(
-      backgroundColor: isDark ? bgDark : bgLight,
+      backgroundColor: bgColor,
       body: CustomScrollView(
         slivers: [
           _buildSliverAppBar(isDark, primaryColor),
@@ -211,17 +235,26 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
   Widget _buildSliverAppBar(bool isDark, Color primaryColor) {
     return SliverAppBar(
       pinned: true,
-      backgroundColor: isDark ? const Color(0xFF111718) : Colors.white,
+      backgroundColor: isDark ? AppTheme.backgroundDark : AppTheme.surfaceLight,
       elevation: 1,
+      shadowColor: Colors.black.withOpacity(0.08),
       centerTitle: false,
+      leading: IconButton(
+        icon: Icon(
+          Icons.arrow_back_ios_new_rounded,
+          color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
+          size: 20,
+        ),
+        onPressed: () => Navigator.pop(context),
+      ),
       title: Row(
         children: [
           Icon(Symbols.school, color: primaryColor),
           const SizedBox(width: 12),
           Text(
-            'Guinée École',
+            _schoolName,
             style: TextStyle(
-              color: isDark ? Colors.white : const Color(0xFF111718),
+              color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
               fontWeight: FontWeight.bold,
               fontSize: 18,
             ),
@@ -231,14 +264,24 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
       actions: [
         IconButton(
           onPressed: () {},
-          icon: const Icon(Symbols.cloud_done, size: 20),
-        ),
-        IconButton(
-          onPressed: () {},
-          icon: const Icon(Symbols.notifications, size: 20),
+          icon: Icon(
+            Symbols.notifications,
+            size: 20,
+            color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
+          ),
         ),
         const SizedBox(width: 12),
-        const CircleAvatar(radius: 18, backgroundColor: Colors.grey),
+        CircleAvatar(
+          radius: 18,
+          backgroundColor: isDark
+              ? AppTheme.cardDark
+              : AppTheme.primaryColor.withOpacity(0.1),
+          child: Icon(
+            Icons.person,
+            size: 18,
+            color: isDark ? AppTheme.textDarkSecondary : AppTheme.primaryColor,
+          ),
+        ),
         const SizedBox(width: 20),
       ],
     );
@@ -253,12 +296,15 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w900,
-            color: isDark ? Colors.white : const Color(0xFF111718),
+            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
           ),
         ),
-        const Text(
+        Text(
           'Enregistrez un nouveau paiement de scolarité.',
-          style: TextStyle(color: Color(0xFF618689), fontSize: 16),
+          style: TextStyle(
+            color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
+            fontSize: 16,
+          ),
         ),
       ],
     );
@@ -268,13 +314,18 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1a2b2d) : Colors.white,
+        color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white10 : const Color(0xFFdbe5e6),
+          color: isDark
+              ? AppTheme.borderDark.withOpacity(0.3)
+              : AppTheme.borderLight,
         ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+            blurRadius: 10,
+          ),
         ],
       ),
       child: Row(
@@ -300,7 +351,9 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
-                    color: isDark ? Colors.white : const Color(0xFF111718),
+                    color: isDark
+                        ? AppTheme.textDarkPrimary
+                        : AppTheme.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -326,11 +379,11 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
                   label: const Text("Changer d'élève"),
                   style: TextButton.styleFrom(
                     backgroundColor: isDark
-                        ? const Color(0xFF1c2e30)
-                        : const Color(0xFFf0f4f4),
+                        ? AppTheme.cardDark
+                        : AppTheme.hoverLight,
                     foregroundColor: isDark
-                        ? Colors.white
-                        : const Color(0xFF111718),
+                        ? AppTheme.textDarkPrimary
+                        : AppTheme.textPrimary,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
@@ -353,19 +406,28 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111718) : const Color(0xFFf6f8f8),
+        color: isDark ? AppTheme.backgroundDark : AppTheme.backgroundLight,
         borderRadius: BorderRadius.circular(6),
+        border: isDark
+            ? Border.all(color: AppTheme.borderDark.withOpacity(0.2))
+            : null,
       ),
       child: Row(
         children: [
-          Icon(icon, size: 14, color: const Color(0xFF618689)),
+          Icon(
+            icon,
+            size: 14,
+            color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
+          ),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF618689),
+              color: isDark
+                  ? AppTheme.textDarkSecondary
+                  : AppTheme.textSecondary,
             ),
           ),
         ],
@@ -407,10 +469,12 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1a2b2d) : Colors.white,
+        color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white10 : const Color(0xFFdbe5e6),
+          color: isDark
+              ? AppTheme.borderDark.withOpacity(0.3)
+              : AppTheme.borderLight,
         ),
       ),
       child: Form(
@@ -426,7 +490,9 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF111718),
+                    color: isDark
+                        ? AppTheme.textDarkPrimary
+                        : AppTheme.textPrimary,
                   ),
                 ),
               ],
@@ -460,7 +526,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: isDark ? Colors.white : const Color(0xFF111718),
+            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -468,6 +534,14 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           value: _selectedTranche,
           decoration: _inputDecoration(isDark),
           items: const [
+            DropdownMenuItem(
+              value: 'inscription',
+              child: Text('Frais d\'Inscription'),
+            ),
+            DropdownMenuItem(
+              value: 'reinscription',
+              child: Text('Frais de Réinscription'),
+            ),
             DropdownMenuItem(value: 't1', child: Text('1ère Tranche (T1)')),
             DropdownMenuItem(value: 't2', child: Text('2ème Tranche (T2)')),
             DropdownMenuItem(value: 't3', child: Text('3ème Tranche (T3)')),
@@ -488,22 +562,28 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: isDark ? Colors.white : const Color(0xFF111718),
+            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
         TextFormField(
           controller: _montantController,
           keyboardType: TextInputType.number,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
+          ),
           decoration: _inputDecoration(isDark).copyWith(
-            suffixIcon: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            suffixIcon: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Text(
                 'GNF',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF618689),
+                  color: isDark
+                      ? AppTheme.textDarkSecondary
+                      : AppTheme.textSecondary,
                 ),
               ),
             ),
@@ -523,7 +603,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: isDark ? Colors.white : const Color(0xFF111718),
+            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
@@ -559,7 +639,9 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           border: Border.all(
             color: isSelected
                 ? primaryColor
-                : (isDark ? Colors.white10 : const Color(0xFFdbe5e6)),
+                : (isDark
+                      ? AppTheme.borderDark.withOpacity(0.3)
+                      : AppTheme.borderLight),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -569,7 +651,11 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
             Icon(
               icon,
               size: 20,
-              color: isSelected ? primaryColor : const Color(0xFF618689),
+              color: isSelected
+                  ? primaryColor
+                  : (isDark
+                        ? AppTheme.textDarkSecondary
+                        : AppTheme.textSecondary),
             ),
             const SizedBox(width: 8),
             Text(
@@ -577,8 +663,10 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
               style: TextStyle(
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 color: isSelected
-                    ? (isDark ? Colors.white : const Color(0xFF111718))
-                    : const Color(0xFF618689),
+                    ? (isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary)
+                    : (isDark
+                          ? AppTheme.textDarkSecondary
+                          : AppTheme.textSecondary),
               ),
             ),
           ],
@@ -596,7 +684,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: isDark ? Colors.white : const Color(0xFF111718),
+            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -613,24 +701,36 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
   InputDecoration _inputDecoration(bool isDark) {
     return InputDecoration(
       filled: true,
-      fillColor: isDark ? const Color(0xFF111718) : Colors.white,
+      fillColor: isDark ? AppTheme.backgroundDark : AppTheme.backgroundLight,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(
-          color: isDark ? Colors.white10 : const Color(0xFFdbe5e6),
+          color: isDark
+              ? AppTheme.borderDark.withOpacity(0.3)
+              : AppTheme.borderLight,
         ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(
-          color: isDark ? Colors.white10 : const Color(0xFFdbe5e6),
+          color: isDark
+              ? AppTheme.borderDark.withOpacity(0.3)
+              : AppTheme.borderLight,
         ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF13daec), width: 2),
+        borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      labelStyle: TextStyle(
+        color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
+      ),
+      hintStyle: TextStyle(
+        color: isDark
+            ? AppTheme.textDarkSecondary.withOpacity(0.5)
+            : AppTheme.textMuted,
+      ),
     );
   }
 
@@ -653,7 +753,9 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
                 'Mode hors-ligne: Données synchronisées localement.',
                 style: TextStyle(
                   fontSize: 14,
-                  color: isDark ? Colors.white : const Color(0xFF111718),
+                  color: isDark
+                      ? AppTheme.textDarkSecondary
+                      : AppTheme.textSecondary,
                 ),
               ),
             ],
@@ -693,8 +795,27 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
   }
 
   Widget _buildFinancialStatusCard(bool isDark, Color primaryColor) {
-    final double totalDue =
-        (_fraisClasse?['montant_total'] as num?)?.toDouble() ?? 0;
+    final String rawStatut =
+        _selectedEleve?['statut']?.toString().toLowerCase() ?? '';
+    final bool isReinscrit =
+        rawStatut.contains('rein') || rawStatut.contains('réin');
+
+    final String enrollmentLabel = isReinscrit
+        ? 'Réinscription'
+        : 'Inscription';
+    final double enrollmentFee = _fraisClasse != null
+        ? (isReinscrit
+              ? (_fraisClasse!['reinscription'] as num?)?.toDouble() ?? 0.0
+              : (_fraisClasse!['inscription'] as num?)?.toDouble() ?? 0.0)
+        : 0.0;
+
+    final double totalDue = _fraisClasse != null
+        ? enrollmentFee +
+              ((_fraisClasse!['tranche1'] as num?)?.toDouble() ?? 0.0) +
+              ((_fraisClasse!['tranche2'] as num?)?.toDouble() ?? 0.0) +
+              ((_fraisClasse!['tranche3'] as num?)?.toDouble() ?? 0.0)
+        : 0.0;
+
     final double paid = _totalPaid;
     final double remaining = totalDue - paid;
     final double progress = totalDue > 0
@@ -704,21 +825,66 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1a2b2d) : Colors.white,
+        color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white10 : const Color(0xFFdbe5e6),
+          color: isDark
+              ? AppTheme.borderDark.withOpacity(0.3)
+              : AppTheme.borderLight,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          if (_selectedEleve != null && _fraisClasse == null) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Symbols.error, color: Colors.red, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Attention: Aucun frais configuré pour la classe de cet élève cette année.',
+                        style: TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          Text(
             'État financier',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
+            ),
           ),
           const SizedBox(height: 24),
-          _statusItem('Total dû (Année)', totalDue, isDark, null),
+          _statusItem(
+            'Frais $enrollmentLabel',
+            enrollmentFee,
+            isDark,
+            Colors.blue,
+          ),
+          const SizedBox(height: 12),
+          _statusItem(
+            'Scolarité (T1+T2+T3)',
+            totalDue - enrollmentFee,
+            isDark,
+            null,
+          ),
+          const Divider(height: 32),
+          _statusItem('TOTAL DÛ (Année)', totalDue, isDark, null, isBold: true),
           const SizedBox(height: 24),
           _statusItem(
             'Déjà payé',
@@ -733,12 +899,12 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.orange.withOpacity(0.1)
+                  ? AppTheme.warningColor.withOpacity(0.1)
                   : const Color(0xFFFFF7ED),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isDark
-                    ? Colors.orange.withOpacity(0.3)
+                    ? AppTheme.warningColor.withOpacity(0.3)
                     : const Color(0xFFFFEDD5),
               ),
             ),
@@ -750,7 +916,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: Colors.orange,
+                    color: AppTheme.warningColor,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -759,25 +925,38 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
-                    color: Colors.orange,
+                    color: AppTheme.warningColor,
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 24),
-          const Divider(height: 1, color: Colors.black12),
+          Divider(
+            height: 1,
+            color: isDark
+                ? AppTheme.borderDark.withOpacity(0.3)
+                : AppTheme.borderLight,
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(Symbols.info, size: 14, color: Color(0xFF618689)),
+              Icon(
+                Symbols.info,
+                size: 14,
+                color: isDark
+                    ? AppTheme.textDarkSecondary
+                    : AppTheme.textSecondary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _lastPaymentInfo ?? 'Aucun paiement enregistré',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF618689),
+                    color: isDark
+                        ? AppTheme.textDarkSecondary
+                        : AppTheme.textSecondary,
                   ),
                 ),
               ),
@@ -794,25 +973,28 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
     bool isDark,
     Color? color, {
     double? progress,
+    bool isBold = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF618689),
+            color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           '${NumberFormat('#,###', 'fr_FR').format(value)} GNF',
           style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w900,
-            color: color ?? (isDark ? Colors.white : const Color(0xFF111718)),
+            fontSize: isBold ? 24 : 20,
+            fontWeight: isBold ? FontWeight.w900 : FontWeight.w700,
+            color:
+                color ??
+                (isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary),
           ),
         ),
         if (progress != null) ...[
@@ -822,9 +1004,11 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
             child: LinearProgressIndicator(
               value: progress,
               backgroundColor: isDark
-                  ? Colors.white10
-                  : const Color(0xFFf0f4f4),
-              valueColor: AlwaysStoppedAnimation<Color>(color!),
+                  ? AppTheme.cardDark
+                  : AppTheme.backgroundLight,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                color ?? AppTheme.primaryColor,
+              ),
               minHeight: 8,
             ),
           ),
@@ -853,8 +1037,8 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
         children: [
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.surfaceDark : Colors.white,
               shape: BoxShape.circle,
             ),
             child: Icon(Symbols.receipt_long, color: primaryColor, size: 40),
@@ -864,14 +1048,19 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
             'Génération de reçu',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF111718),
+              color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Un reçu numérique sera généré automatiquement après validation.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Color(0xFF618689)),
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark
+                  ? AppTheme.textDarkSecondary
+                  : AppTheme.textSecondary,
+            ),
           ),
         ],
       ),
@@ -914,16 +1103,22 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
 
   void _fetchInitialResults() async {
     setState(() => _isLoading = true);
-    final results = await DatabaseHelper.instance.rawQuery('''
-      SELECT e.*, c.nom as classe_nom 
-      FROM eleve e
-      LEFT JOIN classe c ON e.classe_id = c.id
-      LIMIT 20
-    ''');
-    setState(() {
-      _results = results;
-      _isLoading = false;
-    });
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final results = await db.rawQuery('''
+        SELECT e.*, c.nom as classe_nom
+        FROM eleve e
+        LEFT JOIN classe c ON e.classe_id = c.id
+        ORDER BY e.nom ASC
+        LIMIT 30
+      ''');
+      setState(() {
+        _results = results;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _search(String query) async {
@@ -934,11 +1129,26 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
     if (query.length < 2) return;
 
     setState(() => _isLoading = true);
-    final results = await DatabaseHelper.instance.searchEleves(query);
-    setState(() {
-      _results = results;
-      _isLoading = false;
-    });
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final results = await db.rawQuery(
+        '''
+        SELECT e.*, c.nom as classe_nom
+        FROM eleve e
+        LEFT JOIN classe c ON e.classe_id = c.id
+        WHERE e.nom LIKE ? OR e.prenom LIKE ? OR e.matricule LIKE ?
+        ORDER BY e.nom ASC
+        LIMIT 30
+      ''',
+        ['%$query%', '%$query%', '%$query%'],
+      );
+      setState(() {
+        _results = results;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -948,7 +1158,7 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111718) : Colors.white,
+        color: isDark ? AppTheme.backgroundDark : AppTheme.surfaceLight,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: Column(
@@ -972,9 +1182,7 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
                 hintText: 'Rechercher un élève...',
                 prefixIcon: const Icon(Symbols.search),
                 filled: true,
-                fillColor: isDark
-                    ? Colors.white.withOpacity(0.05)
-                    : const Color(0xFFf0f4f4),
+                fillColor: isDark ? AppTheme.surfaceDark : AppTheme.hoverLight,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
                   borderSide: BorderSide.none,
@@ -994,23 +1202,33 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
                       final eleve = _results[index];
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: const Color(
-                            0xFF13daec,
-                          ).withOpacity(0.1),
+                          backgroundColor: AppTheme.primaryColor.withOpacity(
+                            0.1,
+                          ),
                           child: Text(
                             eleve['nom'][0],
                             style: const TextStyle(
-                              color: Color(0xFF13daec),
+                              color: AppTheme.primaryColor,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                         title: Text(
                           '${eleve['prenom']} ${eleve['nom']}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? AppTheme.textDarkPrimary
+                                : AppTheme.textPrimary,
+                          ),
                         ),
                         subtitle: Text(
                           '${eleve['matricule']} • ${eleve['classe_nom'] ?? 'N/A'}',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppTheme.textDarkSecondary
+                                : AppTheme.textSecondary,
+                          ),
                         ),
                         onTap: () => widget.onSelect(eleve),
                         trailing: const Icon(

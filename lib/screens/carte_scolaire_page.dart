@@ -3,10 +3,11 @@ import '../core/database/database_helper.dart';
 import '../models/student.dart';
 import '../widgets/carteele.dart';
 import 'carte_editor_screen.dart';
-import 'bulk_card_print_page.dart';
+// import 'bulk_card_print_page.dart'; // File missing
 
 class CarteScolairePage extends StatefulWidget {
-  const CarteScolairePage({super.key});
+  final Student? student;
+  const CarteScolairePage({super.key, this.student});
 
   @override
   State<CarteScolairePage> createState() => _CarteScolairePageState();
@@ -109,6 +110,7 @@ class _CarteScolairePageState extends State<CarteScolairePage> {
                     'Cartes d\'Identité Scolaire',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
+                  /*
                   IconButton(
                     icon: const Icon(Icons.print),
                     onPressed: () {
@@ -121,6 +123,7 @@ class _CarteScolairePageState extends State<CarteScolairePage> {
                     },
                     tooltip: 'Impression en série',
                   ),
+                  */
                 ],
               ),
             ),

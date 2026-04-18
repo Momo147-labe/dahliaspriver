@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../theme/app_theme.dart';
+import '../../../../services/pdf/payment_control_pdf_service.dart';
 
 class PaymentControlPage extends StatefulWidget {
   const PaymentControlPage({super.key});
@@ -91,6 +92,35 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
             matricule.contains(_searchQuery.toLowerCase());
       }).toList();
     });
+  }
+
+  Future<void> _exportPdf({bool impayesOnly = false}) async {
+    if (_studentsData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucune donnée à exporter.')),
+      );
+      return;
+    }
+    try {
+      final doc = await PaymentControlPdfService().generate(
+        _studentsData,
+        _activeAnneeLabel,
+        impayesOnly: impayesOnly,
+      );
+      await Printing.layoutPdf(
+        onLayout: (format) async => doc.save(),
+        name: impayesOnly ? 'Liste_Impayes.pdf' : 'Controle_Frais.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   String _getStatus(Map<String, dynamic> student, String type) {
@@ -225,6 +255,15 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
                 "Exporter les impayés",
                 isDark,
                 theme,
+                onTap: () => _exportPdf(impayesOnly: true),
+              ),
+              const SizedBox(width: 12),
+              _buildActionButton(
+                Symbols.picture_as_pdf,
+                "Exporter tout",
+                isDark,
+                theme,
+                onTap: () => _exportPdf(impayesOnly: false),
               ),
               const SizedBox(width: 12),
               _buildActionButton(
@@ -247,9 +286,10 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
     bool isDark,
     ThemeData theme, {
     bool isPrimary = false,
+    VoidCallback? onTap,
   }) {
     return ElevatedButton.icon(
-      onPressed: () {},
+      onPressed: onTap ?? () {},
       icon: Icon(icon, size: 20),
       label: Text(
         label,

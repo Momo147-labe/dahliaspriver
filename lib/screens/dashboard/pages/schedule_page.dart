@@ -4,6 +4,9 @@ import '../../../core/database/database_helper.dart';
 import '../../../models/emploi_du_temps.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/schedule/add_schedule_modal.dart';
+import 'package:printing/printing.dart';
+import '../../../services/pdf/timetable_pdf_service.dart';
+import 'master_schedule_page.dart';
 
 class SchedulePage extends StatefulWidget {
   const SchedulePage({super.key});
@@ -101,6 +104,29 @@ class _SchedulePageState extends State<SchedulePage>
     );
   }
 
+  Future<void> _exportPdf() async {
+    if (_selectedClasseId == null || _scheduleEntries.isEmpty) {
+      _showError('Aucun emploi du temps sélectionné ou existant.');
+      return;
+    }
+
+    final classe = _classes.firstWhere((c) => c['id'] == _selectedClasseId);
+    final className = classe['nom'] as String;
+
+    try {
+      final doc = await TimetablePdfService().generateTimetablePdf(
+        className,
+        _scheduleEntries,
+      );
+      await Printing.layoutPdf(
+        onLayout: (format) async => doc.save(),
+        name: 'Emploi_du_temps_$className.pdf',
+      );
+    } catch (e) {
+      _showError('Erreur lors de la génération du PDF: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -161,18 +187,45 @@ class _SchedulePageState extends State<SchedulePage>
             ),
           ],
         ),
-        ElevatedButton.icon(
-          onPressed: () => _openAddModal(),
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Ajouter un cours'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MasterSchedulePage()),
+                );
+              },
+              icon: const Icon(Symbols.calendar_view_week_rounded),
+              label: const Text('Vue Globale'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 24,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 16),
+            ElevatedButton.icon(
+              onPressed: () => _openAddModal(),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Ajouter un cours'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 24,
+                ),
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -223,6 +276,12 @@ class _SchedulePageState extends State<SchedulePage>
             ),
           ),
           const Spacer(),
+          OutlinedButton.icon(
+            onPressed: _exportPdf,
+            icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
+            label: const Text('Générer PDF'),
+          ),
+          const SizedBox(width: 8),
           IconButton.filledTonal(
             onPressed: () => _loadSchedule(),
             icon: const Icon(Icons.refresh_rounded),

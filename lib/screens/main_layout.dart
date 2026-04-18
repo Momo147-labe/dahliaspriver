@@ -32,6 +32,7 @@ class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
   Map<String, dynamic>? schoolData;
   bool _isLoading = true;
+  bool _isCollapsed = false; // État de réduction du sidebar
   late final List<Widget> pages;
 
   @override
@@ -39,7 +40,13 @@ class _MainLayoutState extends State<MainLayout> {
     super.initState();
     _loadSchool();
     pages = [
-      const DashboardOverview(),
+      DashboardOverview(
+        onNavigate: (index) {
+          if (index >= 0 && index < titles.length) {
+            setState(() => _currentIndex = index);
+          }
+        },
+      ),
       const StudentsPage(),
       const ClassesPage(),
       const TeachersPage(),
@@ -140,8 +147,12 @@ class _MainLayoutState extends State<MainLayout> {
 
   // ===================== SIDEBAR =====================
   Widget _sidebar(bool isDark) {
-    return Container(
-      width: 310,
+    final sidebarWidth = _isCollapsed ? 80.0 : 250.0;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      width: sidebarWidth,
       decoration: BoxDecoration(
         color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
         border: Border(
@@ -150,14 +161,62 @@ class _MainLayoutState extends State<MainLayout> {
           ),
         ),
       ),
-      child: Column(
+      child: Stack(
         children: [
-          SchoolProfileCard(
-            school: schoolData,
-            isDark: isDark,
-            isLoading: _isLoading,
+          Column(
+            children: [
+              if (!_isCollapsed)
+                SchoolProfileCard(
+                  school: schoolData,
+                  isDark: isDark,
+                  isLoading: _isLoading,
+                )
+              else
+                const SizedBox(
+                  height: 56,
+                ), // Réserve l'espace pour le bouton en mode réduit
+              Expanded(child: _menu(isDark)),
+            ],
           ),
-          Expanded(child: _menu(isDark)),
+
+          // Bouton de réduction en position absolue
+          Positioned(
+            top: 12,
+            right: _isCollapsed ? 0 : 12,
+            left: _isCollapsed ? 0 : null,
+            child: Align(
+              alignment: _isCollapsed
+                  ? Alignment.center
+                  : Alignment.centerRight,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    debugPrint('Sidebar toggle clicked: !$_isCollapsed');
+                    setState(() => _isCollapsed = !_isCollapsed);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white10
+                          : Colors.black.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isDark ? Colors.white10 : Colors.black12,
+                      ),
+                    ),
+                    child: Icon(
+                      _isCollapsed ? Icons.chevron_right : Icons.chevron_left,
+                      size: 20,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -165,57 +224,123 @@ class _MainLayoutState extends State<MainLayout> {
 
   // ===================== MENU =====================
   Widget _menu(bool isDark) {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      itemCount: titles.length,
-      itemBuilder: (_, i) {
-        final selected = _currentIndex == i;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: selected
-                  ? AppTheme.primaryColor.withOpacity(0.15)
-                  : Colors.transparent,
-              border: selected
-                  ? Border(
-                      left: BorderSide(color: AppTheme.primaryColor, width: 3),
-                    )
-                  : null,
-            ),
-            child: ListTile(
-              selected: selected,
-              selectedTileColor: Colors.transparent,
-              leading: Icon(
-                icons[i],
-                size: 20,
-                color: selected
-                    ? AppTheme.primaryColor
-                    : isDark
-                    ? Colors.white70
-                    : AppTheme.textSecondary,
-              ),
-              title: Text(
-                titles[i],
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected
-                      ? AppTheme.primaryColor
-                      : isDark
-                      ? Colors.white70
-                      : AppTheme.textSecondary,
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: ListView.builder(
+        padding: EdgeInsets.symmetric(
+          horizontal: _isCollapsed ? 8 : 12,
+          vertical: 8,
+        ),
+        itemCount: titles.length,
+        itemBuilder: (_, i) {
+          final selected = _currentIndex == i;
+
+          // Mode Réduit
+          if (_isCollapsed) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Tooltip(
+                message: titles[i],
+                preferBelow: false,
+                child: InkWell(
+                  onTap: () => setState(() => _currentIndex = i),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: selected
+                          ? AppTheme.primaryColor.withOpacity(0.15)
+                          : Colors.transparent,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        icons[i],
+                        size: 24,
+                        color: selected
+                            ? AppTheme.primaryColor
+                            : isDark
+                            ? Colors.white70
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              shape: RoundedRectangleBorder(
+            );
+          }
+
+          // Mode Étendu
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Container(
+              decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
+                color: selected
+                    ? AppTheme.primaryColor.withOpacity(0.15)
+                    : Colors.transparent,
+                border: selected
+                    ? const Border(
+                        left: BorderSide(
+                          color: AppTheme.primaryColor,
+                          width: 3,
+                        ),
+                      )
+                    : null,
               ),
-              onTap: () => setState(() => _currentIndex = i),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                child: SizedBox(
+                  width: 250,
+                  child: InkWell(
+                    onTap: () => setState(() => _currentIndex = i),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            icons[i],
+                            size: 20,
+                            color: selected
+                                ? AppTheme.primaryColor
+                                : isDark
+                                ? Colors.white70
+                                : AppTheme.textSecondary,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              titles[i],
+                              overflow: TextOverflow.clip,
+                              softWrap: false,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                color: selected
+                                    ? AppTheme.primaryColor
+                                    : isDark
+                                    ? Colors.white70
+                                    : AppTheme.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 

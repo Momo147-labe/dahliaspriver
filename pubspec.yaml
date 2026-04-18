@@ -58,6 +58,11 @@ dependencies:
   printing: ^5.14.2
   crypto: ^3.0.7
   fl_chart: ^0.70.2
+  flutter_quill: ^11.5.0
+  postgres: ^3.0.0
+  device_info_plus: ^10.1.0
+  flutter_dotenv: ^5.1.0
+  client_information: ^2.0.0
 
 dev_dependencies:
   flutter_test:
@@ -71,6 +76,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - .env
     - assets/ondoarding/
     - assets/profilStudents/
     - assets/images/drapeau_guinee.png
