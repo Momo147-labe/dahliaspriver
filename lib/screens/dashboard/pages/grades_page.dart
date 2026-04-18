@@ -159,37 +159,39 @@ class _GradesPageState extends State<GradesPage> {
     }
   }
 
+  Future<void> _loadClasses() async {
+    final db = await _dbHelper.database;
+    final classes = await db.rawQuery('''
+      SELECT c.*, cy.nom as cycle_nom, cy.note_min, cy.note_max, cy.moyenne_passage
+      FROM classe c
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+      ORDER BY c.nom ASC
+    ''');
+    setState(() {
+      _classes = classes;
+    });
+  }
+
   Future<void> _loadSaisieData(int anneeId) async {
     setState(() => _isLoading = true);
     try {
-      final db = await _dbHelper.database;
-
-      // Load Configuration
+      // 1. Charger la configuration
       await _loadConfig(anneeId);
 
-      // Load Classes with cycle info
-      final classes = await db.rawQuery('''
-        SELECT c.*, cy.nom as cycle_nom, cy.note_min, cy.note_max, cy.moyenne_passage
-        FROM classe c
-        LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-        ORDER BY c.nom ASC
-      ''');
+      // 2. Charger les classes
+      await _loadClasses();
 
-      setState(() {
-        _classes = classes;
-        // Always pick first class if none selected (e.g. after year reset)
-        if (_classes.isNotEmpty && _selectedClass == null) {
+      // 3. Sélection par défaut si vide
+      if (_classes.isNotEmpty && _selectedClass == null) {
+        setState(() {
           _selectedClass = _classes[0];
           _updateCycleConfig();
-        }
-      });
-
-      if (_classes.isNotEmpty) {
-        // Load mentions for initial class
-        await _loadSubjectsForSelectedClass(anneeId);
+        });
       }
 
-      if (_classes.isEmpty) {
+      if (_classes.isNotEmpty) {
+        await _loadSubjectsForSelectedClass(anneeId);
+      } else {
         setState(() => _isLoading = false);
         _showError('Veuillez d\'abord ajouter des classes.');
         return;
@@ -485,23 +487,25 @@ class _GradesPageState extends State<GradesPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              if (_isSaisieMode)
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                  onPressed: () {
-                    setState(() => _isSaisieMode = false);
-                    if (_lastLoadedAnneeId != null) {
-                      _loadOverview(_lastLoadedAnneeId!);
-                    }
-                  },
-                ),
-              const SizedBox(width: 8),
-              _buildHeaderIcon(),
-              const SizedBox(width: 16),
-              _buildHeaderText(isDark),
-            ],
+          Expanded(
+            child: Row(
+              children: [
+                if (_isSaisieMode)
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    onPressed: () {
+                      setState(() => _isSaisieMode = false);
+                      if (_lastLoadedAnneeId != null) {
+                        _loadOverview(_lastLoadedAnneeId!);
+                      }
+                    },
+                  ),
+                const SizedBox(width: 8),
+                _buildHeaderIcon(),
+                const SizedBox(width: 16),
+                _buildHeaderText(isDark),
+              ],
+            ),
           ),
           Row(
             children: [
@@ -604,7 +608,7 @@ class _GradesPageState extends State<GradesPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.indigo.withOpacity(0.2),
+            color: Colors.indigo.withValues(alpha: 0.2),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -619,57 +623,61 @@ class _GradesPageState extends State<GradesPage> {
   }
 
   Widget _buildHeaderText(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _isSaisieMode ? 'Saisie des Notes' : 'Liste des Notes',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            color: isDark ? Colors.white : AppTheme.textPrimary,
-            letterSpacing: -0.5,
-          ),
-        ),
-        if (_isSaisieMode)
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _isSaisieMode ? 'Saisie des Notes' : 'Liste des Notes',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : AppTheme.textPrimary,
+              letterSpacing: -0.5,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.person_rounded,
-                  size: 14,
-                  color: AppTheme.primaryColor,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _assignedTeacher != null
-                      ? 'Enseignant: ${_assignedTeacher!['prenom']} ${_assignedTeacher!['nom']}'
-                      : 'Aucun enseignant assigné',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (_isSaisieMode)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.person_rounded,
+                    size: 14,
                     color: AppTheme.primaryColor,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  Text(
+                    _assignedTeacher != null
+                        ? 'Enseignant: ${_assignedTeacher!['prenom']} ${_assignedTeacher!['nom']}'
+                        : 'Aucun enseignant assigné',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Text(
+              'Aperçu global des performances scolaires',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.white60 : AppTheme.textSecondary,
+              ),
             ),
-          )
-        else
-          Text(
-            'Aperçu global des performances scolaires',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? Colors.white60 : AppTheme.textSecondary,
-            ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -706,7 +714,7 @@ class _GradesPageState extends State<GradesPage> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -719,7 +727,7 @@ class _GradesPageState extends State<GradesPage> {
               contentPadding: const EdgeInsets.all(20),
               leading: _buildInitialCircle(
                 g['classe_nom'] != null && g['classe_nom'].toString().isNotEmpty
-                    ? g['classe_nom'].toString()[0]
+                    ? g['classe_nom'].toString().runes.first.toString()
                     : '?',
                 isDark,
               ),
@@ -739,7 +747,7 @@ class _GradesPageState extends State<GradesPage> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -758,7 +766,7 @@ class _GradesPageState extends State<GradesPage> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -871,22 +879,36 @@ class _GradesPageState extends State<GradesPage> {
     );
   }
 
-  void _openTrimesterDetail(Map<String, dynamic> overviewData) {
-    setState(() {
-      _isSaisieMode = true;
-      try {
-        _selectedClass = _classes.firstWhere(
-          (c) => c['id'] == overviewData['classe_id'],
-        );
-      } catch (e) {
-        _selectedClass = null;
-      }
-      _selectedTrimestre = overviewData['trimestre'];
-    });
+  Future<void> _openTrimesterDetail(Map<String, dynamic> overviewData) async {
+    setState(() => _isLoading = true);
 
-    if (_lastLoadedAnneeId != null) {
-      _loadSubjectsForSelectedClass(_lastLoadedAnneeId!).then((_) {
+    try {
+      // 1. S'assurer que les classes et la config sont chargées
+      if (_classes.isEmpty) {
+        await _loadClasses();
+      }
+      await _loadConfig(_lastLoadedAnneeId!);
+
+      setState(() {
+        _isSaisieMode = true;
+        try {
+          _selectedClass = _classes.firstWhere(
+            (c) => c['id'] == overviewData['classe_id'],
+          );
+          _updateCycleConfig();
+        } catch (e) {
+          _selectedClass = null;
+        }
+        _selectedTrimestre = overviewData['trimestre'];
+        _selectedSequence = overviewData['sequence'] ?? 1;
+      });
+
+      if (_lastLoadedAnneeId != null) {
+        // 2. Charger les matières pour la classe sélectionnée
+        await _loadSubjectsForSelectedClass(_lastLoadedAnneeId!);
+
         if (!mounted) return;
+
         setState(() {
           try {
             _selectedSubject = _subjects.firstWhere(
@@ -896,8 +918,14 @@ class _GradesPageState extends State<GradesPage> {
             _selectedSubject = null;
           }
         });
-        _loadGrades(_lastLoadedAnneeId!);
-      });
+
+        // 3. Charger les notes
+        await _loadGrades(_lastLoadedAnneeId!);
+      }
+    } catch (e) {
+      debugPrint('Error opening trimester detail: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -1369,128 +1397,131 @@ class _GradesPageState extends State<GradesPage> {
             ),
           ),
           const Divider(height: 1),
-          SizedBox(
-            height: 500,
-            child: ListView.separated(
-              itemCount: _filteredGrades.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final student = _filteredGrades[index];
-                final eleveId = student['eleve_id'] as int;
-                final currentTrimesterSeqs =
-                    _sequences
-                        .where((s) => s['trimestre'] == _selectedTrimestre)
-                        .toList()
-                      ..sort(
-                        (a, b) => (a['numero_sequence'] as int).compareTo(
-                          b['numero_sequence'] as int,
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _filteredGrades.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final student = _filteredGrades[index];
+              final eleveId = student['eleve_id'] as int;
+              final currentTrimesterSeqs =
+                  _sequences
+                      .where((s) => s['trimestre'] == _selectedTrimestre)
+                      .toList()
+                    ..sort(
+                      (a, b) => (a['numero_sequence'] as int).compareTo(
+                        b['numero_sequence'] as int,
+                      ),
+                    );
+
+              return ListTile(
+                contentPadding: const EdgeInsets.all(16),
+                leading: _buildStudentAvatar(
+                  student['photo'],
+                  student['nom'] != null &&
+                          student['nom'].toString().runes.isNotEmpty
+                      ? String.fromCharCode(
+                          student['nom'].toString().runes.first,
+                        )
+                      : '?',
+                ),
+                title: Text(
+                  '${student['nom']} ${student['prenom']}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text('Matricule: ${student['matricule']}'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ...currentTrimesterSeqs.expand((s) {
+                      final seqNum = s['numero_sequence'] as int;
+                      final key = '${eleveId}_$seqNum';
+                      final controller = _controllers[key];
+                      final noteValue = controller?.text ?? '';
+                      final noteValueNum = double.tryParse(noteValue) ?? -1.0;
+                      final coef =
+                          (_selectedSubject?['coefficient'] as num?)
+                              ?.toDouble() ??
+                          1.0;
+                      final noteTimesCoef = (noteValueNum != -1.0)
+                          ? (noteValueNum * coef).toStringAsFixed(1)
+                          : '-';
+
+                      return [
+                        Container(
+                          width: 70,
+                          margin: const EdgeInsets.only(left: 8),
+                          child: TextField(
+                            controller: controller,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            textAlign: TextAlign.center,
+                            onChanged: (v) => setState(() {}),
+                            style: TextStyle(
+                              color:
+                                  (noteValueNum != -1.0 &&
+                                      (noteValueNum < _currentCycleMin ||
+                                          noteValueNum > _currentCycleMax))
+                                  ? Colors.red
+                                  : (isDark ? Colors.white : Colors.black),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: '-',
+                              filled: true,
+                              fillColor:
+                                  (noteValueNum != -1.0 &&
+                                      (noteValueNum < _currentCycleMin ||
+                                          noteValueNum > _currentCycleMax))
+                                  ? Colors.red.withOpacity(0.1)
+                                  : (isDark
+                                        ? AppTheme.cardDark
+                                        : const Color(0xFFF3F4F6)),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    (noteValueNum != -1.0 &&
+                                        (noteValueNum < _currentCycleMin ||
+                                            noteValueNum > _currentCycleMax))
+                                    ? const BorderSide(
+                                        color: Colors.red,
+                                        width: 1,
+                                      )
+                                    : BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
                         ),
-                      );
-
-                return ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  leading: _buildStudentAvatar(
-                    student['photo'],
-                    student['nom'][0],
-                  ),
-                  title: Text(
-                    '${student['nom']} ${student['prenom']}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text('Matricule: ${student['matricule']}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ...currentTrimesterSeqs.expand((s) {
-                        final seqNum = s['numero_sequence'] as int;
-                        final key = '${eleveId}_$seqNum';
-                        final controller = _controllers[key];
-                        final noteValue = controller?.text ?? '';
-                        final noteValueNum = double.tryParse(noteValue) ?? -1.0;
-                        final coef =
-                            (_selectedSubject?['coefficient'] as num?)
-                                ?.toDouble() ??
-                            1.0;
-                        final noteTimesCoef = (noteValueNum != -1.0)
-                            ? (noteValueNum * coef).toStringAsFixed(1)
-                            : '-';
-
-                        return [
-                          Container(
-                            width: 70,
-                            margin: const EdgeInsets.only(left: 8),
-                            child: TextField(
-                              controller: controller,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                              textAlign: TextAlign.center,
-                              onChanged: (v) => setState(() {}),
-                              style: TextStyle(
-                                color:
-                                    (noteValueNum != -1.0 &&
-                                        (noteValueNum < _currentCycleMin ||
-                                            noteValueNum > _currentCycleMax))
-                                    ? Colors.red
-                                    : (isDark ? Colors.white : Colors.black),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: '-',
-                                filled: true,
-                                fillColor:
-                                    (noteValueNum != -1.0 &&
-                                        (noteValueNum < _currentCycleMin ||
-                                            noteValueNum > _currentCycleMax))
-                                    ? Colors.red.withOpacity(0.1)
-                                    : (isDark
-                                          ? AppTheme.cardDark
-                                          : const Color(0xFFF3F4F6)),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide:
-                                      (noteValueNum != -1.0 &&
-                                          (noteValueNum < _currentCycleMin ||
-                                              noteValueNum > _currentCycleMax))
-                                      ? const BorderSide(
-                                          color: Colors.red,
-                                          width: 1,
-                                        )
-                                      : BorderSide.none,
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                              ),
+                        Container(
+                          width: 60,
+                          height: 48,
+                          margin: const EdgeInsets.only(left: 8),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            noteTimesCoef,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                              fontSize: 13,
                             ),
                           ),
-                          Container(
-                            width: 60,
-                            height: 48,
-                            margin: const EdgeInsets.only(left: 8),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              noteTimesCoef,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ];
-                      }),
-                    ],
-                  ),
-                );
-              },
-            ),
+                        ),
+                      ];
+                    }),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),

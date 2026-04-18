@@ -6,6 +6,7 @@ class ClasseDao extends BaseDao {
   ClasseDao(Database db) : super(db);
 
   Future<List<Map<String, dynamic>>> getClassesByAnnee([int? anneeId]) async {
+    // Classes sont maintenant globales, on ignore anneeId pour la liste
     return await db.query(ClasseSchema.tableName, orderBy: 'nom ASC');
   }
 
@@ -63,32 +64,32 @@ class ClasseDao extends BaseDao {
   }
 
   Future<List<Map<String, dynamic>>> getSubjectsByClass(
-    int classeId,
-    int anneeId,
-  ) async {
+    int classeId, [
+    int? anneeId,
+  ]) async {
     return await db.rawQuery(
       '''
       SELECT m.*, cm.coefficient
       FROM matiere m
       JOIN classe_matiere cm ON m.id = cm.matiere_id
-      WHERE cm.classe_id = ? AND cm.annee_scolaire_id = ?
+      WHERE cm.classe_id = ?
       ORDER BY m.nom ASC
     ''',
-      [classeId, anneeId],
+      [classeId],
     );
   }
 
   Future<void> saveClassSubjects(
     int classeId,
-    int anneeId,
+    int? anneeId,
     List<Map<String, dynamic>> subjectsData,
   ) async {
     await db.transaction((txn) async {
-      // Remove existing
+      // Remove existing (globally)
       await txn.delete(
         'classe_matiere',
-        where: 'classe_id = ? AND annee_scolaire_id = ?',
-        whereArgs: [classeId, anneeId],
+        where: 'classe_id = ?',
+        whereArgs: [classeId],
       );
 
       // Insert new
@@ -96,7 +97,6 @@ class ClasseDao extends BaseDao {
         await txn.insert('classe_matiere', {
           'classe_id': classeId,
           'matiere_id': data['id'],
-          'annee_scolaire_id': anneeId,
           'coefficient': data['coefficient'] ?? 1.0,
         });
       }
@@ -195,13 +195,13 @@ class ClasseDao extends BaseDao {
 
   Future<bool> isSubjectInClass(
     int classeId,
-    int matiereId,
-    int anneeId,
-  ) async {
+    int matiereId, [
+    int? anneeId,
+  ]) async {
     final result = await db.query(
       'classe_matiere',
-      where: 'classe_id = ? AND matiere_id = ? AND annee_scolaire_id = ?',
-      whereArgs: [classeId, matiereId, anneeId],
+      where: 'classe_id = ? AND matiere_id = ?',
+      whereArgs: [classeId, matiereId],
     );
     return result.isNotEmpty;
   }
@@ -213,10 +213,14 @@ class ClasseDao extends BaseDao {
         c.*, 
         cy.nom as cycle_nom,
         nv.nom as niveau_nom,
+        e.nom as prof_principal_nom,
+        e.prenom as prof_principal_prenom,
         (SELECT COUNT(*) FROM eleve WHERE classe_id = c.id AND annee_scolaire_id = ?) as eleve_count
       FROM ${ClasseSchema.tableName} c
       LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN niveaux nv ON c.niveau_id = nv.id
+      LEFT JOIN enseignant e ON c.prof_principal_id = e.id
+      ORDER BY c.nom ASC
     ''',
       [anneeId],
     );

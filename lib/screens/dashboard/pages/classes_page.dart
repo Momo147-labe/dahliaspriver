@@ -36,9 +36,11 @@ class _ClassesPageState extends State<ClassesPage> {
   int? _selectedNextClassId;
   bool _isFinalClass = false;
 
+  List<Map<String, dynamic>> _allEnseignants = [];
   List<Map<String, dynamic>> _allCycles = [];
   List<Map<String, dynamic>> _allNiveaux = [];
   List<Map<String, dynamic>> _filteredNiveauxForModal = [];
+  int? _selectedProfPrincipalId;
 
   @override
   void initState() {
@@ -79,10 +81,15 @@ class _ClassesPageState extends State<ClassesPage> {
       // Charger tous les niveaux (pour le filtrage initial)
       final allNiveaux = await DatabaseHelper.instance.configDao.getNiveaux();
 
+      // Charger les enseignants
+      final enseignants = await DatabaseHelper.instance.enseignantDao
+          .getEnseignants();
+
       setState(() {
         _selectedAnneeId = anneeId;
         _allCycles = cycles;
         _allNiveaux = allNiveaux;
+        _allEnseignants = enseignants;
         _isLoading = false;
       });
     } catch (e) {
@@ -760,7 +767,7 @@ class _ClassesPageState extends State<ClassesPage> {
             : (MediaQuery.of(context).size.width > 800 ? 3 : 1),
         crossAxisSpacing: 20,
         mainAxisSpacing: 20,
-        mainAxisExtent: 320,
+        mainAxisExtent: 350,
       ),
       itemCount: classes.length,
       itemBuilder: (context, i) => _buildClassCard(classes[i], isDark, i),
@@ -877,6 +884,15 @@ class _ClassesPageState extends State<ClassesPage> {
             c['salle'] ?? 'N/A',
             isDark,
           ),
+          const SizedBox(height: 8),
+          _buildInfoRow(
+            Icons.person_pin_outlined,
+            'Prof. Principal',
+            (c['prof_principal_nom'] != null)
+                ? '${c['prof_principal_prenom']} ${c['prof_principal_nom']}'
+                : 'N/A',
+            isDark,
+          ),
         ],
       ),
     );
@@ -934,7 +950,6 @@ class _ClassesPageState extends State<ClassesPage> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
@@ -946,9 +961,14 @@ class _ClassesPageState extends State<ClassesPage> {
               ),
             ],
           ),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+            ),
           ),
         ],
       ),
@@ -1016,6 +1036,11 @@ class _ClassesPageState extends State<ClassesPage> {
                   '${c['niveau_nom'] ?? 'N/A'} • ${c['eleve_count']}/${c['eff_max']} élèves',
                   style: const TextStyle(fontSize: 12),
                 ),
+                if (c['prof_principal_nom'] != null)
+                  Text(
+                    'Prof: ${c['prof_principal_prenom']} ${c['prof_principal_nom']}',
+                    style: const TextStyle(fontSize: 11, color: Colors.blue),
+                  ),
                 if (c['next_class_id'] != null)
                   Text(
                     '→ ${_classes.firstWhere((cls) => cls['id'] == c['next_class_id'], orElse: () => {'nom': 'N/A'})['nom']}',
@@ -1093,6 +1118,7 @@ class _ClassesPageState extends State<ClassesPage> {
       _selectedNiveauId = classe['niveau_id'];
       _selectedAnneeId = classe['annee_scolaire_id'];
       _selectedNextClassId = classe['next_class_id'];
+      _selectedProfPrincipalId = classe['prof_principal_id'];
       _isFinalClass = classe['is_final_class'] == 1;
 
       // Filter levels based on selected cycle
@@ -1111,6 +1137,7 @@ class _ClassesPageState extends State<ClassesPage> {
       _selectedNiveauId = null;
       _selectedAnneeId = DatabaseHelper.activeAnneeId;
       _selectedNextClassId = null;
+      _selectedProfPrincipalId = null;
       _isFinalClass = false;
       _filteredNiveauxForModal = [];
     }
@@ -1256,7 +1283,6 @@ class _ClassesPageState extends State<ClassesPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
                         _buildModalDropdown(
                           'Classe Suivante',
                           _selectedNextClassId != null
@@ -1285,6 +1311,24 @@ class _ClassesPageState extends State<ClassesPage> {
                             }
                           }),
                           isDark,
+                        ),
+                        const SizedBox(height: 20),
+                        _buildModalIdDropdown(
+                          'Professeur Principal (Optionnel)',
+                          _selectedProfPrincipalId,
+                          [
+                            {'id': null, 'nom': 'Aucun'},
+                            ..._allEnseignants.map(
+                              (e) => {
+                                'id': e['id'],
+                                'nom': '${e['nom']} ${e['prenom']}',
+                              },
+                            ),
+                          ],
+                          (v) =>
+                              setModalState(() => _selectedProfPrincipalId = v),
+                          isDark,
+                          allowNull: true,
                         ),
                         const SizedBox(height: 20),
                         Row(
@@ -1384,8 +1428,9 @@ class _ClassesPageState extends State<ClassesPage> {
     int? value,
     List<Map<String, dynamic>> items,
     ValueChanged<int?> onChanged,
-    bool isDark,
-  ) {
+    bool isDark, {
+    bool allowNull = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1400,7 +1445,7 @@ class _ClassesPageState extends State<ClassesPage> {
           items: items
               .map(
                 (e) => DropdownMenuItem<int>(
-                  value: e['id'] as int,
+                  value: e['id'] as int?,
                   child: Text(
                     e['nom'].toString(),
                     overflow: TextOverflow.ellipsis,
@@ -1409,7 +1454,7 @@ class _ClassesPageState extends State<ClassesPage> {
               )
               .toList(),
           onChanged: onChanged,
-          validator: (v) => v == null ? 'Requis' : null,
+          validator: (v) => (!allowNull && v == null) ? 'Requis' : null,
           decoration: InputDecoration(
             filled: true,
             fillColor: isDark
@@ -1492,6 +1537,7 @@ class _ClassesPageState extends State<ClassesPage> {
       'niveau_id': _selectedNiveauId,
       'eff_max': int.tryParse(_effMaxController.text) ?? 100,
       'next_class_id': _selectedNextClassId,
+      'prof_principal_id': _selectedProfPrincipalId,
       'is_final_class': _isFinalClass ? 1 : 0,
     };
 

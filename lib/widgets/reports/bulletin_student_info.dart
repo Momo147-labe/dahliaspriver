@@ -13,6 +13,12 @@ class BulletinStudentInfo extends StatelessWidget {
   final String rang;
   final String absences;
 
+  final String? nomPere;
+  final String? prenomPere;
+  final String? nomMere;
+  final String? prenomMere;
+  final double moyenneBase;
+
   const BulletinStudentInfo({
     super.key,
     required this.nom,
@@ -25,6 +31,11 @@ class BulletinStudentInfo extends StatelessWidget {
     required this.moyenne,
     required this.rang,
     required this.absences,
+    this.nomPere,
+    this.prenomPere,
+    this.nomMere,
+    this.prenomMere,
+    this.moyenneBase = 20.0,
   });
 
   @override
@@ -105,6 +116,7 @@ class BulletinStudentInfo extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildMiniInfo(
                         'INFORMATIONS SCOLAIRES',
@@ -114,6 +126,30 @@ class BulletinStudentInfo extends StatelessWidget {
                       _buildMiniInfo('', 'Matricule: $matricule'),
                     ],
                   ),
+                  if (nomPere != null || nomMere != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (nomPere != null)
+                          Expanded(
+                            child: _buildMiniInfo(
+                              'PÈRE',
+                              '${prenomPere ?? ''} $nomPere',
+                            ),
+                          ),
+                        if (nomPere != null && nomMere != null)
+                          const SizedBox(width: 12),
+                        if (nomMere != null)
+                          Expanded(
+                            child: _buildMiniInfo(
+                              'MÈRE',
+                              '${prenomMere ?? ''} $nomMere',
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -127,7 +163,7 @@ class BulletinStudentInfo extends StatelessWidget {
               child: _buildMetricCard(
                 'MOYENNE',
                 moyenne,
-                '/ 20',
+                '/ ${moyenneBase.toStringAsFixed(0)}',
                 const Color(0xFFE0FBFC),
                 const Color(0xFF13DAEC),
               ),

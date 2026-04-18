@@ -32,14 +32,8 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
 
   Future<void> _loadData() async {
     try {
-      final anneeId = await _dbHelper.ensureActiveAnneeCached();
-      if (anneeId == null) return;
-
       // Charger seulement les matières assignées à cette classe
-      final subjects = await _dbHelper.getSubjectsByClass(
-        widget.classe['id'],
-        anneeId,
-      );
+      final subjects = await _dbHelper.getSubjectsByClass(widget.classe['id']);
 
       final teachers = await (await _dbHelper.database).query(
         'enseignant',
@@ -47,7 +41,6 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
       );
       final currentAttributions = await _dbHelper.getAttributionsByClass(
         widget.classe['id'],
-        anneeId,
       );
 
       Map<int, int?> initialAssignments = {};
@@ -72,12 +65,9 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
   Future<void> _saveAssignments() async {
     setState(() => _isLoading = true);
     try {
-      final anneeId = await _dbHelper.ensureActiveAnneeCached();
-      if (anneeId == null) return;
-
       await _dbHelper.saveAllAttributions(
         widget.classe['id'] as int,
-        anneeId,
+        null,
         _assignments,
       );
 

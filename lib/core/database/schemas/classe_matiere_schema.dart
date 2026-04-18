@@ -8,12 +8,13 @@ class ClasseMatiereSchema {
       classe_id INTEGER NOT NULL,
       matiere_id INTEGER NOT NULL,
       coefficient REAL DEFAULT 1,
-      annee_scolaire_id INTEGER NOT NULL,
+      annee_scolaire_id INTEGER,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (classe_id) REFERENCES classe(id),
       FOREIGN KEY (matiere_id) REFERENCES matiere(id),
       FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
+      UNIQUE(classe_id, matiere_id)
     )
   ''';
 }

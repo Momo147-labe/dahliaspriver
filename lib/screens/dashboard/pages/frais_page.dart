@@ -358,60 +358,66 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppTheme.primaryColor, Colors.orange.shade600],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
+        Expanded(
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppTheme.primaryColor, Colors.orange.shade600],
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryColor.withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Symbols.account_balance_wallet,
+                  color: Colors.white,
+                  size: 32,
+                ),
               ),
-              child: const Icon(
-                Symbols.account_balance_wallet,
-                color: Colors.white,
-                size: 32,
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Frais de Scolarité',
+                      style: TextStyle(
+                        fontSize: 42,
+                        fontWeight: FontWeight.w900,
+                        foreground: Paint()
+                          ..shader =
+                              LinearGradient(
+                                colors: [
+                                  AppTheme.primaryColor,
+                                  Colors.orange.shade700,
+                                ],
+                              ).createShader(
+                                const Rect.fromLTWH(0.0, 0.0, 400.0, 70.0),
+                              ),
+                      ),
+                    ),
+                    Text(
+                      'Configurez et suivez les montants d\'inscription et les tranches par classe',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: isDark
+                            ? Colors.white70
+                            : Colors.blueGrey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 20),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Frais de Scolarité',
-                  style: TextStyle(
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                    foreground: Paint()
-                      ..shader =
-                          LinearGradient(
-                            colors: [
-                              AppTheme.primaryColor,
-                              Colors.orange.shade700,
-                            ],
-                          ).createShader(
-                            const Rect.fromLTWH(0.0, 0.0, 400.0, 70.0),
-                          ),
-                  ),
-                ),
-                Text(
-                  'Configurez et suivez les montants d\'inscription et les tranches par classe',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: isDark ? Colors.white70 : Colors.blueGrey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
         Row(
           children: [

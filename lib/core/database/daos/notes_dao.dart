@@ -24,11 +24,10 @@ class NotesDao extends BaseDao {
           AND n.annee_scolaire_id = ?
       LEFT JOIN classe_matiere cm ON cm.matiere_id = ? 
           AND cm.classe_id = e.classe_id
-          AND cm.annee_scolaire_id = ?
       WHERE e.classe_id = ?
       ORDER BY e.nom ASC, e.prenom ASC
     ''',
-      [subjectId, trimestre, sequence, anneeId, subjectId, anneeId, classId],
+      [subjectId, trimestre, sequence, anneeId, subjectId, classId],
     );
   }
 
@@ -50,11 +49,10 @@ class NotesDao extends BaseDao {
           AND n.annee_scolaire_id = ?
       LEFT JOIN classe_matiere cm ON cm.matiere_id = ? 
           AND cm.classe_id = e.classe_id
-          AND cm.annee_scolaire_id = ?
       WHERE e.classe_id = ?
       ORDER BY e.nom ASC, e.prenom ASC, n.sequence ASC
     ''',
-      [subjectId, trimestre, anneeId, subjectId, anneeId, classId],
+      [subjectId, trimestre, anneeId, subjectId, classId],
     );
   }
 
@@ -73,15 +71,11 @@ class NotesDao extends BaseDao {
 
     final int classeId = eleveResult.first['classe_id'] as int;
 
-    // Vérifier l'attribution
+    // Vérifier l'attribution (globale — sans filtre sur annee_scolaire_id)
     final attribution = await db.query(
       'attribution_enseignant',
-      where: 'classe_id = ? AND matiere_id = ? AND annee_scolaire_id = ?',
-      whereArgs: [
-        classeId,
-        noteData['matiere_id'],
-        noteData['annee_scolaire_id'],
-      ],
+      where: 'classe_id = ? AND matiere_id = ?',
+      whereArgs: [classeId, noteData['matiere_id']],
     );
 
     if (attribution.isEmpty) {
@@ -219,7 +213,6 @@ class NotesDao extends BaseDao {
       JOIN eleve e ON n.eleve_id = e.id
       JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id 
         AND cm.classe_id = e.classe_id 
-        AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.annee_scolaire_id = ?
     ''',
       [eleveId, anneeId],
@@ -251,7 +244,6 @@ class NotesDao extends BaseDao {
       JOIN eleve e ON n.eleve_id = e.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
-           AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
     ''',
       [studentId, trimestre, anneeId],
@@ -269,7 +261,9 @@ class NotesDao extends BaseDao {
       '''
       SELECT 
         SUM(n.note * COALESCE(cm.coefficient, 1)) / SUM(COALESCE(cm.coefficient, 1)) as average,
-        cy.moyenne_passage
+        cy.moyenne_passage,
+        cy.note_min,
+        cy.note_max
       FROM ${NotesSchema.tableName} n
       JOIN matiere m ON n.matiere_id = m.id
       JOIN eleve e ON n.eleve_id = e.id
@@ -277,9 +271,8 @@ class NotesDao extends BaseDao {
       LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
-           AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
-      GROUP BY cy.moyenne_passage
+      GROUP BY cy.moyenne_passage, cy.note_min, cy.note_max
     ''',
       [studentId, trimestre, anneeId],
     );
@@ -290,6 +283,8 @@ class NotesDao extends BaseDao {
     double studentAvg = (studentData['average'] as num?)?.toDouble() ?? 0.0;
     double passMark =
         (studentData['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
+    double noteMin = (studentData['note_min'] as num?)?.toDouble() ?? 0.0;
+    double noteMax = (studentData['note_max'] as num?)?.toDouble() ?? 20.0;
 
     // 2. Get averages for all students in the class to calculate rank and class average
     final allAvgsResult = await db.rawQuery(
@@ -300,7 +295,6 @@ class NotesDao extends BaseDao {
       JOIN matiere m ON n.matiere_id = m.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
-           AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE e.classe_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
       GROUP BY e.id
       ORDER BY average DESC
@@ -330,21 +324,20 @@ class NotesDao extends BaseDao {
       JOIN eleve e ON n.eleve_id = e.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
-           AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
     ''',
       [studentId, trimestre, anneeId],
     );
-    double totalPoints =
-        (studentSumResult.first['total_points'] as num?)?.toDouble() ?? 0.0;
 
     return {
       'average': studentAvg,
+      'totalPoints': studentSumResult.first['total_points'] ?? 0.0,
       'rank': rank,
-      'classAverage': classAvg,
       'totalStudents': allAvgsResult.length,
-      'totalPoints': totalPoints,
+      'classAverage': classAvg,
       'moyenne_passage': passMark,
+      'note_min': noteMin,
+      'note_max': noteMax,
     };
   }
 
@@ -364,7 +357,6 @@ class NotesDao extends BaseDao {
       JOIN eleve e ON n.eleve_id = e.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
-           AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.annee_scolaire_id = ?
       ORDER BY m.nom
     ''',
@@ -632,7 +624,7 @@ class NotesDao extends BaseDao {
       JOIN matiere m ON n.matiere_id = m.id
       JOIN annee_scolaire a ON n.annee_scolaire_id = a.id
       LEFT JOIN attribution_enseignant ae ON ae.classe_id = (SELECT classe_id FROM eleve WHERE id = n.eleve_id) 
-           AND ae.matiere_id = n.matiere_id AND ae.annee_scolaire_id = n.annee_scolaire_id
+           AND ae.matiere_id = n.matiere_id
       LEFT JOIN enseignant ens ON ae.enseignant_id = ens.id
       WHERE n.eleve_id = ?
       ORDER BY a.date_debut DESC, n.trimestre ASC, n.sequence ASC
@@ -767,18 +759,18 @@ class NotesDao extends BaseDao {
         n.trimestre,
         n.sequence,
         COALESCE(cm.coefficient, 1) as coefficient,
-        COUNT(DISTINCT e.id) as count, 
+        COUNT(n.id) as count, 
         AVG(n.note) as average
       FROM notes n
       JOIN matiere m ON n.matiere_id = m.id
       JOIN eleve e ON n.eleve_id = e.id
       JOIN classe c ON e.classe_id = c.id
-      LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id AND cm.classe_id = c.id AND cm.annee_scolaire_id = ?
+      LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id AND cm.classe_id = c.id
       WHERE n.annee_scolaire_id = ?
       GROUP BY m.id, c.id, n.trimestre, n.sequence, cm.coefficient
       ORDER BY n.trimestre DESC, n.sequence DESC, c.nom, m.nom
     ''',
-      [anneeId, anneeId],
+      [anneeId],
     );
   }
 
@@ -803,7 +795,7 @@ class NotesDao extends BaseDao {
         n.sequence,
         n.note
       FROM eleve e
-      JOIN classe_matiere cm ON e.classe_id = cm.classe_id AND cm.annee_scolaire_id = ?
+      JOIN classe_matiere cm ON e.classe_id = cm.classe_id
       JOIN matiere m ON cm.matiere_id = m.id
       LEFT JOIN notes n ON e.id = n.eleve_id 
                         AND n.matiere_id = cm.matiere_id 
@@ -811,7 +803,7 @@ class NotesDao extends BaseDao {
       WHERE e.classe_id = ?
       ORDER BY e.nom, e.prenom, m.nom, n.trimestre, n.sequence
     ''',
-      [anneeId, anneeId, classeId],
+      [anneeId, classeId],
     );
   }
 
@@ -824,8 +816,7 @@ class NotesDao extends BaseDao {
       '''
       SELECT e.id as eleve_id,
              (SELECT COUNT(*) FROM classe_matiere cm 
-              WHERE cm.classe_id = e.classe_id 
-              AND cm.annee_scolaire_id = ?) as total_subjects,
+              WHERE cm.classe_id = e.classe_id) as total_subjects,
              (SELECT COUNT(DISTINCT n.matiere_id) FROM notes n 
               WHERE n.eleve_id = e.id 
               AND n.trimestre = ? 
@@ -833,7 +824,7 @@ class NotesDao extends BaseDao {
       FROM eleve e
       WHERE e.classe_id = ?
     ''',
-      [anneeId, trimestre, anneeId, classId],
+      [trimestre, anneeId, classId],
     );
   }
 }

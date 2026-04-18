@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/database/database_helper.dart';
 import '../../../../theme/app_theme.dart';
+import '../../../../core/utils/mention_helper.dart';
 
 class GlobalRankingPage extends StatefulWidget {
   final bool isDark;
@@ -22,8 +23,10 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
   int? _selectedClassId;
 
   List<Map<String, dynamic>> _studentRankings = [];
+  List<Map<String, dynamic>> _mentions = [];
   List<int> _trimesters = [];
   Map<int, List<int>> _sequencesByTrimester = {};
+  Map<int, String> _sequenceNames = {}; // sequenceNumber -> real name
   List<Map<String, dynamic>> _subjects = [];
 
   double _moyennePassage = 10.0;
@@ -102,7 +105,26 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
         _selectedClassId!,
       );
 
-      // Processing structures
+      // Fetch mentions for this cycle
+      _mentions = [];
+      if (classeInfo != null && classeInfo['cycle_id'] != null) {
+        _mentions = await _dbHelper.getMentionsByCycle(
+          classeInfo['cycle_id'] as int,
+        );
+      }
+      // Fetch sequence names for this academic year
+      _sequenceNames = {};
+      try {
+        final seqRows = await _dbHelper.configDao.getSequences(anneeId);
+        for (final r in seqRows) {
+          final num = r['numero_sequence'] as int?;
+          final nom = r['nom'] as String?;
+          if (num != null && nom != null && nom.isNotEmpty) {
+            _sequenceNames[num] = nom;
+          }
+        }
+      } catch (_) {}
+
       Map<int, Map<String, dynamic>> studentsMap = {};
       Set<int> trimestersSet = {};
       Map<int, Set<int>> sequencesByTrimesterSet = {};
@@ -220,6 +242,12 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
         s['statut'] = (s['moyenne_generale'] as double) >= _moyennePassage
             ? 'Admis'
             : 'Échec';
+
+        // Add Mention
+        s['mention_data'] = MentionHelper.getMentionForGrade(
+          s['moyenne_generale'] as double,
+          _mentions,
+        );
       }
 
       // Format Headers
@@ -568,7 +596,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
           // header row (synchronized height with two-row header)
           Row(
             children: [
-              hCell('Rg', rankW, fw: FontWeight.w900),
+              hCell('Rang', rankW, fw: FontWeight.w900),
               hCell('Né(e) le', birthW, fw: FontWeight.w900),
               hCell(
                 'Élève & Matricule',
@@ -768,7 +796,9 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
 
       for (var t in _trimesters) {
         for (var s in _sequencesByTrimester[t]!) {
-          subLabelCells.add(groupCell('S$s', seqW, bg: groupBg));
+          subLabelCells.add(
+            groupCell(_sequenceNames[s] ?? 'S$s', seqW, bg: groupBg),
+          );
         }
         subLabelCells.add(
           groupCell('Moy T$t', trimW, bg: groupBg, fg: AppTheme.primaryColor),
@@ -783,7 +813,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
     groupTitleCells.add(
       groupCell(
         'RÉSULTATS GLOBAUX',
-        90 + 80,
+        90 + 80 + 120 + 220, // Added 120 for Mention + 220 for Appreciation
         bg: AppTheme.primaryColor,
         fg: Colors.white,
         isTitle: true,
@@ -805,6 +835,22 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
         fg: Colors.white,
       ),
     );
+    subLabelCells.add(
+      groupCell(
+        'Mention',
+        120,
+        bg: AppTheme.primaryColor.withOpacity(0.9),
+        fg: Colors.white,
+      ),
+    );
+    subLabelCells.add(
+      groupCell(
+        'Appréciation',
+        220,
+        bg: AppTheme.primaryColor.withOpacity(0.9),
+        fg: Colors.white,
+      ),
+    );
 
     Widget buildScrollablePanel() {
       double totalW = 0;
@@ -815,7 +861,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
         }
         totalW += annW + pondW;
       }
-      totalW += 90 + 80;
+      totalW += 90 + 80 + 120 + 220; // Added Mention and Appreciation columns
 
       return SingleChildScrollView(
         controller: _horizontalScrollController,
@@ -984,6 +1030,85 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
                         ),
                       );
 
+                      // Mention
+                      final mentionData =
+                          student['mention_data'] as Map<String, dynamic>?;
+                      cells.add(
+                        dCell(
+                          mentionData != null
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: MentionHelper.getMentionColor(
+                                      mentionData['couleur'],
+                                    ).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: MentionHelper.getMentionColor(
+                                        mentionData['couleur'],
+                                      ),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        MentionHelper.getMentionIcon(
+                                          mentionData['icone'],
+                                        ),
+                                        size: 14,
+                                        color: MentionHelper.getMentionColor(
+                                          mentionData['couleur'],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        MentionHelper.stripEmojis(
+                                          mentionData['label'] ?? '',
+                                        ),
+                                        style: TextStyle(
+                                          color: MentionHelper.getMentionColor(
+                                            mentionData['couleur'],
+                                          ),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : const Text('-'),
+                          120,
+                          isEven: isEven,
+                        ),
+                      );
+
+                      // Appréciation
+                      cells.add(
+                        dCell(
+                          Text(
+                            MentionHelper.stripEmojis(
+                              mentionData?['appreciation'] ?? '-',
+                            ),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: widget.isDark
+                                  ? Colors.white70
+                                  : Colors.black87,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          220,
+                          isEven: isEven,
+                        ),
+                      );
+
                       // Plain Row — no individual ScrollView needed
                       return Row(children: cells);
                     },
@@ -1075,6 +1200,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
                   student['nom'][0].toUpperCase(),
                   style: const TextStyle(
                     color: AppTheme.primaryColor,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 )
@@ -1082,34 +1208,91 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
         ),
         title: Text(
           '${student['nom']} ${student['prenom']}',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Row(
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'Rang: ${student['rang']}',
-                style: const TextStyle(
-                  color: AppTheme.primaryColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Rang: ${student['rang']}',
+                    style: const TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Text(
+                  isPassing ? 'Admis' : 'Échec',
+                  style: TextStyle(
+                    color: isPassing
+                        ? AppTheme.successColor
+                        : AppTheme.errorColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              isPassing ? 'Admis' : 'Échec',
-              style: TextStyle(
-                color: isPassing ? AppTheme.successColor : AppTheme.errorColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+            if (student['mention_data'] != null)
+              Builder(
+                builder: (context) {
+                  final m = student['mention_data'] as Map<String, dynamic>;
+                  final color = MentionHelper.getMentionColor(m['couleur']);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: color.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          MentionHelper.stripEmojis(m['label'] ?? ''),
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (m['appreciation'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 2),
+                          child: Text(
+                            MentionHelper.stripEmojis(
+                              m['appreciation'].toString(),
+                            ),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                              color: widget.isDark
+                                  ? Colors.white60
+                                  : Colors.black54,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
-            ),
           ],
         ),
         trailing: Container(

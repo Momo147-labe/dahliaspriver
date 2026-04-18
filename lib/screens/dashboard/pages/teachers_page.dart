@@ -176,62 +176,68 @@ class _TeachersPageState extends State<TeachersPage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF3B82F6), Color(0xFF9333EA)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withOpacity(0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF3B82F6), Color(0xFF9333EA)],
                     ),
-                  ],
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Symbols.person,
+                    color: Colors.white,
+                    size: 32,
+                  ),
                 ),
-                child: const Icon(
-                  Symbols.person,
-                  color: Colors.white,
-                  size: 32,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gestion des Enseignants',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          foreground: Paint()
+                            ..shader =
+                                const LinearGradient(
+                                  colors: [
+                                    Color(0xFF2563EB),
+                                    Color(0xFF9333EA),
+                                    Color(0xFFDB2777),
+                                  ],
+                                ).createShader(
+                                  const Rect.fromLTWH(0.0, 0.0, 300.0, 70.0),
+                                ),
+                        ),
+                      ),
+                      Text(
+                        'Gérez le personnel enseignant et leurs spécialités',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 16,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Gestion des Enseignants',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      foreground: Paint()
-                        ..shader =
-                            const LinearGradient(
-                              colors: [
-                                Color(0xFF2563EB),
-                                Color(0xFF9333EA),
-                                Color(0xFFDB2777),
-                              ],
-                            ).createShader(
-                              const Rect.fromLTWH(0.0, 0.0, 300.0, 70.0),
-                            ),
-                    ),
-                  ),
-                  Text(
-                    'Gérez le personnel enseignant et leurs spécialités',
-                    style: TextStyle(
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(width: 16),
           Row(
             children: [
               _buildActionButton(
@@ -684,9 +690,15 @@ class _TeachersPageState extends State<TeachersPage>
                           : null,
                       child: (teacher.photo == null || teacher.photo!.isEmpty)
                           ? Text(
-                              teacher.nom[0] +
+                              (teacher.nom.isNotEmpty
+                                      ? String.fromCharCode(
+                                          teacher.nom.runes.first,
+                                        )
+                                      : '') +
                                   (teacher.prenom.isNotEmpty
-                                      ? teacher.prenom[0]
+                                      ? String.fromCharCode(
+                                          teacher.prenom.runes.first,
+                                        )
                                       : ''),
                               style: TextStyle(
                                 color: color,

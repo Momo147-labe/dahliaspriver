@@ -63,10 +63,12 @@ class ConfigDao extends BaseDao {
   }
 
   Future<int> updateCycle(int id, Map<String, dynamic> cycle) async {
-    cycle['updated_at'] = DateTime.now().toIso8601String();
+    final data = Map<String, dynamic>.from(cycle);
+    data.remove('id'); // ID cannot be updated
+    data['updated_at'] = DateTime.now().toIso8601String();
     return await db.update(
       CyclesScolairesSchema.tableName,
-      cycle,
+      data,
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -183,13 +185,11 @@ class ConfigDao extends BaseDao {
   }
 
   Future<List<Map<String, dynamic>>> getMentionsByCycle(int? cycleId) async {
-    if (cycleId == null) {
-      return await db.query('mention_config', where: 'cycle_id IS NULL');
-    }
     return await db.query(
       'mention_config',
-      where: 'cycle_id = ?',
-      whereArgs: [cycleId],
+      where: cycleId == null ? 'cycle_id IS NULL' : 'cycle_id = ?',
+      whereArgs: cycleId == null ? [] : [cycleId],
+      orderBy: 'note_min DESC',
     );
   }
 

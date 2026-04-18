@@ -2,8 +2,18 @@ import 'package:flutter/material.dart';
 
 class BulletinGradesTable extends StatelessWidget {
   final List<Map<String, dynamic>> grades;
+  final double noteMax;
+  final List<Map<String, dynamic>>
+  columns; // e.g. [{'label': 'S1', 'key': 1}, ...]
+  final String noteKey; // 'notes_par_sequence' or 'notes_par_trimestre'
 
-  const BulletinGradesTable({super.key, required this.grades});
+  const BulletinGradesTable({
+    super.key,
+    required this.grades,
+    required this.columns,
+    this.noteMax = 20.0,
+    this.noteKey = 'notes_par_sequence',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -16,30 +26,46 @@ class BulletinGradesTable extends StatelessWidget {
           children: [
             _buildTableCell('MATIÈRES', isHeader: true),
             _buildTableCell('COEFF', isHeader: true, isCenter: true),
-            _buildTableCell('NOTE CTRL', isHeader: true, isCenter: true),
-            _buildTableCell('NOTE COMP', isHeader: true, isCenter: true),
+            ...columns.map(
+              (col) => _buildTableCell(
+                '${col['label']}',
+                isHeader: true,
+                isCenter: true,
+              ),
+            ),
             _buildTableCell('MOYENNE', isHeader: true, isCenter: true),
             _buildTableCell('OBSERVATIONS', isHeader: true),
           ],
         ),
         // Rows
         ...grades.map((grade) {
-          final ctrl = grade['note_ctrl'] as double?;
-          final comp = grade['note_comp'] as double?;
+          final notesMap = (grade[noteKey] as Map<dynamic, dynamic>?) ?? {};
           final moy = grade['note'] as double?;
 
           return TableRow(
             children: [
-              _buildTableCell(grade['matiere'] as String, isBold: true),
-              _buildTableCell(grade['coeff'].toString(), isCenter: true),
-              _buildTableCell(ctrl?.toStringAsFixed(2) ?? '-', isCenter: true),
-              _buildTableCell(comp?.toStringAsFixed(2) ?? '-', isCenter: true),
+              _buildTableCell(
+                (grade['matiere']?.toString() ?? ''),
+                isBold: true,
+              ),
+              _buildTableCell(
+                grade['coeff']?.toString() ?? '1',
+                isCenter: true,
+              ),
+              ...columns.map((col) {
+                final key = col['key'];
+                final val = (notesMap[key] as num?)?.toDouble();
+                return _buildTableCell(
+                  val?.toStringAsFixed(2) ?? '-',
+                  isCenter: true,
+                );
+              }),
               _buildTableCell(
                 moy?.toStringAsFixed(2) ?? '-',
                 isCenter: true,
                 isBold: true,
               ),
-              _buildTableCell(grade['obs'] as String, isItalic: true),
+              _buildTableCell((grade['obs']?.toString() ?? ''), isItalic: true),
             ],
           );
         }),
@@ -50,16 +76,21 @@ class BulletinGradesTable extends StatelessWidget {
             _buildTableCell('TOTAUX', isBold: true),
             _buildTableCell(
               grades
-                  .fold<double>(0, (p, e) => p + (e['coeff'] as double))
+                  .fold<double>(
+                    0,
+                    (p, e) => p + ((e['coeff'] as num?)?.toDouble() ?? 0.0),
+                  )
                   .toStringAsFixed(0),
               isCenter: true,
               isBold: true,
             ),
-            _buildTableCell('', isCenter: true),
-            _buildTableCell('', isCenter: true),
+            ...columns.map((_) => _buildTableCell('', isCenter: true)),
             _buildTableCell(
               grades
-                  .fold<double>(0, (p, e) => p + (e['total'] as double))
+                  .fold<double>(
+                    0,
+                    (p, e) => p + ((e['total'] as num?)?.toDouble() ?? 0.0),
+                  )
                   .toStringAsFixed(2),
               isCenter: true,
               isBold: true,

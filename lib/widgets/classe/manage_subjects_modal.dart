@@ -32,13 +32,9 @@ class _ManageClassSubjectsModalState extends State<ManageClassSubjectsModal> {
 
   Future<void> _loadData() async {
     try {
-      final anneeId = await _dbHelper.ensureActiveAnneeCached();
-      if (anneeId == null) return;
-
       final allSubjects = await _dbHelper.getAllSubjects();
       final classSubjects = await _dbHelper.getSubjectsByClass(
         widget.classe['id'],
-        anneeId,
       );
 
       setState(() {
@@ -58,16 +54,13 @@ class _ManageClassSubjectsModalState extends State<ManageClassSubjectsModal> {
   Future<void> _save() async {
     setState(() => _isLoading = true);
     try {
-      final anneeId = await _dbHelper.ensureActiveAnneeCached();
-      if (anneeId == null) return;
-
       final List<Map<String, dynamic>> data = _selectedSubjects.entries.map((
         e,
       ) {
         return {'id': e.key, 'coefficient': e.value};
       }).toList();
 
-      await _dbHelper.saveClassSubjects(widget.classe['id'], anneeId, data);
+      await _dbHelper.saveClassSubjects(widget.classe['id'], null, data);
 
       widget.onSuccess();
       if (mounted) Navigator.pop(context);

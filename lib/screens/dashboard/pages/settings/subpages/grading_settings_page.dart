@@ -14,14 +14,10 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
   bool _isLoading = true;
 
   double _baseNotation = 20.0;
-  String _modeCalcul = 'trimestrielle';
-  bool _includeConduite = true;
 
   List<Map<String, dynamic>> _cycles = [];
   int? _selectedCycleId;
   List<Map<String, dynamic>> _mentions = [];
-
-  int? _configEcoleId;
 
   @override
   void initState() {
@@ -34,15 +30,6 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
     try {
       final annee = await _db.getActiveAnnee();
       if (annee != null) {
-        // Configuration école
-        final configEcole = await _db.getConfigurationEcole(annee['id']);
-        if (configEcole != null) {
-          _configEcoleId = configEcole['id'];
-          _baseNotation = (configEcole['base_notation'] ?? 20.0).toDouble();
-          _modeCalcul = configEcole['mode_calcul_moyenne'] ?? 'trimestrielle';
-          _includeConduite = (configEcole['include_conduite'] ?? 1) == 1;
-        }
-
         // Cycles
         _cycles = await _db.getCyclesScolaires();
         if (_cycles.isNotEmpty) {
@@ -59,48 +46,17 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
 
   Future<void> _loadMentions() async {
     if (_selectedCycleId == null) return;
+
+    // Load cycle data to get its specific note_max
+    final cycle = await _db.configDao.getCycleById(_selectedCycleId!);
+    if (cycle != null) {
+      _baseNotation = (cycle['note_max'] as num?)?.toDouble() ?? 20.0;
+    }
+
     final mentions = await _db.getMentionsByCycle(_selectedCycleId);
     setState(() {
       _mentions = List<Map<String, dynamic>>.from(mentions);
     });
-  }
-
-  Future<void> _saveSettings() async {
-    setState(() => _isLoading = true);
-    try {
-      final annee = await _db.getActiveAnnee();
-      if (annee == null) return;
-
-      final configData = {
-        'annee_scolaire_id': annee['id'],
-        'base_notation': _baseNotation,
-        'mode_calcul_moyenne': _modeCalcul,
-        'include_conduite': _includeConduite ? 1 : 0,
-      };
-
-      if (_configEcoleId != null) {
-        await _db.updateConfigurationEcole(_configEcoleId!, configData);
-      } else {
-        await _db.saveConfigurationEcole(configData);
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Paramètres enregistrés avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
   @override
@@ -115,25 +71,38 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
         children: [
           _buildPageHeader(),
           const SizedBox(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Colonne Gauche: Configuration Fondamentale
-              Expanded(
-                flex: 1,
-                child: Column(
-                  children: [
-                    _buildFundamentalConfigCard(isDark),
-                    const SizedBox(height: 24),
-                    _buildConduiteCard(isDark),
-                  ],
+          _buildMentionsCard(isDark),
+          const SizedBox(height: 32),
+          Center(
+            child: SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Tous les paramètres ont été enregistrés'),
+                      backgroundColor: AppTheme.primaryColor,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.save),
+                label: const Text(
+                  'Sauvegarder les modifications',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 4,
                 ),
               ),
-              const SizedBox(width: 24),
-              // Colonne Droite: Mentions
-              Expanded(flex: 2, child: _buildMentionsCard(isDark)),
-            ],
+            ),
           ),
+          const SizedBox(height: 100), // Extra space for scrolling
         ],
       ),
     );
@@ -230,202 +199,6 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
     );
   }
 
-  Widget _buildFundamentalConfigCard(bool isDark) {
-    return _buildPremiumCard(
-      title: 'Configuration Fondamentale',
-      icon: Icons.settings_suggest,
-      isDark: isDark,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Base de notation globale',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [10, 20, 100].map((base) {
-                bool isSelected = _baseNotation == base.toDouble();
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () =>
-                        setState(() => _baseNotation = base.toDouble()),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppTheme.primaryColor
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: AppTheme.primaryColor.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Sur $base',
-                          style: TextStyle(
-                            color: isSelected
-                                ? Colors.white
-                                : (isDark ? Colors.grey : Colors.black87),
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Mode de calcul des moyennes',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-          const SizedBox(height: 12),
-          Column(
-            children: [
-              _buildRadioOption('Trimestrielle', 'trimestrielle', isDark),
-              _buildRadioOption('Semestrielle', 'semestrielle', isDark),
-              _buildRadioOption('Annuelle uniquement', 'annuelle', isDark),
-            ],
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _saveSettings,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('Enregistrer les modifications'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRadioOption(String label, String value, bool isDark) {
-    bool isSelected = _modeCalcul == value;
-    return GestureDetector(
-      onTap: () => setState(() => _modeCalcul = value),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppTheme.primaryColor.withOpacity(0.05)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? AppTheme.primaryColor
-                : (isDark ? Colors.white12 : Colors.grey[300]!),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? AppTheme.primaryColor : Colors.grey,
-                  width: 2,
-                ),
-              ),
-              child: isSelected
-                  ? Center(
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primaryColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected
-                    ? AppTheme.primaryColor
-                    : (isDark ? Colors.white70 : Colors.black87),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildConduiteCard(bool isDark) {
-    return _buildPremiumCard(
-      title: 'Comportement & Conduite',
-      icon: Icons.gavel_rounded,
-      isDark: isDark,
-      iconColor: Colors.orange,
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Inclure la note de conduite',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'La note de conduite sera comptabilisée dans la moyenne générale.',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: _includeConduite,
-                onChanged: (v) => setState(() => _includeConduite = v),
-                activeColor: AppTheme.primaryColor,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMentionsCard(bool isDark) {
     return _buildPremiumCard(
       title: 'Appréciations & Mentions',
@@ -435,39 +208,122 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // En-tête de section avec sélecteur de cycle
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // En-tête de section avec sélecteurs
+          Wrap(
+            spacing: 24,
+            runSpacing: 16,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Text(
-                'Seuils & Appréciations',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Seuils & Appréciations',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Configurez les mentions pour chaque cycle',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white10 : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    value: _selectedCycleId,
-                    items: _cycles.map((c) {
-                      return DropdownMenuItem<int>(
-                        value: c['id'],
-                        child: Text(c['nom']),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() => _selectedCycleId = val);
-                      _loadMentions();
-                    },
-                    style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black87,
-                      fontWeight: FontWeight.w600,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Sélecteur de Cycle
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white10 : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: _selectedCycleId,
+                        items: _cycles.map((c) {
+                          return DropdownMenuItem<int>(
+                            value: c['id'],
+                            child: Text(c['nom']),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setState(() => _selectedCycleId = val);
+                          _loadMentions();
+                        },
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  // Sélecteur de Base de Notation
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white10 : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [10, 20].map((base) {
+                        bool isSelected = _baseNotation == base.toDouble();
+                        return GestureDetector(
+                          onTap: () async {
+                            if (_selectedCycleId != null) {
+                              setState(() => _baseNotation = base.toDouble());
+                              final cycle = _cycles.firstWhere(
+                                (c) => c['id'] == _selectedCycleId,
+                              );
+                              await _db.configDao.updateCycle(
+                                _selectedCycleId!,
+                                {...cycle, 'note_max': base.toDouble()},
+                              );
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Base de notation mise à jour',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                              _cycles = await _db.getCyclesScolaires();
+                              _loadMentions(); // Reload to refresh relative ranges
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppTheme.primaryColor
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '/$base',
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : (isDark ? Colors.grey : Colors.black54),
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -520,25 +376,202 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
           else
             Column(
               children: [
-                ..._mentions
-                    .map(
-                      (m) => _MentionCard(
-                        key: ValueKey('mention_${m['id']}'),
-                        mention: m,
-                        isDark: isDark,
-                        baseNotation: _baseNotation,
-                        onChanged: (key, val) =>
-                            _updateMentionValue(m['id'], key, val),
-                        onEdit: () => _showEditMentionDialog(m),
-                        onDelete: () => _deleteMention(m['id']),
-                      ),
-                    )
-                    .toList(),
-                const SizedBox(height: 12),
-                _buildAddMentionButton(isDark),
+                _buildMentionsTable(isDark),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(child: _buildAddMentionButton(isDark)),
+                    const SizedBox(width: 12),
+                    _buildActionButton(
+                      icon: Icons.auto_awesome_outlined,
+                      tooltip: 'Générer par défaut',
+                      onTap: _seedDefaultMentions,
+                      isDark: isDark,
+                      color: Colors.purple,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildActionButton(
+                      icon: Icons.delete_sweep_outlined,
+                      tooltip: 'Tout effacer',
+                      onTap: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Confirmer'),
+                            content: const Text(
+                              'Voulez-vous vraiment supprimer toutes les mentions de ce cycle ?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Annuler'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                ),
+                                child: const Text('Supprimer tout'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          for (var m in _mentions) {
+                            await _db.deleteMention(m['id']);
+                          }
+                          _loadMentions();
+                        }
+                      },
+                      isDark: isDark,
+                      color: Colors.red,
+                    ),
+                  ],
+                ),
               ],
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMentionsTable(bool isDark) {
+    if (_mentions.isEmpty) return const SizedBox.shrink();
+
+    // Sort mentions by note_min descending for the table
+    final sorted = List<Map<String, dynamic>>.from(_mentions)
+      ..sort((a, b) => (b['note_min'] as num).compareTo(a['note_min'] as num));
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.02) : Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth:
+                  MediaQuery.of(context).size.width -
+                  88, // 24*2 (padding) + 20*2 (card padding)
+            ),
+            child: DataTable(
+              columnSpacing: 24,
+              headingRowColor: WidgetStateProperty.all(
+                isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+              ),
+              columns: [
+                DataColumn(
+                  label: Text(
+                    'Moyenne /${_baseNotation.toInt()}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Mention',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Appréciation Type',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Actions',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+              rows: sorted.map((m) {
+                final color = _parseColor(m['couleur'] ?? '#2196F3');
+                final noteMin = (m['note_min'] as num?)?.toDouble() ?? 0.0;
+                final noteMax =
+                    (m['note_max'] as num?)?.toDouble() ?? _baseNotation;
+
+                return DataRow(
+                  cells: [
+                    DataCell(
+                      Text(
+                        '${noteMin.toStringAsFixed(1)} à < ${noteMax.toStringAsFixed(1)}',
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    DataCell(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            m['label'] ?? '',
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    DataCell(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 300),
+                        child: Text(
+                          m['appreciation'] ?? '',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.grey[400] : Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            onPressed: () => _showEditMentionDialog(m),
+                            tooltip: 'Modifier',
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.delete_outline_rounded,
+                              size: 18,
+                              color: Colors.red[300],
+                            ),
+                            onPressed: () => _deleteMention(m['id']),
+                            tooltip: 'Supprimer',
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -574,18 +607,6 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
         ),
       ),
     );
-  }
-
-  Future<void> _updateMentionValue(int id, String key, dynamic value) async {
-    final index = _mentions.indexWhere((m) => m['id'] == id);
-    if (index != -1) {
-      final updated = {..._mentions[index], key: value};
-      setState(() {
-        _mentions[index] = updated;
-      });
-      // Save to DB (non-blocking)
-      _db.saveMention(updated);
-    }
   }
 
   Widget _buildVisualBarPreview() {
@@ -633,7 +654,9 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
                 color: color,
                 child: Center(
                   child: Text(
-                    m['label'][0], // Première lettre
+                    m['label'].runes.isNotEmpty
+                        ? String.fromCharCode(m['label'].runes.first)
+                        : '',
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -681,139 +704,168 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          mention == null ? 'Ajouter une mention' : 'Modifier la mention',
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: labelCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Libellé (ex: Excellent)',
-              ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text(
+              mention == null ? 'Ajouter une mention' : 'Modifier la mention',
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: minCtrl,
-                    decoration: const InputDecoration(labelText: 'Note Min'),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: maxCtrl,
-                    decoration: const InputDecoration(labelText: 'Note Max'),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: appreciationCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Appréciation par défaut',
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Sélecteur d'icône
-            const Text('Icône', style: TextStyle(fontSize: 12)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 12,
-              children: ['excellent', 'star', 'thumb', 'medal'].map((icon) {
-                return GestureDetector(
-                  onTap: () => setState(() => selectedIcon = icon),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: selectedIcon == icon
-                          ? AppTheme.primaryColor.withOpacity(0.1)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: selectedIcon == icon
-                            ? AppTheme.primaryColor
-                            : Colors.grey[300]!,
-                      ),
-                    ),
-                    child: Icon(
-                      _getIconData(icon),
-                      size: 20,
-                      color: selectedIcon == icon
-                          ? AppTheme.primaryColor
-                          : Colors.grey,
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: labelCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Libellé (ex: Excellent)',
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 20),
-            // Sélecteur de couleur simplifié
-            Wrap(
-              spacing: 8,
-              children:
-                  [
-                    '#F44336',
-                    '#FF9800',
-                    '#FFEB3B',
-                    '#4CAF50',
-                    '#2196F3',
-                    '#9C27B0',
-                    '#795548',
-                  ].map((hex) {
-                    return GestureDetector(
-                      onTap: () => setState(() => selectedColor = hex),
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: _parseColor(hex),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: selectedColor == hex
-                                ? Colors.black
-                                : Colors.transparent,
-                            width: 2,
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: minCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Note Min',
                           ),
+                          keyboardType: TextInputType.number,
                         ),
                       ),
-                    );
-                  }).toList(),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: maxCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Note Max',
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: appreciationCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Appréciation par défaut',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Sélecteur d'icône
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Icône', style: TextStyle(fontSize: 12)),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 12,
+                    children: ['excellent', 'star', 'thumb', 'medal'].map((
+                      icon,
+                    ) {
+                      return GestureDetector(
+                        onTap: () => setDialogState(() => selectedIcon = icon),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: selectedIcon == icon
+                                ? AppTheme.primaryColor.withOpacity(0.1)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: selectedIcon == icon
+                                  ? AppTheme.primaryColor
+                                  : Colors.grey[300]!,
+                            ),
+                          ),
+                          child: Icon(
+                            _getIconData(icon),
+                            size: 20,
+                            color: selectedIcon == icon
+                                ? AppTheme.primaryColor
+                                : Colors.grey,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+                  // Sélecteur de couleur simplifié
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Couleur', style: TextStyle(fontSize: 12)),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children:
+                        [
+                          '#F44336',
+                          '#FF9800',
+                          '#FFEB3B',
+                          '#4CAF50',
+                          '#2196F3',
+                          '#9C27B0',
+                          '#795548',
+                        ].map((hex) {
+                          return GestureDetector(
+                            onTap: () =>
+                                setDialogState(() => selectedColor = hex),
+                            child: Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: _parseColor(hex),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: selectedColor == hex
+                                      ? Colors.black
+                                      : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newMention = {
-                if (mention != null) 'id': mention['id'],
-                'label': labelCtrl.text,
-                'note_min': double.tryParse(minCtrl.text) ?? 0.0,
-                'note_max': double.tryParse(maxCtrl.text) ?? 0.0,
-                'appreciation': appreciationCtrl.text,
-                'icone': selectedIcon,
-                'couleur': selectedColor,
-                'cycle_id': _selectedCycleId,
-              };
-              await _db.saveMention(newMention);
-              if (mounted) Navigator.pop(context);
-              _loadMentions();
-            },
-            child: const Text('Enregistrer'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final newMention = {
+                    if (mention != null) 'id': mention['id'],
+                    'label': labelCtrl.text,
+                    'note_min': double.tryParse(minCtrl.text) ?? 0.0,
+                    'note_max': double.tryParse(maxCtrl.text) ?? 0.0,
+                    'appreciation': appreciationCtrl.text,
+                    'icone': selectedIcon,
+                    'couleur': selectedColor,
+                    'cycle_id': _selectedCycleId,
+                  };
+                  await _db.saveMention(newMention);
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Mention enregistrée avec succès'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    _loadMentions();
+                  }
+                },
+                child: const Text('Enregistrer'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -847,296 +899,148 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
   Future<void> _seedDefaultMentions() async {
     if (_selectedCycleId == null) return;
 
-    final defaults = [
-      {
-        'label': 'Excellent',
-        'note_min': 16.0,
-        'note_max': 20.0,
-        'couleur': '#9C27B0',
-        'icone': 'excellent',
-        'appreciation': 'Félicitations du conseil de classe.',
-      },
-      {
-        'label': 'Très bien',
-        'note_min': 14.0,
-        'note_max': 16.0,
-        'couleur': '#4CAF50',
-        'icone': 'star',
-        'appreciation': 'Travail d\'une grande rigueur. Continuez ainsi.',
-      },
-      {
-        'label': 'Bien',
-        'note_min': 12.0,
-        'note_max': 14.0,
-        'couleur': '#2196F3',
-        'icone': 'thumb',
-        'appreciation': 'Bon travail, des efforts à poursuivre.',
-      },
-      {
-        'label': 'Assez bien',
-        'note_min': 10.0,
-        'note_max': 12.0,
-        'couleur': '#00BCD4',
-        'icone': 'medal',
-        'appreciation': 'Résultats satisfaisants.',
-      },
-      {
-        'label': 'Passable',
-        'note_min': 8.0,
-        'note_max': 10.0,
-        'couleur': '#FF9800',
-        'icone': 'star',
-        'appreciation': 'Résultats justes, redoublez d\'efforts.',
-      },
-      {
-        'label': 'Insuffisant',
-        'note_min': 0.0,
-        'note_max': 8.0,
-        'couleur': '#F44336',
-        'icone': 'star',
-        'appreciation': 'Travail insuffisant.',
-      },
-    ];
+    final List<Map<String, dynamic>> defaults;
+
+    if (_baseNotation == 10.0) {
+      defaults = [
+        {
+          'label': 'Très Bien',
+          'note_min': 9.0,
+          'note_max': 10.0,
+          'couleur': '#9C27B0',
+          'icone': 'excellent',
+          'appreciation': 'Excellent travail, continue ainsi',
+        },
+        {
+          'label': 'Bien',
+          'note_min': 8.0,
+          'note_max': 9.0,
+          'couleur': '#4CAF50',
+          'icone': 'star',
+          'appreciation': 'Bon travail, quelques efforts encore',
+        },
+        {
+          'label': 'Assez Bien',
+          'note_min': 7.0,
+          'note_max': 8.0,
+          'couleur': '#2196F3',
+          'icone': 'thumb',
+          'appreciation': 'Travail satisfaisant, peut mieux faire',
+        },
+        {
+          'label': 'Passable',
+          'note_min': 5.0,
+          'note_max': 7.0,
+          'couleur': '#FF9800',
+          'icone': 'medal',
+          'appreciation': 'Résultats moyens, doit faire plus d’efforts',
+        },
+        {
+          'label': 'Insuffisant',
+          'note_min': 0.0,
+          'note_max': 5.0,
+          'couleur': '#F44336',
+          'icone': 'star',
+          'appreciation': 'Travail insuffisant, beaucoup d’efforts nécessaires',
+        },
+      ];
+    } else {
+      // Default to /20 barème
+      defaults = [
+        {
+          'label': 'Très Bien',
+          'note_min': 16.0,
+          'note_max': 20.0,
+          'couleur': '#9C27B0',
+          'icone': 'excellent',
+          'appreciation': 'Excellent travail, élève sérieux et régulier',
+        },
+        {
+          'label': 'Bien',
+          'note_min': 14.0,
+          'note_max': 16.0,
+          'couleur': '#4CAF50',
+          'icone': 'star',
+          'appreciation': 'Bon niveau, participation active',
+        },
+        {
+          'label': 'Assez Bien',
+          'note_min': 12.0,
+          'note_max': 14.0,
+          'couleur': '#2196F3',
+          'icone': 'thumb',
+          'appreciation': 'Ensemble satisfaisant, peut progresser',
+        },
+        {
+          'label': 'Passable',
+          'note_min': 10.0,
+          'note_max': 12.0,
+          'couleur': '#FF9800',
+          'icone': 'medal',
+          'appreciation': 'Niveau juste, manque d’efforts',
+        },
+        {
+          'label': 'Insuffisant',
+          'note_min': 0.0,
+          'note_max': 10.0,
+          'couleur': '#F44336',
+          'icone': 'star',
+          'appreciation': 'Résultats faibles, travail insuffisant',
+        },
+      ];
+    }
 
     for (var m in defaults) {
       await _db.saveMention({...m, 'cycle_id': _selectedCycleId});
     }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mentions par défaut générées'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
     _loadMentions();
   }
-}
 
-class _MentionCard extends StatefulWidget {
-  final Map<String, dynamic> mention;
-  final bool isDark;
-  final double baseNotation;
-  final Function(String, dynamic) onChanged;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const _MentionCard({
-    super.key,
-    required this.mention,
-    required this.isDark,
-    required this.baseNotation,
-    required this.onChanged,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  @override
-  State<_MentionCard> createState() => _MentionCardState();
-}
-
-class _MentionCardState extends State<_MentionCard> {
-  late TextEditingController _appreciationController;
-
-  @override
-  void initState() {
-    super.initState();
-    _appreciationController = TextEditingController(
-      text: widget.mention['appreciation'] ?? '',
-    );
-  }
-
-  @override
-  void didUpdateWidget(covariant _MentionCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.mention['appreciation'] != widget.mention['appreciation']) {
-      if (_appreciationController.text != widget.mention['appreciation']) {
-        _appreciationController.text = widget.mention['appreciation'] ?? '';
-      }
+  IconData _getIconData(String? iconName) {
+    switch (iconName) {
+      case 'excellent':
+        return Icons.workspace_premium;
+      case 'star':
+        return Icons.stars;
+      case 'thumb':
+        return Icons.thumb_up;
+      case 'medal':
+        return Icons.military_tech;
+      default:
+        return Icons.stars;
     }
   }
 
-  @override
-  void dispose() {
-    _appreciationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final m = widget.mention;
-    final isDark = widget.isDark;
-    final color = _parseColor(m['couleur'] ?? '#2196F3');
-    final noteMin = (m['note_min'] as num?)?.toDouble() ?? 0.0;
-    final label = m['label'] ?? '';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.02) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+  Widget _buildActionButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    required bool isDark,
+    required Color color,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.2)),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(_getIconData(m['icone']), color: color, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                label.toUpperCase(),
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 16,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                'SEUIL MIN : ',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: color.withOpacity(0.2)),
-                ),
-                child: Text(
-                  noteMin.toStringAsFixed(1),
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '/ ${widget.baseNotation.toInt()}',
-                style: TextStyle(
-                  color: color.withOpacity(0.5),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          SliderTheme(
-            data: SliderThemeData(
-              activeTrackColor: color,
-              inactiveTrackColor: color.withOpacity(0.1),
-              thumbColor: color,
-              overlayColor: color.withOpacity(0.2),
-              trackHeight: 4,
-            ),
-            child: Slider(
-              value: noteMin.clamp(0.0, widget.baseNotation),
-              min: 0,
-              max: widget.baseNotation,
-              onChanged: (val) => widget.onChanged('note_min', val),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'APPRÉCIATION PAR DÉFAUT',
-            style: TextStyle(
-              color: Colors.grey[500],
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(
-                color: isDark ? Colors.white10 : Colors.grey[200]!,
-              ),
-            ),
-            child: TextField(
-              controller: _appreciationController,
-              maxLines: 2,
-              onChanged: (val) => widget.onChanged('appreciation', val),
-              style: const TextStyle(fontSize: 14, height: 1.4),
-              decoration: const InputDecoration(
-                hintText: 'Saisissez l\'appréciation par défaut...',
-                border: InputBorder.none,
-                isDense: true,
-                hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                onPressed: widget.onEdit,
-                icon: Icon(
-                  Icons.settings_outlined,
-                  size: 18,
-                  color: Colors.grey[400],
-                ),
-                tooltip: 'Paramètres avancés',
-              ),
-              IconButton(
-                onPressed: widget.onDelete,
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  size: 18,
-                  color: Colors.red[300],
-                ),
-                tooltip: 'Supprimer',
-              ),
-            ],
-          ),
-        ],
+          child: Icon(icon, size: 20, color: color),
+        ),
       ),
     );
-  }
-}
-
-IconData _getIconData(String? iconName) {
-  switch (iconName) {
-    case 'excellent':
-      return Icons.workspace_premium;
-    case 'star':
-      return Icons.stars;
-    case 'thumb':
-      return Icons.thumb_up;
-    case 'medal':
-      return Icons.military_tech;
-    default:
-      return Icons.stars;
-  }
-}
-
-Color _parseColor(String hex) {
-  try {
-    return Color(int.parse(hex.replaceAll('#', '0xFF')));
-  } catch (e) {
-    return Colors.grey;
   }
 }

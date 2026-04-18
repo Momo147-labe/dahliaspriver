@@ -18,6 +18,7 @@ import 'daos/notes_dao.dart';
 import 'daos/paiement_dao.dart';
 import 'daos/timetable_dao.dart';
 import 'daos/user_dao.dart';
+import 'schemas/document_template_schema.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -112,6 +113,8 @@ class DatabaseHelper {
     int anneeId,
     int classId,
   ) => notesDao.getClassGradesData(anneeId, classId);
+  Future<List<Map<String, dynamic>>> getGradesOverview(int anneeId) =>
+      notesDao.getGradesOverview(anneeId);
 
   // ConfigDao Proxies
   Future<bool> hasGradesForSequence(int anneeId, int trimestre, int sequence) =>
@@ -144,7 +147,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 43,
+      version: 47,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -195,10 +198,10 @@ class DatabaseHelper {
         eff_max INTEGER DEFAULT 100,
         next_class_id INTEGER,
         is_final_class INTEGER DEFAULT 0,
-        annee_scolaire_id INTEGER,
+        prof_principal_id INTEGER,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
+        FOREIGN KEY (prof_principal_id) REFERENCES enseignant(id),
         FOREIGN KEY (next_class_id) REFERENCES classe(id),
         FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id),
         FOREIGN KEY (niveau_id) REFERENCES niveaux(id)
@@ -272,10 +275,11 @@ class DatabaseHelper {
       )
     ''');
 
+    // Table de configuration (Standardisée)
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS configuration_ecole (
+      CREATE TABLE IF NOT EXISTS configuration_annee (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        annee_scolaire_id INTEGER,
+        annee_scolaire_id INTEGER UNIQUE,
         moyenne_passage_cycle1 REAL DEFAULT 10.0,
         moyenne_passage_cycle2 REAL DEFAULT 10.0,
         moyenne_passage_cycle3 REAL DEFAULT 10.0,
@@ -286,20 +290,10 @@ class DatabaseHelper {
         appreciation_abien TEXT DEFAULT 'Assez bien',
         appreciation_passable TEXT DEFAULT 'Passable',
         appreciation_insuffisant TEXT DEFAULT 'Insuffisant',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         mode_calcul_moyenne TEXT DEFAULT 'trimestrielle',
         use_custom_mentions INTEGER DEFAULT 1,
         base_notation REAL DEFAULT 20.0,
         include_conduite INTEGER DEFAULT 1,
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS configuration_evaluation (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        annee_scolaire_id INTEGER,
         nombre_sequences_trimestre INTEGER DEFAULT 3,
         nombre_trimestres_annee INTEGER DEFAULT 3,
         coefficient_max_matiere REAL DEFAULT 10.0,
@@ -488,13 +482,13 @@ class DatabaseHelper {
         classe_id INTEGER NOT NULL,
         matiere_id INTEGER NOT NULL,
         enseignant_id INTEGER NOT NULL,
-        annee_scolaire_id INTEGER NOT NULL,
+        annee_scolaire_id INTEGER,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (classe_id) REFERENCES classe(id),
         FOREIGN KEY (matiere_id) REFERENCES matiere(id),
         FOREIGN KEY (enseignant_id) REFERENCES enseignant(id),
         FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
-        UNIQUE(classe_id, matiere_id, annee_scolaire_id)
+        UNIQUE(classe_id, matiere_id)
       )
     ''');
 
@@ -503,13 +497,13 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         classe_id INTEGER NOT NULL,
         matiere_id INTEGER NOT NULL,
-        annee_scolaire_id INTEGER NOT NULL,
+        annee_scolaire_id INTEGER,
         coefficient REAL DEFAULT 1,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (classe_id) REFERENCES classe(id),
         FOREIGN KEY (matiere_id) REFERENCES matiere(id),
         FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
-        UNIQUE(classe_id, matiere_id, annee_scolaire_id)
+        UNIQUE(classe_id, matiere_id)
       )
     ''');
 
@@ -555,6 +549,8 @@ class DatabaseHelper {
         FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
       )
     ''');
+
+    await db.execute(DocumentTemplateSchema.createTable);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -996,13 +992,13 @@ class DatabaseHelper {
 
       await _addColumnSafely(
         db,
-        'configuration_ecole',
+        'configuration_annee',
         'mode_calcul_moyenne',
         'TEXT DEFAULT "trimestrielle"',
       );
       await _addColumnSafely(
         db,
-        'configuration_ecole',
+        'configuration_annee',
         'use_custom_mentions',
         'INTEGER DEFAULT 1',
       );
@@ -1044,13 +1040,13 @@ class DatabaseHelper {
     if (oldVersion < 32) {
       await _addColumnSafely(
         db,
-        'configuration_ecole',
+        'configuration_annee',
         'base_notation',
         'REAL DEFAULT 20.0',
       );
       await _addColumnSafely(
         db,
-        'configuration_ecole',
+        'configuration_annee',
         'include_conduite',
         'INTEGER DEFAULT 1',
       );
@@ -1351,6 +1347,140 @@ class DatabaseHelper {
         debugPrint('Erreur lors de la migration v43 : $e');
       }
     }
+
+    if (oldVersion < 44) {
+      debugPrint('Mise à jour vers la version 44 : Réparation du schéma');
+      try {
+        // 1. Créer la table configuration_annee si elle manque
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS configuration_annee (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            annee_scolaire_id INTEGER UNIQUE,
+            moyenne_passage_cycle1 REAL DEFAULT 10.0,
+            moyenne_passage_cycle2 REAL DEFAULT 10.0,
+            moyenne_passage_cycle3 REAL DEFAULT 10.0,
+            moyenne_generale_min REAL DEFAULT 10.0,
+            mode_calcul_moyenne TEXT DEFAULT 'trimestrielle',
+            use_custom_mentions INTEGER DEFAULT 1,
+            base_notation REAL DEFAULT 20.0,
+            include_conduite INTEGER DEFAULT 1,
+            appreciation_automatique INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
+          )
+        ''');
+
+        // 2. Créer la table sequence_planification si elle manque
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS sequence_planification (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            annee_scolaire_id INTEGER,
+            trimestre INTEGER,
+            numero_sequence INTEGER,
+            nom TEXT,
+            date_debut TEXT,
+            date_fin TEXT,
+            poids REAL,
+            statut TEXT,
+            FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
+          )
+        ''');
+
+        // 3. Réparer la table classe (annee_scolaire_id)
+        await _addColumnSafely(
+          db,
+          'classe',
+          'annee_scolaire_id',
+          'INTEGER REFERENCES annee_scolaire(id)',
+        );
+
+        debugPrint('Migration vers la version 44 terminée avec succès.');
+      } catch (e) {
+        debugPrint('Erreur lors de la migration v44 : $e');
+      }
+    }
+    if (oldVersion < 45) {
+      try {
+        await _addColumnSafely(
+          db,
+          'classe',
+          'prof_principal_id',
+          'INTEGER REFERENCES enseignant(id)',
+        );
+        debugPrint('Migration vers la version 45 terminée avec succès.');
+      } catch (e) {
+        debugPrint('Erreur lors de la migration v45 : $e');
+      }
+    }
+    if (oldVersion < 46) {
+      try {
+        // Migration classe_matiere pour globalisation
+        await db.execute(
+          'ALTER TABLE classe_matiere RENAME TO classe_matiere_old',
+        );
+        await db.execute('''
+          CREATE TABLE classe_matiere (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            classe_id INTEGER NOT NULL,
+            matiere_id INTEGER NOT NULL,
+            annee_scolaire_id INTEGER,
+            coefficient REAL DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (classe_id) REFERENCES classe(id),
+            FOREIGN KEY (matiere_id) REFERENCES matiere(id),
+            FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
+            UNIQUE(classe_id, matiere_id)
+          )
+        ''');
+        await db.execute('''
+          INSERT OR IGNORE INTO classe_matiere (id, classe_id, matiere_id, annee_scolaire_id, coefficient, created_at)
+          SELECT id, classe_id, matiere_id, annee_scolaire_id, coefficient, created_at FROM classe_matiere_old
+        ''');
+        await db.execute('DROP TABLE classe_matiere_old');
+
+        // Migration attribution_enseignant pour globalisation
+        await db.execute(
+          'ALTER TABLE attribution_enseignant RENAME TO attribution_enseignant_old',
+        );
+        await db.execute('''
+          CREATE TABLE attribution_enseignant (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            classe_id INTEGER NOT NULL,
+            matiere_id INTEGER NOT NULL,
+            enseignant_id INTEGER NOT NULL,
+            annee_scolaire_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (classe_id) REFERENCES classe(id),
+            FOREIGN KEY (matiere_id) REFERENCES matiere(id),
+            FOREIGN KEY (enseignant_id) REFERENCES enseignant(id),
+            FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
+            UNIQUE(classe_id, matiere_id)
+          )
+        ''');
+        await db.execute('''
+          INSERT OR IGNORE INTO attribution_enseignant (id, classe_id, matiere_id, enseignant_id, annee_scolaire_id, created_at)
+          SELECT id, classe_id, matiere_id, enseignant_id, annee_scolaire_id, created_at FROM attribution_enseignant_old
+        ''');
+        await db.execute('DROP TABLE attribution_enseignant_old');
+
+        debugPrint('Migration vers la version 46 terminée avec succès.');
+      } catch (e) {
+        debugPrint('Erreur lors de la migration v46 : $e');
+      }
+    }
+
+    if (oldVersion < 47) {
+      debugPrint(
+        'Mise à jour vers la version 47 : Ajout de document_templates',
+      );
+      try {
+        await db.execute(DocumentTemplateSchema.createTable);
+        debugPrint('Migration vers la version 47 terminée avec succès.');
+      } catch (e) {
+        debugPrint('Erreur lors de la migration v47 : $e');
+      }
+    }
   }
 
   Future<void> _addColumnSafely(
@@ -1413,67 +1543,26 @@ class DatabaseHelper {
   // -------------------------
   // Méthodes Configuration École
   // -------------------------
-  Future<int> saveConfigurationEcole(Map<String, dynamic> config) async {
-    final db = await database;
-    return await db.insert('configuration_ecole', config);
-  }
+  Future<int> saveConfigurationEcole(Map<String, dynamic> config) =>
+      configDao.saveConfigurationAnnee(config);
 
-  Future<int> updateConfigurationEcole(
-    int id,
-    Map<String, dynamic> config,
-  ) async {
-    final db = await database;
-    config['updated_at'] = DateTime.now().toIso8601String();
-    return await db.update(
-      'configuration_ecole',
-      config,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
+  Future<int> updateConfigurationEcole(int id, Map<String, dynamic> config) =>
+      configDao.updateConfigurationAnnee(id, config);
 
-  Future<Map<String, dynamic>?> getConfigurationEcole(
-    int anneeScolaireId,
-  ) async {
-    final db = await database;
-    final result = await db.query(
-      'configuration_ecole',
-      where: 'annee_scolaire_id = ?',
-      whereArgs: [anneeScolaireId],
-    );
-    return result.isNotEmpty ? result.first : null;
-  }
+  Future<Map<String, dynamic>?> getConfigurationEcole(int anneeScolaireId) =>
+      configDao.getConfigurationAnnee(anneeScolaireId);
 
-  Future<int> saveConfigurationEvaluation(Map<String, dynamic> config) async {
-    final db = await database;
-    return await db.insert('configuration_evaluation', config);
-  }
+  Future<int> saveConfigurationEvaluation(Map<String, dynamic> config) =>
+      configDao.saveConfigurationAnnee(config);
 
   Future<int> updateConfigurationEvaluation(
     int id,
     Map<String, dynamic> config,
-  ) async {
-    final db = await database;
-    config['updated_at'] = DateTime.now().toIso8601String();
-    return await db.update(
-      'configuration_evaluation',
-      config,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
+  ) => configDao.updateConfigurationAnnee(id, config);
 
   Future<Map<String, dynamic>?> getConfigurationEvaluation(
     int anneeScolaireId,
-  ) async {
-    final db = await database;
-    final result = await db.query(
-      'configuration_evaluation',
-      where: 'annee_scolaire_id = ?',
-      whereArgs: [anneeScolaireId],
-    );
-    return result.isNotEmpty ? result.first : null;
-  }
+  ) => configDao.getConfigurationAnnee(anneeScolaireId);
 
   Future<int> saveCycleScolaire(Map<String, dynamic> cycle) async {
     final db = await database;
@@ -1573,24 +1662,11 @@ class DatabaseHelper {
   // -------------------------
   // Mentions configuration
   // -------------------------
-  Future<List<Map<String, dynamic>>> getMentionsByCycle(int? cycleId) async {
-    final db = await database;
-    return await db.query(
-      'mention_config',
-      where: cycleId == null ? 'cycle_id IS NULL' : 'cycle_id = ?',
-      whereArgs: cycleId == null ? [] : [cycleId],
-      orderBy: 'note_min DESC',
-    );
-  }
+  Future<List<Map<String, dynamic>>> getMentionsByCycle(int? cycleId) =>
+      configDao.getMentionsByCycle(cycleId);
 
-  Future<void> saveMention(Map<String, dynamic> mention) async {
-    final db = await database;
-    await db.insert(
-      'mention_config',
-      mention,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
+  Future<void> saveMention(Map<String, dynamic> mention) =>
+      configDao.saveMention(mention);
 
   Future<void> deleteMention(int id) async {
     final db = await database;
@@ -1711,7 +1787,7 @@ class DatabaseHelper {
       final classe = await queryById('classe', eleve['classe_id'] as int);
       int? nextClassId = classe?['next_class_id'] as int?;
       bool isFinal = classe?['is_final_class'] == 1;
-      final config = await queryAll('configuration_ecole');
+      final config = await queryAll('configuration_annee');
       double moyennePassage = config.isNotEmpty
           ? (config.first['moyenne_generale_min'] as num?)?.toDouble() ?? 10.0
           : 10.0;
@@ -2064,23 +2140,36 @@ class DatabaseHelper {
   ) async {
     final db = await database;
 
-    // 1. Get average for the specific student
-    final studentAvgResult = await db.rawQuery(
+    // 1. Get average and cycle info for the specific student
+    final studentDataResult = await db.rawQuery(
       '''
-      SELECT SUM(note * COALESCE(cm.coefficient, 1)) / SUM(COALESCE(cm.coefficient, 1)) as average
+      SELECT 
+        SUM(note * COALESCE(cm.coefficient, 1)) / SUM(COALESCE(cm.coefficient, 1)) as average,
+        cy.moyenne_passage,
+        cy.note_min,
+        cy.note_max
       FROM notes n
       JOIN matiere m ON n.matiere_id = m.id
       JOIN eleve e ON n.eleve_id = e.id
+      JOIN classe c ON e.classe_id = c.id
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
            AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
+      GROUP BY cy.moyenne_passage, cy.note_min, cy.note_max
     ''',
       [studentId, trimestre, anneeId],
     );
 
-    double studentAvg =
-        (studentAvgResult.first['average'] as num?)?.toDouble() ?? 0.0;
+    final studentData = studentDataResult.isNotEmpty
+        ? studentDataResult.first
+        : {};
+    double studentAvg = (studentData['average'] as num?)?.toDouble() ?? 0.0;
+    double passMark =
+        (studentData['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
+    double noteMin = (studentData['note_min'] as num?)?.toDouble() ?? 0.0;
+    double noteMax = (studentData['note_max'] as num?)?.toDouble() ?? 20.0;
 
     // 2. Get averages for all students in the class to calculate rank and class average
     final allAvgsResult = await db.rawQuery(
@@ -2112,9 +2201,6 @@ class DatabaseHelper {
         ? totalClassAvg / allAvgsResult.length
         : 0.0;
 
-    // 3. Get class passing mark
-    final classe = await getClasseWithCycle(classId);
-
     // 4. Get student total points
     final studentSumResult = await db.rawQuery(
       '''
@@ -2137,7 +2223,9 @@ class DatabaseHelper {
       'rank': rank,
       'classAverage': classAvg,
       'totalStudents': allAvgsResult.length,
-      'moyenne_passage': classe?['moyenne_passage'] ?? 10.0,
+      'moyenne_passage': passMark,
+      'note_min': noteMin,
+      'note_max': noteMax,
       'totalPoints': totalPoints,
     };
   }
@@ -2191,44 +2279,32 @@ class DatabaseHelper {
       String matNom = row['matiere_nom'] as String;
       double coeff = (row['coefficient'] as num).toDouble();
       double note = (row['note'] as num).toDouble();
-      int tri = row['trimestre'] as int; // 1, 2, or 3
+      int tri = row['trimestre'] as int;
 
       if (!subjectStats.containsKey(matId)) {
         subjectStats[matId] = {
           'matiere_id': matId,
           'matiere_nom': matNom,
           'coefficient': coeff,
-          't1': null,
-          't2': null,
-          't3': null,
+          'notes': <int, double?>{},
         };
       }
-      if (tri == 1) subjectStats[matId]!['t1'] = note;
-      if (tri == 2) subjectStats[matId]!['t2'] = note;
-      if (tri == 3) subjectStats[matId]!['t3'] = note;
+      (subjectStats[matId]!['notes'] as Map<int, double?>)[tri] = note;
     }
 
     // 3. Calculate annual averages and subject ranks
     List<Map<String, dynamic>> results = [];
     for (var stat in subjectStats.values) {
-      double? t1 = stat['t1'];
-      double? t2 = stat['t2'];
-      double? t3 = stat['t3'];
+      final notesMap = stat['notes'] as Map<int, double?>;
 
       int count = 0;
       double sum = 0;
-      if (t1 != null) {
-        sum += t1;
-        count++;
-      }
-      if (t2 != null) {
-        sum += t2;
-        count++;
-      }
-      if (t3 != null) {
-        sum += t3;
-        count++;
-      }
+      notesMap.forEach((triId, val) {
+        if (val != null) {
+          sum += val;
+          count++;
+        }
+      });
 
       double moyAnnuelle = count > 0 ? sum / count : 0.0;
 
@@ -2245,9 +2321,7 @@ class DatabaseHelper {
       results.add({
         'matiere_nom': stat['matiere_nom'],
         'coefficient': stat['coefficient'],
-        'moy_t1': t1,
-        'moy_t2': t2,
-        'moy_t3': t3,
+        'notes_par_trimestre': notesMap,
         'moy_annuelle': moyAnnuelle,
         'rang': rank,
         'appreciation': appreciationAutomatique(moyAnnuelle),
@@ -2307,6 +2381,7 @@ class DatabaseHelper {
     int classId,
     int anneeId,
   ) async {
+    final db = await database;
     final grades = await getAnnualGradesForStudent(studentId, anneeId);
 
     double totalPoints = 0;
@@ -2347,11 +2422,25 @@ class DatabaseHelper {
         ? allAverages.reduce((a, b) => a + b) / allAverages.length
         : 0.0;
 
+    // Get pass mark and notation for class cycle
+    final cycleResult = await db.rawQuery(
+      'SELECT cy.moyenne_passage, cy.note_min, cy.note_max FROM classe c JOIN cycles_scolaires cy ON c.cycle_id = cy.id WHERE c.id = ?',
+      [classId],
+    );
+    final cycleData = cycleResult.isNotEmpty ? cycleResult.first : {};
+    double passMark =
+        (cycleData['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
+    double noteMin = (cycleData['note_min'] as num?)?.toDouble() ?? 0.0;
+    double noteMax = (cycleData['note_max'] as num?)?.toDouble() ?? 20.0;
+
     return {
       'average': annualAvg,
       'rank': rank,
       'classAverage': classTotalAvg,
       'totalStudents': allStudents.length,
+      'moyenne_passage': passMark,
+      'note_min': noteMin,
+      'note_max': noteMax,
     };
   }
 
@@ -2382,11 +2471,10 @@ class DatabaseHelper {
           AND n.annee_scolaire_id = ?
       LEFT JOIN classe_matiere cm ON cm.matiere_id = ? 
           AND cm.classe_id = e.classe_id
-          AND cm.annee_scolaire_id = ?
       WHERE e.classe_id = ?
       ORDER BY e.nom ASC, e.prenom ASC
     ''',
-      [subjectId, trimestre, sequence, anneeId, subjectId, anneeId, classId],
+      [subjectId, trimestre, sequence, anneeId, subjectId, classId],
     );
   }
 
@@ -2404,25 +2492,6 @@ class DatabaseHelper {
 
     if (eleveResult.isEmpty) {
       throw Exception("Élève non trouvé");
-    }
-
-    final int classeId = eleveResult.first['classe_id'] as int;
-
-    // Vérifier l'attribution
-    final attribution = await db.query(
-      'attribution_enseignant',
-      where: 'classe_id = ? AND matiere_id = ? AND annee_scolaire_id = ?',
-      whereArgs: [
-        classeId,
-        noteData['matiere_id'],
-        noteData['annee_scolaire_id'],
-      ],
-    );
-
-    if (attribution.isEmpty) {
-      throw Exception(
-        "Impossible d'enregistrer la note : aucun enseignant n'est affecté à cette matière pour cette classe.",
-      );
     }
 
     // 2. Enregistrement
@@ -2497,37 +2566,6 @@ class DatabaseHelper {
       'successRate': total > 0 ? (passed / total) * 100 : 0.0,
       'total': total,
     };
-  }
-
-  Future<List<Map<String, dynamic>>> getGradesOverview(int anneeId) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT 
-        c.id as classe_id,
-        c.nom as classe_nom, 
-        m.id as matiere_id,
-        m.nom as matiere_nom, 
-        cm.coefficient,
-        n.trimestre,
-        n.sequence,
-        COUNT(n.id) as count,
-        AVG(n.note) as average,
-        ens.nom as enseignant_nom,
-        ens.prenom as enseignant_prenom
-      FROM notes n
-      JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
-      JOIN classe_matiere cm ON cm.matiere_id = m.id AND cm.classe_id = c.id AND cm.annee_scolaire_id = ?
-      LEFT JOIN attribution_enseignant ae ON ae.classe_id = c.id AND ae.matiere_id = m.id AND ae.annee_scolaire_id = ?
-      LEFT JOIN enseignant ens ON ae.enseignant_id = ens.id
-      WHERE n.annee_scolaire_id = ?
-      GROUP BY c.id, m.id, n.trimestre, n.sequence
-      ORDER BY c.nom ASC, n.trimestre DESC, n.sequence DESC
-    ''',
-      [anneeId, anneeId, anneeId],
-    );
   }
 
   // --- PAYMENTS MANAGEMENT ---
@@ -3196,110 +3234,8 @@ class DatabaseHelper {
     );
   }
 
-  Future<Map<String, dynamic>> getDashboardStats(int anneeId) async {
-    final db = await database;
-
-    final studentResult = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM eleve WHERE annee_scolaire_id = ?',
-      [anneeId],
-    );
-    final classeResult = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM classe WHERE annee_scolaire_id = ?',
-      [anneeId],
-    );
-    final teacherResult = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM enseignant',
-    );
-
-    final financial = await getFinancialSummary(anneeId);
-
-    // Recent payments
-    final recentPayments = await db.rawQuery(
-      '''
-      SELECT pd.*, e.nom, e.prenom, c.nom as classe_nom
-      FROM paiement_detail pd
-      JOIN eleve e ON pd.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
-      WHERE pd.annee_scolaire_id = ?
-      ORDER BY pd.date_paiement DESC
-      LIMIT 5
-    ''',
-      [anneeId],
-    );
-
-    // Students by level (existing)
-    final levelStats = await db.rawQuery(
-      '''
-      SELECT n.nom as niveau, COUNT(e.id) as count
-      FROM eleve e
-      JOIN classe c ON e.classe_id = c.id
-      JOIN niveaux n ON c.niveau_id = n.id
-      WHERE e.annee_scolaire_id = ?
-      GROUP BY n.nom
-    ''',
-      [anneeId],
-    );
-
-    // Stats par sexe
-    final genderStats = await db.rawQuery(
-      'SELECT sexe, COUNT(*) as count FROM eleve WHERE annee_scolaire_id = ? GROUP BY sexe',
-      [anneeId],
-    );
-
-    // Stats par cycle
-    final cycleStats = await db.rawQuery(
-      '''
-      SELECT cy.nom as cycle, COUNT(e.id) as count 
-      FROM eleve e 
-      JOIN classe c ON e.classe_id = c.id 
-      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      WHERE e.annee_scolaire_id = ? 
-      GROUP BY cy.nom
-      ''',
-      [anneeId],
-    );
-
-    // Stats par classe
-    final classStats = await db.rawQuery(
-      '''
-      SELECT c.nom, COUNT(e.id) as count 
-      FROM eleve e 
-      JOIN classe c ON e.classe_id = c.id 
-      WHERE e.annee_scolaire_id = ? 
-      GROUP BY c.nom
-      ORDER BY count DESC
-      LIMIT 10
-      ''',
-      [anneeId],
-    );
-
-    // Paiements par mois (6 derniers mois)
-    // Note: on utilise SUBSTR pour extraire le mois si le format est YYYY-MM-DD
-    final paymentMonthlyStats = await db.rawQuery(
-      '''
-      SELECT SUBSTR(pd.date_paiement, 1, 7) as month, SUM(pd.montant) as total 
-      FROM paiement_detail pd
-      WHERE pd.annee_scolaire_id = ?
-      GROUP BY month
-      ORDER BY month DESC
-      LIMIT 6
-    ''',
-      [anneeId],
-    );
-
-    return {
-      'students': studentResult.first['count'] as int? ?? 0,
-      'classes': classeResult.first['count'] as int? ?? 0,
-      'teachers': teacherResult.first['count'] as int? ?? 0,
-      'financial': financial,
-      'recentPayments': recentPayments,
-      'levelStats': levelStats,
-      'genderStats': genderStats,
-      'cycleStats': cycleStats,
-      'classStats': classStats,
-      'paymentMonthlyStats': paymentMonthlyStats,
-    };
-  }
+  Future<Map<String, dynamic>> getDashboardStats(int anneeId) =>
+      dashboardDao.getDashboardData(anneeId);
 
   Future<List<Map<String, dynamic>>> getStudentPaymentControlData(
     int anneeId,
@@ -3439,9 +3375,9 @@ class DatabaseHelper {
   }
 
   Future<List<Map<String, dynamic>>> getAttributionsByClass(
-    int classeId,
-    int anneeId,
-  ) async {
+    int classeId, [
+    int? anneeId, // Optional for backward compatibility
+  ]) async {
     final db = await database;
     return await db.rawQuery(
       '''
@@ -3449,26 +3385,32 @@ class DatabaseHelper {
       FROM attribution_enseignant ae
       JOIN enseignant e ON ae.enseignant_id = e.id
       JOIN matiere m ON ae.matiere_id = m.id
-      WHERE ae.classe_id = ? AND ae.annee_scolaire_id = ?
+      WHERE ae.classe_id = ?
     ''',
-      [classeId, anneeId],
+      [classeId],
     );
   }
 
   Future<void> saveAllAttributions(
     int classeId,
-    int anneeId,
+    int? anneeId,
     Map<int, int?> assignments,
   ) async {
     final db = await database;
     await db.transaction((txn) async {
+      // Nettoyage des anciennes attributions pour cette classe (globalement)
+      await txn.delete(
+        'attribution_enseignant',
+        where: 'classe_id = ?',
+        whereArgs: [classeId],
+      );
+
       for (var entry in assignments.entries) {
         if (entry.value != null) {
           await txn.insert('attribution_enseignant', {
             'classe_id': classeId,
             'matiere_id': entry.key,
             'enseignant_id': entry.value,
-            'annee_scolaire_id': anneeId,
           }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
       }
@@ -3487,18 +3429,18 @@ class DatabaseHelper {
 
   Future<Map<String, dynamic>?> getAssignedTeacher(
     int classeId,
-    int matiereId,
-    int anneeId,
-  ) async {
+    int matiereId, [
+    int? anneeId,
+  ]) async {
     final db = await database;
     final results = await db.rawQuery(
       '''
       SELECT e.*
       FROM attribution_enseignant ae
       JOIN enseignant e ON ae.enseignant_id = e.id
-      WHERE ae.classe_id = ? AND ae.matiere_id = ? AND ae.annee_scolaire_id = ?
+      WHERE ae.classe_id = ? AND ae.matiere_id = ?
     ''',
-      [classeId, matiereId, anneeId],
+      [classeId, matiereId],
     );
 
     if (results.isNotEmpty) return results.first;
@@ -3514,58 +3456,38 @@ class DatabaseHelper {
   }
 
   Future<List<Map<String, dynamic>>> getSubjectsByClass(
-    int classeId,
-    int anneeId,
-  ) async {
+    int classeId, [
+    int? anneeId,
+  ]) async {
     final db = await database;
     return await db.rawQuery(
       '''
       SELECT m.*, cm.coefficient
       FROM matiere m
       JOIN classe_matiere cm ON m.id = cm.matiere_id
-      WHERE cm.classe_id = ? AND cm.annee_scolaire_id = ?
+      WHERE cm.classe_id = ?
       ORDER BY m.nom ASC
     ''',
-      [classeId, anneeId],
+      [classeId],
     );
   }
 
   Future<void> saveClassSubjects(
     int classeId,
-    int anneeId,
+    int? anneeId,
     List<Map<String, dynamic>> subjectsData,
-  ) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      // Remove existing
-      await txn.delete(
-        'classe_matiere',
-        where: 'classe_id = ? AND annee_scolaire_id = ?',
-        whereArgs: [classeId, anneeId],
-      );
-
-      // Insert new
-      for (var data in subjectsData) {
-        await txn.insert('classe_matiere', {
-          'classe_id': classeId,
-          'matiere_id': data['id'],
-          'annee_scolaire_id': anneeId,
-          'coefficient': data['coefficient'] ?? 1.0,
-        });
-      }
-    });
-  }
+  ) => classeDao.saveClassSubjects(classeId, anneeId, subjectsData);
 
   Future<bool> isSubjectInClass(
     int classeId,
-    int matiereId,
-    int anneeId,
-  ) async {
+    int matiereId, [
+    int? anneeId,
+  ]) async {
     final db = await database;
     final result = await db.query(
       'classe_matiere',
-      where: 'classe_id = ? AND matiere_id = ? AND annee_scolaire_id = ?',
-      whereArgs: [classeId, matiereId, anneeId],
+      where: 'classe_id = ? AND matiere_id = ?',
+      whereArgs: [classeId, matiereId],
     );
     return result.isNotEmpty;
   }
@@ -3758,8 +3680,6 @@ class DatabaseHelper {
     List<int> targetClasseIds,
     int anneeScolaireId,
   ) async {
-    final db = await database;
-
     // Obtenir les frais de la classe source
     final sourceFrais = await getFraisByClasse(sourceClasseId, anneeScolaireId);
     if (sourceFrais == null) {
@@ -3924,11 +3844,12 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getSequences(int anneeId) async {
     final db = await database;
     try {
-      // First try to get explicit sequence definitions
+      // First try to get explicit sequence definitions from sequence_planification
+      // We fetch all sequences for the year, regardless of status, to allow full visibility in grades management
       final sequences = await db.query(
         'sequence_planification',
-        where: 'annee_scolaire_id = ? AND statut = ?',
-        whereArgs: [anneeId, 'active'],
+        where: 'annee_scolaire_id = ?',
+        whereArgs: [anneeId],
         orderBy: 'trimestre ASC, numero_sequence ASC',
       );
 
@@ -3981,11 +3902,45 @@ class DatabaseHelper {
     });
   }
 
+  /// Get configured sequences for a specific trimester and academic year
+  Future<List<Map<String, dynamic>>> getSequencesForTrimester(
+    int anneeId,
+    int trimester,
+  ) async {
+    final db = await database;
+    try {
+      return await db.query(
+        'sequence_planification',
+        where: 'annee_scolaire_id = ? AND trimestre = ?',
+        whereArgs: [anneeId, trimester],
+        orderBy: 'numero_sequence ASC',
+      );
+    } catch (e) {
+      debugPrint('Error loading sequences for trimester: $e');
+      return [];
+    }
+  }
+
   /// Get configured trimesters for a specific academic year
+
   Future<List<int>> getTrimesters(int anneeId) async {
     final db = await database;
     try {
-      // Check configuration_evaluation
+      // First try sequence_planification to get trimesters that actually have sequences planned
+      final sequences = await db.query(
+        'sequence_planification',
+        where: 'annee_scolaire_id = ?',
+        whereArgs: [anneeId],
+        columns: ['trimestre'],
+        distinct: true,
+        orderBy: 'trimestre ASC',
+      );
+
+      if (sequences.isNotEmpty) {
+        return sequences.map((s) => s['trimestre'] as int).toList();
+      }
+
+      // Fallback: Check configuration_evaluation
       final config = await db.query(
         'configuration_evaluation',
         where: 'annee_scolaire_id = ?',

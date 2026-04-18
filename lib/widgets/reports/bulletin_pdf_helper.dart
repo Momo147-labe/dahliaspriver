@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../models/ecole.dart';
+import '../../core/utils/mention_helper.dart';
 
 class BulletinPdfHelper {
   static Future<pw.Document> generateSingleBulletin({
@@ -11,6 +12,9 @@ class BulletinPdfHelper {
     required Ecole? ecole,
     required String trimestre,
     required String annee,
+    required List<Map<String, dynamic>> columns,
+    String noteKey = 'notes_par_sequence',
+    List<Map<String, dynamic>> mentions = const [],
   }) async {
     final pdf = pw.Document();
     await _addBulletinPage(
@@ -21,6 +25,9 @@ class BulletinPdfHelper {
       ecole,
       trimestre,
       annee,
+      columns,
+      noteKey,
+      mentions,
     );
     return pdf;
   }
@@ -31,6 +38,9 @@ class BulletinPdfHelper {
     required Ecole? ecole,
     required String trimestre,
     required String annee,
+    required List<Map<String, dynamic>> columns,
+    String noteKey = 'notes_par_sequence',
+    List<Map<String, dynamic>> mentions = const [],
   }) async {
     final pdf = pw.Document();
     for (var data in studentsData) {
@@ -42,6 +52,9 @@ class BulletinPdfHelper {
         ecole,
         trimestre,
         annee,
+        columns,
+        noteKey,
+        mentions,
       );
     }
     return pdf;
@@ -53,9 +66,22 @@ class BulletinPdfHelper {
     required Map<String, dynamic> stats,
     required Ecole? ecole,
     required String annee,
+    required List<Map<String, dynamic>> columns,
+    String noteKey = 'notes_par_trimestre',
+    List<Map<String, dynamic>> mentions = const [],
   }) async {
     final pdf = pw.Document();
-    await _addAnnualBulletinPage(pdf, student, grades, stats, ecole, annee);
+    await _addAnnualBulletinPage(
+      pdf,
+      student,
+      grades,
+      stats,
+      ecole,
+      annee,
+      columns,
+      noteKey,
+      mentions,
+    );
     return pdf;
   }
 
@@ -63,6 +89,9 @@ class BulletinPdfHelper {
     required List<Map<String, dynamic>> studentsData,
     required Ecole? ecole,
     required String annee,
+    required List<Map<String, dynamic>> columns,
+    String noteKey = 'notes_par_trimestre',
+    List<Map<String, dynamic>> mentions = const [],
   }) async {
     final pdf = pw.Document();
     for (var data in studentsData) {
@@ -73,6 +102,9 @@ class BulletinPdfHelper {
         data['stats'],
         ecole,
         annee,
+        columns,
+        noteKey,
+        mentions,
       );
     }
     return pdf;
@@ -86,6 +118,9 @@ class BulletinPdfHelper {
     Ecole? ecole,
     String trimestre,
     String annee,
+    List<Map<String, dynamic>> columns,
+    String noteKey,
+    List<Map<String, dynamic>> mentions,
   ) async {
     // Load logo if available
     final logoPath = ecole?.logo;
@@ -112,18 +147,25 @@ class BulletinPdfHelper {
               children: [
                 _buildHeader(logoImage, ecole, annee, trimestre),
                 pw.SizedBox(height: 10),
-                // Header underline as in requested design (conversion entete sans modifier)
-                // Actually the user said keep header, modify after.
                 pw.Divider(thickness: 1, color: PdfColors.black),
                 pw.SizedBox(height: 10),
                 _buildStudentInfoBox(student, trimestre, studentPhoto),
                 pw.SizedBox(height: 20),
-                _buildGradesTable(grades),
+                _buildGradesTable(
+                  grades,
+                  (stats['note_max'] as num?)?.toDouble() ?? 20.0,
+                  columns,
+                  noteKey,
+                  mentions,
+                ),
                 pw.SizedBox(height: 20),
                 pw.Row(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Expanded(flex: 3, child: _buildAcademicSynthesis(stats)),
+                    pw.Expanded(
+                      flex: 3,
+                      child: _buildAcademicSynthesis(stats, mentions),
+                    ),
                     pw.SizedBox(width: 20),
                     pw.Expanded(flex: 2, child: _buildDirectionSignature()),
                   ],
@@ -145,6 +187,9 @@ class BulletinPdfHelper {
     Map<String, dynamic> stats,
     Ecole? ecole,
     String annee,
+    List<Map<String, dynamic>> columns,
+    String noteKey,
+    List<Map<String, dynamic>> mentions,
   ) async {
     // Load logo if available
     final logoPath = ecole?.logo;
@@ -175,12 +220,21 @@ class BulletinPdfHelper {
                 pw.SizedBox(height: 10),
                 _buildStudentInfoBox(student, 'BILAN ANNUEL', studentPhoto),
                 pw.SizedBox(height: 20),
-                _buildAnnualGradesTable(grades),
+                _buildGradesTable(
+                  grades,
+                  (stats['note_max'] as num?)?.toDouble() ?? 20.0,
+                  columns,
+                  noteKey,
+                  mentions,
+                ),
                 pw.SizedBox(height: 20),
                 pw.Row(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Expanded(flex: 3, child: _buildAcademicSynthesis(stats)),
+                    pw.Expanded(
+                      flex: 3,
+                      child: _buildAcademicSynthesis(stats, mentions),
+                    ),
                     pw.SizedBox(width: 20),
                     pw.Expanded(flex: 2, child: _buildDirectionSignature()),
                   ],
@@ -314,47 +368,83 @@ class BulletinPdfHelper {
         border: pw.Border.all(color: PdfColors.black, width: 1),
       ),
       padding: pw.EdgeInsets.all(10),
-      child: pw.Row(
+      child: pw.Column(
         children: [
-          pw.Container(
-            width: 70,
-            height: 70,
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.grey300),
-            ),
-            child: photo != null
-                ? pw.Image(photo, fit: pw.BoxFit.cover)
-                : pw.Center(
-                    child: pw.Text('PHOTO', style: pw.TextStyle(fontSize: 8)),
+          pw.Row(
+            children: [
+              pw.Container(
+                width: 70,
+                height: 70,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300),
+                ),
+                child: photo != null
+                    ? pw.Image(photo, fit: pw.BoxFit.cover)
+                    : pw.Center(
+                        child: pw.Text(
+                          'PHOTO',
+                          style: pw.TextStyle(fontSize: 8),
+                        ),
+                      ),
+              ),
+              pw.SizedBox(width: 20),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    _infoRow(
+                      'NOM ET PRÉNOMS',
+                      '${student['nom']} ${student['prenom'] ?? ''}'
+                          .toUpperCase(),
+                      isBold: true,
+                    ),
+                    _infoRow(
+                      'CLASSE',
+                      (student['classe_nom'] ?? '').toUpperCase(),
+                    ),
+                  ],
+                ),
+              ),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    _infoRow(
+                      'MATRICULE',
+                      (student['matricule'] ?? '').toUpperCase(),
+                    ),
+                    _infoRow('PÉRIODE', periode.toUpperCase()),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (student['nom_pere'] != null || student['nom_mere'] != null) ...[
+            pw.SizedBox(height: 10),
+            pw.Divider(thickness: 0.5, color: PdfColors.grey300),
+            pw.Row(
+              children: [
+                if (student['nom_pere'] != null)
+                  pw.Expanded(
+                    child: _infoRow(
+                      'PÈRE',
+                      '${student['prenom_pere'] ?? ''} ${student['nom_pere']}'
+                          .toUpperCase(),
+                    ),
                   ),
-          ),
-          pw.SizedBox(width: 20),
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                _infoRow(
-                  'NOM ET PRÉNOMS',
-                  (student['nom'] + ' ' + (student['prenom'] ?? ''))
-                      .toUpperCase(),
-                  isBold: true,
-                ),
-                _infoRow('CLASSE', (student['classe_nom'] ?? '').toUpperCase()),
+                if (student['nom_pere'] != null && student['nom_mere'] != null)
+                  pw.SizedBox(width: 20),
+                if (student['nom_mere'] != null)
+                  pw.Expanded(
+                    child: _infoRow(
+                      'MÈRE',
+                      '${student['prenom_mere'] ?? ''} ${student['nom_mere']}'
+                          .toUpperCase(),
+                    ),
+                  ),
               ],
             ),
-          ),
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                _infoRow(
-                  'MATRICULE',
-                  (student['matricule'] ?? '').toUpperCase(),
-                ),
-                _infoRow('PÉRIODE', periode.toUpperCase()),
-              ],
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -383,109 +473,90 @@ class BulletinPdfHelper {
     );
   }
 
-  static pw.Widget _buildGradesTable(List<Map<String, dynamic>> grades) {
+  static pw.Widget _buildGradesTable(
+    List<Map<String, dynamic>> grades,
+    double noteMax,
+    List<Map<String, dynamic>> columns,
+    String noteKey,
+    List<Map<String, dynamic>> mentions,
+  ) {
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
-      columnWidths: {
-        0: pw.FlexColumnWidth(3), // Matières
-        1: pw.FixedColumnWidth(40), // Coeff
-        2: pw.FixedColumnWidth(60), // Contrôle
-        3: pw.FixedColumnWidth(60), // Comp
-        4: pw.FixedColumnWidth(60), // Moyenne
-        5: pw.FlexColumnWidth(3), // Appreciations
-      },
       children: [
         pw.TableRow(
           decoration: pw.BoxDecoration(color: PdfColors.grey100),
           children: [
             _tableHeader('MATIÈRES'),
             _tableHeader('COEFF.'),
-            _tableHeader('NOTE DE\nCONTRÔLE'),
-            _tableHeader('NOTE DE\nCOMP.'),
+            ...columns.map(
+              (col) => _tableHeader(
+                '${col['label']} / ${noteMax.toStringAsFixed(0)}',
+              ),
+            ),
             _tableHeader('MOYENNE'),
             _tableHeader('APPRÉCIATIONS'),
           ],
         ),
-        ...grades.map((g) {
-          final noteCtrl = g['note_ctrl'] as double?;
-          final noteComp = g['note_comp'] as double?;
-          final coeff = (g['coeff'] as num?)?.toDouble() ?? 1.0;
-          final moy = (g['note'] as num?)?.toDouble() ?? 0.0;
+        ...grades.map((grade) {
+          final notesMap = (grade[noteKey] as Map<dynamic, dynamic>?) ?? {};
+          final moy = (grade['note'] as num?)?.toDouble();
+
+          // Map dynamic appreciation if mentions provided
+          String observation = grade['obs']?.toString() ?? '';
+          if (mentions.isNotEmpty && moy != null) {
+            final m = MentionHelper.getMentionForGrade(moy, mentions);
+            if (m != null) {
+              observation = m['appreciation'] ?? m['label'] ?? '';
+            }
+          }
 
           return pw.TableRow(
             children: [
-              _tableCell(g['matiere'] ?? '', alignLeft: true, isBold: true),
-              _tableCell(coeff.toStringAsFixed(0)),
-              _tableCell(noteCtrl?.toStringAsFixed(2) ?? '-'),
-              _tableCell(noteComp?.toStringAsFixed(2) ?? '-'),
-              _tableCell(moy.toStringAsFixed(2), isBold: true),
-              _tableCell(g['obs'] ?? _getObservation(moy), alignLeft: true),
+              _tableCell(grade['matiere']?.toString() ?? '', alignLeft: true),
+              _tableCell(grade['coeff']?.toString() ?? '1'),
+              ...columns.map((col) {
+                final key = col['key'];
+                final val = (notesMap[key] as num?)?.toDouble();
+                return _tableCell(val?.toStringAsFixed(2) ?? '-');
+              }),
+              _tableCell(moy?.toStringAsFixed(2) ?? '-', isBold: true),
+              _tableCell(observation, alignLeft: true),
             ],
           );
         }),
-      ],
-    );
-  }
-
-  static pw.Widget _buildAnnualGradesTable(List<Map<String, dynamic>> grades) {
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
-      columnWidths: {
-        0: pw.FlexColumnWidth(3), // Matières
-        1: pw.FlexColumnWidth(1), // Coeff
-        2: pw.FlexColumnWidth(1), // Tot T1
-        3: pw.FlexColumnWidth(1), // Tot T2
-        4: pw.FlexColumnWidth(1), // Tot T3
-        5: pw.FlexColumnWidth(1.2), // Moy An
-        6: pw.FlexColumnWidth(1), // Rang
-        7: pw.FlexColumnWidth(2), // Appreciation
-      },
-      children: [
+        // Totals row
         pw.TableRow(
-          decoration: pw.BoxDecoration(color: PdfColors.grey200),
+          decoration: pw.BoxDecoration(color: PdfColors.grey50),
           children: [
-            _tableHeader('Matières'),
-            _tableHeader('Coeff'),
-            _tableHeader('Moy T1'),
-            _tableHeader('Moy T2'),
-            _tableHeader('Moy T3'),
-            _tableHeader('Moy An'),
-            _tableHeader('Rang'),
-            _tableHeader('Appréciation'),
+            _tableCell('TOTAUX', isBold: true),
+            _tableCell(
+              grades
+                  .fold<double>(
+                    0,
+                    (p, e) => p + ((e['coeff'] as num?)?.toDouble() ?? 0.0),
+                  )
+                  .toStringAsFixed(0),
+              isBold: true,
+            ),
+            ...columns.map((_) => _tableCell('')),
+            _tableCell(
+              grades
+                  .fold<double>(
+                    0,
+                    (p, e) => p + ((e['total'] as num?)?.toDouble() ?? 0.0),
+                  )
+                  .toStringAsFixed(2),
+              isBold: true,
+            ),
+            _tableCell(''),
           ],
         ),
-        ...grades.map((g) {
-          final t1 = (g['moy_t1'] as num?)?.toDouble();
-          final t2 = (g['moy_t2'] as num?)?.toDouble();
-          final t3 = (g['moy_t3'] as num?)?.toDouble();
-          final moyAn = (g['moy_annuelle'] as num?)?.toDouble() ?? 0.0;
-
-          return pw.TableRow(
-            children: [
-              _tableCell(g['matiere_nom'] ?? '', alignLeft: true),
-              _tableCell('${g['coefficient']}'),
-              _tableCell(t1?.toStringAsFixed(2) ?? '-'),
-              _tableCell(t2?.toStringAsFixed(2) ?? '-'),
-              _tableCell(t3?.toStringAsFixed(2) ?? '-'),
-              _tableCell(moyAn.toStringAsFixed(2), isBold: true),
-              _tableCell('${g['rang']}e'),
-              _tableCell(g['appreciation'] ?? ''),
-            ],
-          );
-        }),
       ],
     );
   }
 
   static pw.Widget _tableHeader(String text) {
-    return pw.Padding(
-      padding: pw.EdgeInsets.all(5),
-      child: pw.Text(
-        text,
-        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
-        textAlign: pw.TextAlign.center,
-      ),
-    );
+    return _tableCell(text, isBold: true);
   }
 
   static pw.Widget _tableCell(
@@ -506,12 +577,23 @@ class BulletinPdfHelper {
     );
   }
 
-  static pw.Widget _buildAcademicSynthesis(Map<String, dynamic> stats) {
+  static pw.Widget _buildAcademicSynthesis(
+    Map<String, dynamic> stats,
+    List<Map<String, dynamic>> mentions,
+  ) {
     final double avg = (stats['average'] as num?)?.toDouble() ?? 0.0;
-    // Decision logic: if eleve is admin or non depende de la configuration de cycle
     final double passMark =
         (stats['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
     final bool isAdmis = avg >= passMark;
+
+    // Dynamic mention for final result
+    String finalMention = '';
+    if (mentions.isNotEmpty) {
+      final m = MentionHelper.getMentionForGrade(avg, mentions);
+      if (m != null) {
+        finalMention = m['label'] ?? '';
+      }
+    }
 
     return pw.Container(
       decoration: pw.BoxDecoration(
@@ -534,6 +616,9 @@ class BulletinPdfHelper {
             'Total des points:',
             '${(stats['totalPoints'] ?? 0.0).toStringAsFixed(2)}',
           ),
+          pw.SizedBox(height: 5),
+          if (finalMention.isNotEmpty)
+            _synthesisRow('Mention:', finalMention, isItalic: true),
           pw.SizedBox(height: 10),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -549,7 +634,7 @@ class BulletinPdfHelper {
                 padding: pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: pw.BoxDecoration(color: PdfColors.black),
                 child: pw.Text(
-                  '${avg.toStringAsFixed(2)} / 20',
+                  '${avg.toStringAsFixed(2)} / ${(stats['note_max'] as num?)?.toDouble().toStringAsFixed(0) ?? '20'}',
                   style: pw.TextStyle(
                     color: PdfColors.white,
                     fontWeight: pw.FontWeight.bold,
@@ -692,13 +777,5 @@ class BulletinPdfHelper {
         ),
       ],
     );
-  }
-
-  static String _getObservation(double note) {
-    if (note >= 16) return 'Très Bien';
-    if (note >= 14) return 'Bien';
-    if (note >= 12) return 'Assez Bien';
-    if (note >= 10) return 'Passable';
-    return 'Insuffisant';
   }
 }

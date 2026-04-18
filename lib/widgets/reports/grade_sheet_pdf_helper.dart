@@ -11,6 +11,7 @@ class GradeSheetPdfHelper {
     required String sequence,
     required String annee,
     required List<Map<String, dynamic>> students,
+    double noteMax = 20.0,
   }) async {
     final pdf = pw.Document();
 
@@ -28,9 +29,9 @@ class GradeSheetPdfHelper {
           return [
             _buildHeader(logoImage, ecole, annee),
             pw.SizedBox(height: 20),
-            _buildTitle(className, subjectName, sequence),
+            _buildTitle(className, subjectName, sequence, noteMax),
             pw.SizedBox(height: 20),
-            _buildStudentsTable(students),
+            _buildStudentsTable(students, noteMax),
             pw.SizedBox(height: 30),
             _buildSignatures(),
           ];
@@ -100,6 +101,7 @@ class GradeSheetPdfHelper {
     String className,
     String subjectName,
     String sequence,
+    double noteMax,
   ) {
     return pw.Center(
       child: pw.Column(
@@ -122,7 +124,10 @@ class GradeSheetPdfHelper {
     );
   }
 
-  static pw.Widget _buildStudentsTable(List<Map<String, dynamic>> students) {
+  static pw.Widget _buildStudentsTable(
+    List<Map<String, dynamic>> students,
+    double noteMax,
+  ) {
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
       columnWidths: {
@@ -140,7 +145,7 @@ class GradeSheetPdfHelper {
             _tableHeader('N°'),
             _tableHeader('Matricule'),
             _tableHeader('Nom & Prénoms'),
-            _tableHeader('Note /20'),
+            _tableHeader('Note /${noteMax.toStringAsFixed(0)}'),
             _tableHeader('Observations'),
           ],
         ),

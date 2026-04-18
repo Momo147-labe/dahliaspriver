@@ -35,6 +35,7 @@ class _GradeSheetPageState extends State<GradeSheetPage> {
   bool _isLoading = true;
   bool _isSaving = false;
   Ecole? _ecole;
+  double _noteMax = 20.0;
 
   @override
   void initState() {
@@ -59,9 +60,34 @@ class _GradeSheetPageState extends State<GradeSheetPage> {
           widget.sequence,
           anneeId,
         );
+
+        // Fetch noteMax from the first available grade or default to 20
+        double noteMax = 20.0;
+        if (students.isNotEmpty && students.first['note_max'] != null) {
+          noteMax = (students.first['note_max'] as num).toDouble();
+        } else {
+          // Fallback: check sequence planification or default
+          final activeAnnee = await dbHelper.getActiveAnneeScolaire();
+          if (activeAnnee != null) {
+            final sequencePlan = await dbHelper.getSequencesPlanification(
+              activeAnnee['id'],
+            );
+            final currentSeq = sequencePlan.firstWhere(
+              (s) =>
+                  s['trimestre'] == widget.trimestre &&
+                  s['numero_sequence'] == widget.sequence,
+              orElse: () => {},
+            );
+            if (currentSeq.isNotEmpty) {
+              // Sequence might have a default noteMax
+            }
+          }
+        }
+
         setState(() {
           _students = List<Map<String, dynamic>>.from(students);
           _ecole = ecole;
+          _noteMax = noteMax;
           _isLoading = false;
         });
       }
@@ -90,6 +116,7 @@ class _GradeSheetPageState extends State<GradeSheetPage> {
         sequence: widget.sequence.toString(),
         annee: anneeLabel,
         students: _students,
+        noteMax: _noteMax,
       );
 
       await Printing.layoutPdf(
@@ -311,7 +338,8 @@ class _GradeSheetPageState extends State<GradeSheetPage> {
                                         fontWeight: FontWeight.bold,
                                       ),
                                       decoration: InputDecoration(
-                                        labelText: 'Note/20',
+                                        labelText:
+                                            'Note/${_noteMax.toStringAsFixed(0)}',
                                         labelStyle: const TextStyle(
                                           fontSize: 10,
                                         ),

@@ -7,8 +7,6 @@ import 'bulletin_summary.dart';
 import 'bulletin_footer.dart';
 import '../../models/ecole.dart';
 
-import 'bulletin_annual_grades_table.dart';
-
 class BulletinPreview extends StatelessWidget {
   final double zoomLevel;
   final String trimestre;
@@ -18,6 +16,9 @@ class BulletinPreview extends StatelessWidget {
   final List<Map<String, dynamic>> grades;
   final Map<String, dynamic> summary;
   final bool isAnnual;
+  final List<Map<String, dynamic>> columns;
+  final String noteKey;
+  final List<Map<String, dynamic>> mentions;
 
   const BulletinPreview({
     super.key,
@@ -29,6 +30,9 @@ class BulletinPreview extends StatelessWidget {
     required this.grades,
     required this.summary,
     this.isAnnual = false,
+    required this.columns,
+    this.noteKey = 'notes_par_sequence',
+    this.mentions = const [],
   });
 
   @override
@@ -84,13 +88,21 @@ class BulletinPreview extends StatelessWidget {
               moyenne: summary['moyenne'] ?? '',
               rang: summary['rang'] ?? '',
               absences: studentInfo['absences']?.toString() ?? '0',
+              nomPere: studentInfo['nom_pere'],
+              prenomPere: studentInfo['prenom_pere'],
+              nomMere: studentInfo['nom_mere'],
+              prenomMere: studentInfo['prenom_mere'],
+              moyenneBase: (summary['note_max'] as num?)?.toDouble() ?? 20.0,
             ),
             const SizedBox(height: 24),
 
             // Grades Table
-            isAnnual
-                ? BulletinAnnualGradesTable(grades: grades)
-                : BulletinGradesTable(grades: grades),
+            BulletinGradesTable(
+              grades: grades,
+              noteMax: (summary['note_max'] as num?)?.toDouble() ?? 20.0,
+              columns: columns,
+              noteKey: noteKey,
+            ),
             const SizedBox(height: 16),
 
             // Results Summary

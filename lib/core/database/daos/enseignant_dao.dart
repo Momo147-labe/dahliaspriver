@@ -82,7 +82,7 @@ class EnseignantDao extends BaseDao {
 
   Future<void> saveAllAttributions(
     int classeId,
-    int anneeId,
+    int? anneeId,
     Map<int, int?> assignments,
   ) async {
     await db.transaction((txn) async {
@@ -108,19 +108,23 @@ class EnseignantDao extends BaseDao {
   }
 
   Future<List<Map<String, dynamic>>> getAttributionsByClass(
-    int classeId,
-    int anneeId,
-  ) async {
-    return await db.rawQuery(
-      '''
+    int classeId, [
+    int? anneeId,
+  ]) async {
+    final String whereClause = anneeId != null
+        ? 'WHERE ae.classe_id = ? AND ae.annee_scolaire_id = ?'
+        : 'WHERE ae.classe_id = ?';
+    final List<dynamic> whereArgs = anneeId != null
+        ? [classeId, anneeId]
+        : [classeId];
+
+    return await db.rawQuery('''
       SELECT ae.*, e.nom, e.prenom, m.nom as matiere_nom
       FROM attribution_enseignant ae
       JOIN ${EnseignantSchema.tableName} e ON ae.enseignant_id = e.id
       JOIN matiere m ON ae.matiere_id = m.id
-      WHERE ae.classe_id = ? AND ae.annee_scolaire_id = ?
-    ''',
-      [classeId, anneeId],
-    );
+      $whereClause
+    ''', whereArgs);
   }
 
   Future<Map<String, dynamic>> getTeacherAnalytics(
