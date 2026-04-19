@@ -1098,12 +1098,13 @@ class _GradesPageState extends State<GradesPage> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<int>(
+            isExpanded: true,
             value: value,
             items: items
                 .map(
                   (c) => DropdownMenuItem<int>(
                     value: c['id'],
-                    child: Text(c['nom']),
+                    child: Text(c['nom'], overflow: TextOverflow.ellipsis),
                   ),
                 )
                 .toList(),

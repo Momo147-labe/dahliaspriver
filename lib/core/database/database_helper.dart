@@ -2861,9 +2861,9 @@ class DatabaseHelper {
         ) as total_expected
       FROM frais_scolarite fs
       JOIN classe c ON fs.classe_id = c.id
-      WHERE c.annee_scolaire_id = ? AND fs.annee_scolaire_id = ?
+      WHERE fs.annee_scolaire_id = ?
     ''',
-      [currentYearId, currentYearId, currentYearId],
+      [currentYearId, currentYearId],
     );
 
     // Previous year financial data
@@ -3010,9 +3010,8 @@ class DatabaseHelper {
         WHERE annee_scolaire_id = ?
         GROUP BY classe_id
       ) student_counts ON c.id = student_counts.classe_id
-      WHERE c.annee_scolaire_id = ?
     ''',
-      [currentYearId, currentYearId],
+      [currentYearId],
     );
 
     // Previous year class data
@@ -3030,9 +3029,8 @@ class DatabaseHelper {
           WHERE annee_scolaire_id = ?
           GROUP BY classe_id
         ) student_counts ON c.id = student_counts.classe_id
-        WHERE c.annee_scolaire_id = ?
       ''',
-        [previousYearId, previousYearId],
+        [previousYearId],
       );
       previousClasses = prevResult.first;
     }
@@ -3047,10 +3045,9 @@ class DatabaseHelper {
       FROM classe c
       JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN eleve e ON c.id = e.classe_id AND e.annee_scolaire_id = ?
-      WHERE c.annee_scolaire_id = ?
       GROUP BY cy.nom
     ''',
-      [currentYearId, currentYearId],
+      [currentYearId],
     );
 
     // Distribution by level (current year)
@@ -3063,11 +3060,10 @@ class DatabaseHelper {
       FROM classe c
       JOIN niveaux n ON c.niveau_id = n.id
       LEFT JOIN eleve e ON c.id = e.classe_id AND e.annee_scolaire_id = ?
-      WHERE c.annee_scolaire_id = ?
       GROUP BY n.nom
       ORDER BY n.ordre
     ''',
-      [currentYearId, currentYearId],
+      [currentYearId],
     );
 
     return {
@@ -3637,10 +3633,9 @@ class DatabaseHelper {
              (SELECT COUNT(*) FROM eleve WHERE classe_id = c.id AND annee_scolaire_id = ?) as nb_eleves
       FROM classe c
       LEFT JOIN frais_scolarite fs ON c.id = fs.classe_id AND fs.annee_scolaire_id = ?
-      WHERE c.annee_scolaire_id = ?
       ORDER BY c.nom ASC
     ''',
-      [anneeScolaireId, anneeScolaireId, anneeScolaireId],
+      [anneeScolaireId, anneeScolaireId],
     );
   }
 
@@ -3724,9 +3719,8 @@ class DatabaseHelper {
         )) as total_expected_revenue
       FROM classe c
       LEFT JOIN frais_scolarite fs ON c.id = fs.classe_id AND fs.annee_scolaire_id = ?
-      WHERE c.annee_scolaire_id = ?
     ''',
-      [anneeScolaireId, anneeScolaireId, anneeScolaireId],
+      [anneeScolaireId, anneeScolaireId],
     );
 
     return stats.first;

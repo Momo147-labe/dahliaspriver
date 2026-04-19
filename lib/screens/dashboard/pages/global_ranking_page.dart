@@ -1211,6 +1211,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -1251,45 +1252,49 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
                 builder: (context) {
                   final m = student['mention_data'] as Map<String, dynamic>;
                   final color = MentionHelper.getMentionColor(m['couleur']);
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: color.withOpacity(0.3)),
-                        ),
-                        child: Text(
-                          MentionHelper.stripEmojis(m['label'] ?? ''),
-                          style: TextStyle(
-                            color: color,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
                           ),
-                        ),
-                      ),
-                      if (m['appreciation'] != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4, left: 2),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: color.withOpacity(0.3)),
+                          ),
                           child: Text(
-                            MentionHelper.stripEmojis(
-                              m['appreciation'].toString(),
-                            ),
+                            MentionHelper.stripEmojis(m['label'] ?? ''),
                             style: TextStyle(
+                              color: color,
                               fontSize: 11,
-                              fontStyle: FontStyle.italic,
-                              color: widget.isDark
-                                  ? Colors.white60
-                                  : Colors.black54,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                    ],
+                        if (m['appreciation'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4, left: 2),
+                            child: Text(
+                              MentionHelper.stripEmojis(
+                                m['appreciation'].toString(),
+                              ),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontStyle: FontStyle.italic,
+                                color: widget.isDark
+                                    ? Colors.white60
+                                    : Colors.black54,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   );
                 },
               ),

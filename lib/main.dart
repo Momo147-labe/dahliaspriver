@@ -142,7 +142,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 20),
-              Text('Initialisation...'),
+              Text('Initialisation Guinée Ecole...'),
             ],
           ),
         ),

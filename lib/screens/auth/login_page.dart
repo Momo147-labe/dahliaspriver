@@ -86,118 +86,121 @@ class _LoginPageState extends State<LoginPage> {
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 500),
                 padding: const EdgeInsets.all(48),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // School Image
-                    Container(
-                      width: double.infinity,
-                      height: 300,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                const Color(0xFF13DAEC).withOpacity(0.3),
-                                const Color(0xFF13DAEC).withOpacity(0.1),
-                              ],
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // School Image
+                      Container(
+                        width: double.infinity,
+                        height: 300,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
                             ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  const Color(0xFF13DAEC).withOpacity(0.3),
+                                  const Color(0xFF13DAEC).withOpacity(0.1),
+                                ],
+                              ),
+                            ),
+                            child:
+                                schoolData != null &&
+                                    schoolData!['logo'] != null
+                                ? Image.file(
+                                    File(schoolData!['logo']),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.school,
+                                        size: 120,
+                                        color: Color(0xFF13DAEC),
+                                      );
+                                    },
+                                  )
+                                : const Icon(
+                                    Icons.school,
+                                    size: 120,
+                                    color: Color(0xFF13DAEC),
+                                  ),
                           ),
-                          child:
-                              schoolData != null && schoolData!['logo'] != null
-                              ? Image.file(
-                                  File(schoolData!['logo']),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(
-                                      Icons.school,
-                                      size: 120,
-                                      color: Color(0xFF13DAEC),
-                                    );
-                                  },
-                                )
-                              : const Icon(
-                                  Icons.school,
-                                  size: 120,
-                                  color: Color(0xFF13DAEC),
-                                ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 32),
+                      const SizedBox(height: 32),
 
-                    // Title
-                    Text(
-                      schoolData?['nom'] ?? "Guinée École",
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w700,
-                        color: isDark
-                            ? AppTheme.textDarkPrimary
-                            : const Color(0xFF111718),
+                      // Title
+                      Text(
+                        schoolData?['nom'] ?? "Guinée École",
+                        style: TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w700,
+                          color: isDark
+                              ? AppTheme.textDarkPrimary
+                              : const Color(0xFF111718),
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
 
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                    // Subtitle
-                    const Text(
-                      "L'éducation connectée, même hors ligne. Gérez votre établissement avec simplicité et efficacité.",
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Color(0xFF618689),
-                        height: 1.5,
+                      // Subtitle
+                      const Text(
+                        "L'éducation connectée, même hors ligne. Gérez votre établissement avec simplicité et efficacité.",
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Color(0xFF618689),
+                          height: 1.5,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
 
-                    const SizedBox(height: 32),
+                      const SizedBox(height: 32),
 
-                    // Offline Badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF13DAEC).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.cloud_off,
-                            color: Color(0xFF13DAEC),
-                            size: 20,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            "Mode Local Activé",
-                            style: TextStyle(
+                      // Offline Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF13DAEC).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.cloud_off,
                               color: Color(0xFF13DAEC),
-                              fontWeight: FontWeight.w500,
+                              size: 20,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: 8),
+                            Text(
+                              "Mode Local Activé",
+                              style: TextStyle(
+                                color: Color(0xFF13DAEC),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
