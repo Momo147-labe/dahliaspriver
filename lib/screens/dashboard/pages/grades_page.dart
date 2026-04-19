@@ -4,6 +4,7 @@ import '../../../core/database/database_helper.dart';
 import '../../../theme/app_theme.dart';
 import '../../grades/grade_sheet_page.dart';
 import '../../grades/result_sheet_selection_modal.dart';
+import '../../grades/grade_sheet_selection_modal.dart';
 import 'global_ranking_page.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/academic_year_provider.dart';
@@ -579,12 +580,12 @@ class _GradesPageState extends State<GradesPage> {
   }
 
   void _showGradeSheetSelectionModal() {
-    // showModalBottomSheet(
-    //   context: context,
-    //   isScrollControlled: true,
-    //   backgroundColor: Colors.transparent,
-    //   builder: (context) => GradeSheetSelectionModal(dbHelper: _dbHelper),
-    // );
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => GradeSheetSelectionModal(dbHelper: _dbHelper),
+    );
   }
 
   void _showResultSheetSelectionModal() {

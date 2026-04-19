@@ -26,8 +26,8 @@ class StudentCardDesign extends StatelessWidget {
     return Transform.scale(
       scale: scale,
       child: Container(
-        width: 320,
-        height: 204,
+        width: 280,
+        height: 200,
         decoration: BoxDecoration(
           color: const Color(0xFFE8F4F8),
           border: Border.all(color: Colors.grey[300]!, width: 1.5),
@@ -155,7 +155,7 @@ class StudentCardDesign extends StatelessWidget {
               child: Column(
                 children: [
                   const Text(
-                    'BURKINA FASO',
+                    'République de Guinée',
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w900,
@@ -164,7 +164,7 @@ class StudentCardDesign extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   const Text(
-                    'Unité-Progrès-Justice',
+                    'Travail-Justice-Solidarité',
                     style: TextStyle(
                       fontSize: 7,
                       fontWeight: FontWeight.w600,
@@ -182,11 +182,6 @@ class StudentCardDesign extends StatelessWidget {
                     ),
                     textAlign: TextAlign.center,
                     maxLines: 2,
-                  ),
-                  Text(
-                    'Région des Cascades - Province de la Leraba',
-                    style: TextStyle(fontSize: 5, color: Colors.grey[700]),
-                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
@@ -218,12 +213,11 @@ class StudentCardDesign extends StatelessWidget {
 
             // Academic year badge
             Positioned(
-              top: 72,
-              left: 12,
+              top: 80,
+              left: 83,
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFCD116),
                   borderRadius: BorderRadius.circular(3),
                 ),
                 child: Text(
@@ -239,11 +233,11 @@ class StudentCardDesign extends StatelessWidget {
 
             // Student photo
             Positioned(
-              top: 92,
+              top: 80,
               left: 12,
               child: Container(
                 width: 70,
-                height: 85,
+                height: 80,
                 decoration: BoxDecoration(
                   border: Border.all(color: const Color(0xFF002D62), width: 2),
                   color: Colors.grey[200],

@@ -6,17 +6,13 @@ class BulletinStudentInfo extends StatelessWidget {
   final String prenom;
   final String dateNaissance;
   final String lieuNaissance;
+  final String sexe;
   final String classe;
   final String matricule;
   final String? photoPath;
   final String moyenne;
   final String rang;
   final String absences;
-
-  final String? nomPere;
-  final String? prenomPere;
-  final String? nomMere;
-  final String? prenomMere;
   final double moyenneBase;
 
   const BulletinStudentInfo({
@@ -25,16 +21,13 @@ class BulletinStudentInfo extends StatelessWidget {
     required this.prenom,
     required this.dateNaissance,
     required this.lieuNaissance,
+    required this.sexe,
     required this.classe,
     required this.matricule,
     this.photoPath,
     required this.moyenne,
     required this.rang,
     required this.absences,
-    this.nomPere,
-    this.prenomPere,
-    this.nomMere,
-    this.prenomMere,
     this.moyenneBase = 20.0,
   });
 
@@ -107,13 +100,22 @@ class BulletinStudentInfo extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Né le: $dateNaissance à $lieuNaissance',
+                    'Né(e) le: $dateNaissance à $lieuNaissance',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: Colors.grey.shade700,
                     ),
                   ),
+                  if (sexe.isNotEmpty)
+                    Text(
+                      'Sexe: $sexe',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,30 +128,6 @@ class BulletinStudentInfo extends StatelessWidget {
                       _buildMiniInfo('', 'Matricule: $matricule'),
                     ],
                   ),
-                  if (nomPere != null || nomMere != null) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (nomPere != null)
-                          Expanded(
-                            child: _buildMiniInfo(
-                              'PÈRE',
-                              '${prenomPere ?? ''} $nomPere',
-                            ),
-                          ),
-                        if (nomPere != null && nomMere != null)
-                          const SizedBox(width: 12),
-                        if (nomMere != null)
-                          Expanded(
-                            child: _buildMiniInfo(
-                              'MÈRE',
-                              '${prenomMere ?? ''} $nomMere',
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ),

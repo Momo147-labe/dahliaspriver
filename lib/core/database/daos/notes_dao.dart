@@ -424,12 +424,17 @@ class NotesDao extends BaseDao {
 
       results.add({
         'matiere_id': stat['matiere_id'],
+        'matiere': stat['matiere_nom'],
         'matiere_nom': stat['matiere_nom'],
         'coefficient': stat['coefficient'],
+        'coeff': stat['coefficient'],
         'moy_t1': t1,
         'moy_t2': t2,
         'moy_t3': t3,
+        'notes_par_trimestre': {1: t1, 2: t2, 3: t3},
         'moy_annuelle': moyAnnuelle,
+        'note': moyAnnuelle,
+        'total': moyAnnuelle * (stat['coefficient'] ?? 1.0),
         'rang': rang,
         'appreciation': _getObservation(moyAnnuelle),
       });
@@ -551,6 +556,8 @@ class NotesDao extends BaseDao {
       'classAverage': classTotalAvg,
       'totalStudents': allStudents.length,
       'moyenne_passage': passMark,
+      'totalPoints': totalPoints,
+      'totalCoeff': totalCoeff,
     };
   }
 
@@ -787,6 +794,7 @@ class NotesDao extends BaseDao {
         e.photo as eleve_photo,
         e.matricule as matricule,
         COALESCE(e.date_naissance, '') as date_naissance,
+        COALESCE(e.lieu_naissance, '') as lieu_naissance,
         e.sexe as sexe,
         cm.matiere_id,
         m.nom as matiere_nom,

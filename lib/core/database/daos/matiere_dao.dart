@@ -40,10 +40,10 @@ class MatiereDao extends BaseDao {
       SELECT m.*, cm.coefficient
       FROM ${MatiereSchema.tableName} m
       JOIN classe_matiere cm ON m.id = cm.matiere_id
-      WHERE cm.classe_id = ? AND cm.annee_scolaire_id = ?
+      WHERE cm.classe_id = ?
       ORDER BY m.nom ASC
     ''',
-      [classeId, anneeId],
+      [classeId],
     );
   }
 
@@ -54,8 +54,8 @@ class MatiereDao extends BaseDao {
   ) async {
     final result = await db.query(
       'classe_matiere',
-      where: 'classe_id = ? AND matiere_id = ? AND annee_scolaire_id = ?',
-      whereArgs: [classeId, matiereId, anneeId],
+      where: 'classe_id = ? AND matiere_id = ?',
+      whereArgs: [classeId, matiereId],
     );
     return result.isNotEmpty;
   }

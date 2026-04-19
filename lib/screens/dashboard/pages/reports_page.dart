@@ -217,18 +217,43 @@ class _ReportsPageState extends State<ReportsPage> {
           _selectedStudent!['id'],
           _selectedClasse!['id'],
           anneeId,
+          _dbHelper.getStudentsByClasse,
         );
-        final notes = await _dbHelper.getAnnualGradesForStudent(
+        final rawNotes = await _dbHelper.getAnnualGradesForStudent(
           _selectedStudent!['id'],
           anneeId,
           classId: _selectedClasse!['id'],
         );
 
+        // Récupérer note_max du cycle de la classe
+        final db = await _dbHelper.database;
+        final cycleRes = await db.rawQuery(
+          '''SELECT cy.note_max FROM classe c
+             LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+             WHERE c.id = ?''',
+          [_selectedClasse!['id']],
+        );
+        final noteMax =
+            (cycleRes.isNotEmpty
+                ? (cycleRes.first['note_max'] as num?)?.toDouble()
+                : null) ??
+            20.0;
+
+        // Normaliser les grades pour l'affichage (utilise désormais les clés fournies par le DAO si possible)
+        final normalized = _normalizeAnnualGrades(rawNotes, noteMax: noteMax);
+
         if (mounted) {
           setState(() {
             _isAnnualMode = true;
-            _bulletinStats = stats;
-            _grades = notes;
+            _bulletinStats = {
+              ...stats,
+              'note_max': noteMax,
+              'totalPoints': normalized.fold<double>(
+                0,
+                (sum, g) => sum + ((g['total'] as num?)?.toDouble() ?? 0.0),
+              ),
+            };
+            _grades = normalized;
             _isLoading = false;
           });
         }
@@ -251,7 +276,12 @@ class _ReportsPageState extends State<ReportsPage> {
 
       // All periodic reports (non-annual) are handled as trimesters
       final currentTriSeqs = _trimesterMap[tri] ?? [];
-      final processedGrades = _groupGradesBySubject(notes, currentTriSeqs);
+      final noteMax = (stats['note_max'] as num?)?.toDouble() ?? 20.0;
+      final processedGrades = _groupGradesBySubject(
+        notes,
+        currentTriSeqs,
+        noteMax: noteMax,
+      );
 
       if (mounted) {
         setState(() {
@@ -1071,6 +1101,7 @@ class _ReportsPageState extends State<ReportsPage> {
               annee: _anneeLibelle!,
               columns: columns,
               noteKey: noteKey,
+              mentions: _mentions,
             )
           : await BulletinPdfHelper.generateSingleBulletin(
               student: {
@@ -1084,6 +1115,7 @@ class _ReportsPageState extends State<ReportsPage> {
               annee: _anneeLibelle!,
               columns: columns,
               noteKey: noteKey,
+              mentions: _mentions,
             );
 
       final fileName =
@@ -1134,10 +1166,15 @@ class _ReportsPageState extends State<ReportsPage> {
             student['id'],
             _selectedClasse!['id'],
             anneeId,
+            _dbHelper.getStudentsByClasse,
+          );
+          final normalizedGrades = _normalizeAnnualGrades(
+            grades,
+            noteMax: (stats['note_max'] as num?)?.toDouble() ?? 20.0,
           );
           studentsData.add({
             'student': {...student, 'classe_nom': _selectedClasse!['nom']},
-            'grades': grades,
+            'grades': normalizedGrades,
             'stats': stats,
           });
         } else {
@@ -1207,34 +1244,40 @@ class _ReportsPageState extends State<ReportsPage> {
     }
   }
 
-  String _getObservation(double note) {
+  String _getObservation(double note, {double noteMax = 20.0}) {
+    // Normaliser sur 20 pour les cas par défaut
+    final normalizedNote = (note / noteMax) * 20.0;
+
     if (_mentions.isNotEmpty) {
       final m = MentionHelper.getMentionForGrade(note, _mentions);
       if (m != null) return m['appreciation'] ?? m['label'] ?? '';
     }
-    if (note >= 16) return 'Très Bien';
-    if (note >= 14) return 'Bien';
-    if (note >= 12) return 'Assez Bien';
-    if (note >= 10) return 'Passable';
+    if (normalizedNote >= 16) return 'Très Bien';
+    if (normalizedNote >= 14) return 'Bien';
+    if (normalizedNote >= 12) return 'Assez Bien';
+    if (normalizedNote >= 10) return 'Passable';
     return 'Insuffisant';
   }
 
-  String _getFinalObservation(double average) {
+  String _getFinalObservation(double average, {double noteMax = 20.0}) {
+    final normalizedAvg = (average / noteMax) * 20.0;
+
     if (_mentions.isNotEmpty) {
       final m = MentionHelper.getMentionForGrade(average, _mentions);
       if (m != null) return m['appreciation'] ?? m['label'] ?? '';
     }
-    if (average >= 16) return 'Excellent travail, félicitations !';
-    if (average >= 14) return 'Très bon travail, continuez ainsi.';
-    if (average >= 12) return 'Bon travail, peut encore mieux faire.';
-    if (average >= 10) return 'Résultats passables, redoublez d\'effort.';
+    if (normalizedAvg >= 16) return 'Excellent travail, félicitations !';
+    if (normalizedAvg >= 14) return 'Très bon travail, continuez ainsi.';
+    if (normalizedAvg >= 12) return 'Bon travail, peut encore mieux faire.';
+    if (normalizedAvg >= 10) return 'Résultats passables, redoublez d\'effort.';
     return 'Résultats insuffisants, doit travailler davantage.';
   }
 
   List<Map<String, dynamic>> _groupGradesBySubject(
     List<Map<String, dynamic>> rawNotes,
-    List<Map<String, dynamic>> sequencesPlan,
-  ) {
+    List<Map<String, dynamic>> sequencesPlan, {
+    double noteMax = 20.0,
+  }) {
     Map<String, Map<String, dynamic>> grouped = {};
     for (var n in rawNotes) {
       String mId = n['matiere_id']?.toString() ?? n['matiere_nom'];
@@ -1276,7 +1319,39 @@ class _ReportsPageState extends State<ReportsPage> {
         'notes_par_sequence': notesMap,
         'note': avg,
         'total': avg * ((g['coeff'] as num?)?.toDouble() ?? 1.0),
-        'obs': _getObservation(avg),
+        'obs': _getObservation(avg, noteMax: noteMax),
+      };
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _normalizeAnnualGrades(
+    List<Map<String, dynamic>> grades, {
+    double noteMax = 20.0,
+  }) {
+    return grades.map((g) {
+      final moy = (g['note'] ?? g['moy_annuelle'] as num?)?.toDouble() ?? 0.0;
+      final coeff = (g['coeff'] ?? g['coefficient'] as num?)?.toDouble() ?? 1.0;
+
+      // Récupérer ou reconstruire notes_par_trimestre
+      Map<int, double?> notesTri;
+      if (g['notes_par_trimestre'] is Map) {
+        notesTri = Map<int, double?>.from(g['notes_par_trimestre']);
+      } else {
+        notesTri = {
+          1: (g['moy_t1'] as num?)?.toDouble(),
+          2: (g['moy_t2'] as num?)?.toDouble(),
+          3: (g['moy_t3'] as num?)?.toDouble(),
+        };
+      }
+
+      return {
+        ...g,
+        'matiere': g['matiere'] ?? g['matiere_nom'] ?? '',
+        'coeff': coeff,
+        'notes_par_trimestre': notesTri,
+        'note': moy,
+        'total': moy * coeff,
+        'obs': _getObservation(moy, noteMax: noteMax),
       };
     }).toList();
   }

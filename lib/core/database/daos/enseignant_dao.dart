@@ -36,20 +36,20 @@ class EnseignantDao extends BaseDao {
   }
 
   Future<List<Map<String, dynamic>>> getClassesByTeacher(
-    int enseignantId,
-    int anneeId,
-  ) async {
+    int enseignantId, [
+    int? anneeId,
+  ]) async {
     return await db.rawQuery(
       '''
       SELECT DISTINCT c.nom, cy.nom as cycle, n.nom as niveau
       FROM classe c
-      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      JOIN niveaux n ON c.niveau_id = n.id
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+      LEFT JOIN niveaux n ON c.niveau_id = n.id
       JOIN attribution_enseignant ae ON c.id = ae.classe_id
-      WHERE ae.enseignant_id = ? AND ae.annee_scolaire_id = ?
+      WHERE ae.enseignant_id = ?
       ORDER BY c.nom ASC
     ''',
-      [enseignantId, anneeId],
+      [enseignantId],
     );
   }
 
@@ -63,9 +63,9 @@ class EnseignantDao extends BaseDao {
       SELECT e.*
       FROM attribution_enseignant ae
       JOIN ${EnseignantSchema.tableName} e ON ae.enseignant_id = e.id
-      WHERE ae.classe_id = ? AND ae.matiere_id = ? AND ae.annee_scolaire_id = ?
+      WHERE ae.classe_id = ? AND ae.matiere_id = ?
     ''',
-      [classeId, matiereId, anneeId],
+      [classeId, matiereId],
     );
     return results.isNotEmpty ? results.first : null;
   }
@@ -75,7 +75,7 @@ class EnseignantDao extends BaseDao {
       SELECT 
         (SELECT COUNT(*) FROM ${EnseignantSchema.tableName}) as total_enseignants,
         (SELECT COUNT(DISTINCT specialite) FROM ${EnseignantSchema.tableName} WHERE specialite IS NOT NULL AND specialite != '') as total_specialites,
-        (SELECT COUNT(*) FROM emploi_du_temps) as assignments_count
+        (SELECT COUNT(*) FROM attribution_enseignant) as assignments_count
     ''');
     return result.first;
   }
@@ -111,12 +111,8 @@ class EnseignantDao extends BaseDao {
     int classeId, [
     int? anneeId,
   ]) async {
-    final String whereClause = anneeId != null
-        ? 'WHERE ae.classe_id = ? AND ae.annee_scolaire_id = ?'
-        : 'WHERE ae.classe_id = ?';
-    final List<dynamic> whereArgs = anneeId != null
-        ? [classeId, anneeId]
-        : [classeId];
+    const String whereClause = 'WHERE ae.classe_id = ?';
+    final List<dynamic> whereArgs = [classeId];
 
     return await db.rawQuery('''
       SELECT ae.*, e.nom, e.prenom, m.nom as matiere_nom

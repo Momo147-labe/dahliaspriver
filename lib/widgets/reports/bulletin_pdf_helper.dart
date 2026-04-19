@@ -17,6 +17,14 @@ class BulletinPdfHelper {
     List<Map<String, dynamic>> mentions = const [],
   }) async {
     final pdf = pw.Document();
+
+    // Load logo once
+    pw.MemoryImage? logoImage;
+    final logoPath = ecole?.logo;
+    if (logoPath != null && File(logoPath).existsSync()) {
+      logoImage = pw.MemoryImage(File(logoPath).readAsBytesSync());
+    }
+
     await _addBulletinPage(
       pdf,
       student,
@@ -28,6 +36,7 @@ class BulletinPdfHelper {
       columns,
       noteKey,
       mentions,
+      logoImage: logoImage,
     );
     return pdf;
   }
@@ -43,6 +52,14 @@ class BulletinPdfHelper {
     List<Map<String, dynamic>> mentions = const [],
   }) async {
     final pdf = pw.Document();
+
+    // Load logo once for the whole batch
+    pw.MemoryImage? logoImage;
+    final logoPath = ecole?.logo;
+    if (logoPath != null && File(logoPath).existsSync()) {
+      logoImage = pw.MemoryImage(File(logoPath).readAsBytesSync());
+    }
+
     for (var data in studentsData) {
       await _addBulletinPage(
         pdf,
@@ -55,6 +72,7 @@ class BulletinPdfHelper {
         columns,
         noteKey,
         mentions,
+        logoImage: logoImage,
       );
     }
     return pdf;
@@ -71,6 +89,14 @@ class BulletinPdfHelper {
     List<Map<String, dynamic>> mentions = const [],
   }) async {
     final pdf = pw.Document();
+
+    // Load logo once
+    pw.MemoryImage? logoImage;
+    final logoPath = ecole?.logo;
+    if (logoPath != null && File(logoPath).existsSync()) {
+      logoImage = pw.MemoryImage(File(logoPath).readAsBytesSync());
+    }
+
     await _addAnnualBulletinPage(
       pdf,
       student,
@@ -81,6 +107,7 @@ class BulletinPdfHelper {
       columns,
       noteKey,
       mentions,
+      logoImage: logoImage,
     );
     return pdf;
   }
@@ -94,6 +121,14 @@ class BulletinPdfHelper {
     List<Map<String, dynamic>> mentions = const [],
   }) async {
     final pdf = pw.Document();
+
+    // Load logo once for the whole batch
+    pw.MemoryImage? logoImage;
+    final logoPath = ecole?.logo;
+    if (logoPath != null && File(logoPath).existsSync()) {
+      logoImage = pw.MemoryImage(File(logoPath).readAsBytesSync());
+    }
+
     for (var data in studentsData) {
       await _addAnnualBulletinPage(
         pdf,
@@ -105,6 +140,7 @@ class BulletinPdfHelper {
         columns,
         noteKey,
         mentions,
+        logoImage: logoImage,
       );
     }
     return pdf;
@@ -120,13 +156,16 @@ class BulletinPdfHelper {
     String annee,
     List<Map<String, dynamic>> columns,
     String noteKey,
-    List<Map<String, dynamic>> mentions,
-  ) async {
-    // Load logo if available
-    final logoPath = ecole?.logo;
-    pw.MemoryImage? logoImage;
-    if (logoPath != null && File(logoPath).existsSync()) {
-      logoImage = pw.MemoryImage(File(logoPath).readAsBytesSync());
+    List<Map<String, dynamic>> mentions, {
+    pw.MemoryImage? logoImage,
+  }) async {
+    // Shared logo passed from caller or loaded if not provided
+    pw.MemoryImage? finalLogo = logoImage;
+    if (finalLogo == null) {
+      final logoPath = ecole?.logo;
+      if (logoPath != null && File(logoPath).existsSync()) {
+        finalLogo = pw.MemoryImage(File(logoPath).readAsBytesSync());
+      }
     }
 
     // Load student photo if available
@@ -145,7 +184,7 @@ class BulletinPdfHelper {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                _buildHeader(logoImage, ecole, annee, trimestre),
+                _buildHeader(finalLogo, ecole, annee, trimestre),
                 pw.SizedBox(height: 10),
                 pw.Divider(thickness: 1, color: PdfColors.black),
                 pw.SizedBox(height: 10),
@@ -170,8 +209,6 @@ class BulletinPdfHelper {
                     pw.Expanded(flex: 2, child: _buildDirectionSignature()),
                   ],
                 ),
-                pw.Spacer(),
-                _buildPdfBottomFooter(student, annee),
               ],
             ),
           );
@@ -189,13 +226,16 @@ class BulletinPdfHelper {
     String annee,
     List<Map<String, dynamic>> columns,
     String noteKey,
-    List<Map<String, dynamic>> mentions,
-  ) async {
-    // Load logo if available
-    final logoPath = ecole?.logo;
-    pw.MemoryImage? logoImage;
-    if (logoPath != null && File(logoPath).existsSync()) {
-      logoImage = pw.MemoryImage(File(logoPath).readAsBytesSync());
+    List<Map<String, dynamic>> mentions, {
+    pw.MemoryImage? logoImage,
+  }) async {
+    // Shared logo passed from caller or loaded if not provided
+    pw.MemoryImage? finalLogo = logoImage;
+    if (finalLogo == null) {
+      final logoPath = ecole?.logo;
+      if (logoPath != null && File(logoPath).existsSync()) {
+        finalLogo = pw.MemoryImage(File(logoPath).readAsBytesSync());
+      }
     }
 
     // Load student photo if available
@@ -214,7 +254,7 @@ class BulletinPdfHelper {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                _buildHeader(logoImage, ecole, annee, 'BILAN ANNUEL'),
+                _buildHeader(finalLogo, ecole, annee, 'BILAN ANNUEL'),
                 pw.SizedBox(height: 10),
                 pw.Divider(thickness: 1, color: PdfColors.black),
                 pw.SizedBox(height: 10),
@@ -239,8 +279,6 @@ class BulletinPdfHelper {
                     pw.Expanded(flex: 2, child: _buildDirectionSignature()),
                   ],
                 ),
-                pw.Spacer(),
-                _buildPdfBottomFooter(student, annee),
               ],
             ),
           );
@@ -363,88 +401,71 @@ class BulletinPdfHelper {
     String periode,
     pw.MemoryImage? photo,
   ) {
+    final String dateNaiss = student['date_naissance']?.toString() ?? '';
+    final String lieuNaiss = student['lieu_naissance']?.toString() ?? '';
+    final String sexe = student['sexe']?.toString() ?? '';
+    final String neLe = dateNaiss.isNotEmpty ? 'Né(e) le: $dateNaiss' : '';
+    final String aLieu = lieuNaiss.isNotEmpty ? 'à $lieuNaiss' : '';
+    final String sexeText = sexe.isNotEmpty ? 'Sexe: $sexe' : '';
+
     return pw.Container(
       decoration: pw.BoxDecoration(
         border: pw.Border.all(color: PdfColors.black, width: 1),
       ),
       padding: pw.EdgeInsets.all(10),
-      child: pw.Column(
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Row(
-            children: [
-              pw.Container(
-                width: 70,
-                height: 70,
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.grey300),
-                ),
-                child: photo != null
-                    ? pw.Image(photo, fit: pw.BoxFit.cover)
-                    : pw.Center(
-                        child: pw.Text(
-                          'PHOTO',
-                          style: pw.TextStyle(fontSize: 8),
-                        ),
-                      ),
-              ),
-              pw.SizedBox(width: 20),
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    _infoRow(
-                      'NOM ET PRÉNOMS',
-                      '${student['nom']} ${student['prenom'] ?? ''}'
-                          .toUpperCase(),
-                      isBold: true,
-                    ),
-                    _infoRow(
-                      'CLASSE',
-                      (student['classe_nom'] ?? '').toUpperCase(),
-                    ),
-                  ],
-                ),
-              ),
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    _infoRow(
-                      'MATRICULE',
-                      (student['matricule'] ?? '').toUpperCase(),
-                    ),
-                    _infoRow('PÉRIODE', periode.toUpperCase()),
-                  ],
-                ),
-              ),
-            ],
+          pw.Container(
+            width: 70,
+            height: 70,
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.grey300),
+            ),
+            child: photo != null
+                ? pw.Image(photo, fit: pw.BoxFit.cover)
+                : pw.Center(
+                    child: pw.Text('PHOTO', style: pw.TextStyle(fontSize: 8)),
+                  ),
           ),
-          if (student['nom_pere'] != null || student['nom_mere'] != null) ...[
-            pw.SizedBox(height: 10),
-            pw.Divider(thickness: 0.5, color: PdfColors.grey300),
-            pw.Row(
+          pw.SizedBox(width: 20),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                if (student['nom_pere'] != null)
-                  pw.Expanded(
-                    child: _infoRow(
-                      'PÈRE',
-                      '${student['prenom_pere'] ?? ''} ${student['nom_pere']}'
-                          .toUpperCase(),
-                    ),
+                _infoRow(
+                  'NOM ET PRÉNOMS',
+                  '${student['nom']} ${student['prenom'] ?? ''}'.toUpperCase(),
+                  isBold: true,
+                ),
+                if (neLe.isNotEmpty || sexeText.isNotEmpty) ...[
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    '$neLe $aLieu',
+                    style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
                   ),
-                if (student['nom_pere'] != null && student['nom_mere'] != null)
-                  pw.SizedBox(width: 20),
-                if (student['nom_mere'] != null)
-                  pw.Expanded(
-                    child: _infoRow(
-                      'MÈRE',
-                      '${student['prenom_mere'] ?? ''} ${student['nom_mere']}'
-                          .toUpperCase(),
+                  if (sexeText.isNotEmpty)
+                    pw.Text(
+                      sexeText,
+                      style: pw.TextStyle(
+                        fontSize: 8,
+                        color: PdfColors.grey700,
+                      ),
                     ),
-                  ),
+                ],
+                pw.SizedBox(height: 4),
+                _infoRow('CLASSE', (student['classe_nom'] ?? '').toUpperCase()),
               ],
             ),
-          ],
+          ),
+          pw.SizedBox(width: 20),
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _infoRow('MATRICULE', (student['matricule'] ?? '').toUpperCase()),
+              _infoRow('PÉRIODE', periode.toUpperCase()),
+            ],
+          ),
         ],
       ),
     );
@@ -746,36 +767,6 @@ class BulletinPdfHelper {
           ),
         ],
       ),
-    );
-  }
-
-  static pw.Widget _buildPdfBottomFooter(
-    Map<String, dynamic> student,
-    String annee,
-  ) {
-    final now = DateTime.now();
-    final dateStr = '${now.day}/${now.month}/${now.year}';
-    return pw.Column(
-      children: [
-        pw.Divider(thickness: 0.5, color: PdfColors.grey),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text(
-              'ID: BULT-$annee-${student['matricule']}',
-              style: pw.TextStyle(fontSize: 6, color: PdfColors.grey),
-            ),
-            pw.Text(
-              'ÉMIS PAR GUINÉE ÉCOLE LE $dateStr',
-              style: pw.TextStyle(fontSize: 6, color: PdfColors.grey),
-            ),
-            pw.Text(
-              'PAGE 1 / 1',
-              style: pw.TextStyle(fontSize: 6, color: PdfColors.grey),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }

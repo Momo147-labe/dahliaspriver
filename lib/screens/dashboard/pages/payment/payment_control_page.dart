@@ -4,6 +4,7 @@ import 'package:printing/printing.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../services/pdf/payment_control_pdf_service.dart';
+import 'paid_students_page.dart';
 
 class PaymentControlPage extends StatefulWidget {
   const PaymentControlPage({super.key});
@@ -17,13 +18,19 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _studentsData = [];
   List<Map<String, dynamic>> _filteredData = [];
+  String _activeAnneeLabel = "";
+  List<Map<String, dynamic>> _classes = [];
+  List<Map<String, dynamic>> _cycles = [];
+  String _selectedCycle = "Tous";
+  int? _selectedClasseId;
   String _searchQuery = "";
+  int _currentPage = 1;
+  static const int _pageSize = 50;
 
   // Stats
   int _enRegle = 0;
   int _enRetard = 0;
   double _tauxRecouvrement = 0.0;
-  String _activeAnneeLabel = "";
 
   @override
   void initState() {
@@ -38,11 +45,14 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
       if (anneeId != null) {
         final data = await dbHelper.getStudentPaymentControlData(anneeId);
         final activeAnnee = await dbHelper.getActiveAnnee();
+        final classes = await dbHelper.getAllClasses();
+        final cycles = await dbHelper.getCycles();
         setState(() {
           _studentsData = data;
+          _classes = classes;
+          _cycles = cycles;
           _activeAnneeLabel = activeAnnee?['libelle'] ?? "N/A";
           _applyFilters();
-          _calculateStats();
           _isLoading = false;
         });
       }
@@ -58,19 +68,34 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
     double totalExpected = 0;
     double totalCollected = 0;
 
-    for (var student in _studentsData) {
+    for (var student in _filteredData) {
       final double totalPaid =
           (student['total_paye'] as num?)?.toDouble() ?? 0.0;
       final double totalDue =
           (student['montant_total'] as num?)?.toDouble() ?? 0.0;
 
+      if (totalDue == 0) continue; // Skip students with no fees defined
+
       totalExpected += totalDue;
       totalCollected += totalPaid;
 
-      if (totalPaid >= totalDue) {
-        upToDate++;
+      // Un élève est en règle si montant_restant est 0 (si disponible) ou si totalPaid >= totalDue
+      final double? rest = student['montant_restant'] != null
+          ? (student['montant_restant'] as num).toDouble()
+          : null;
+
+      if (rest != null) {
+        if (rest <= 0) {
+          upToDate++;
+        } else {
+          late++;
+        }
       } else {
-        late++;
+        if (totalPaid >= totalDue) {
+          upToDate++;
+        } else {
+          late++;
+        }
       }
     }
 
@@ -88,9 +113,21 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
       _filteredData = _studentsData.where((student) {
         final fullName = "${student['prenom']} ${student['nom']}".toLowerCase();
         final matricule = (student['matricule'] ?? "").toLowerCase();
-        return fullName.contains(_searchQuery.toLowerCase()) ||
+        final matchesSearch =
+            fullName.contains(_searchQuery.toLowerCase()) ||
             matricule.contains(_searchQuery.toLowerCase());
+
+        final matchesCycle =
+            _selectedCycle == "Tous" || student['cycle_nom'] == _selectedCycle;
+
+        final matchesClasse =
+            _selectedClasseId == null ||
+            student['classe_id'] == _selectedClasseId;
+
+        return matchesSearch && matchesCycle && matchesClasse;
       }).toList();
+      _currentPage = 1;
+      _calculateStats();
     });
   }
 
@@ -103,7 +140,7 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
     }
     try {
       final doc = await PaymentControlPdfService().generate(
-        _studentsData,
+        _filteredData,
         _activeAnneeLabel,
         impayesOnly: impayesOnly,
       );
@@ -140,6 +177,13 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
     double sum2 = sum1 + t1;
     double sum3 = sum2 + t2;
     double sum4 = sum3 + t3;
+
+    final double? rest = student['montant_restant'] != null
+        ? (student['montant_restant'] as num).toDouble()
+        : null;
+
+    // Si montant_restant est explicitement 0 ou moins, tout est payé
+    if (rest != null && rest <= 0) return "Payé";
 
     switch (type) {
       case 'Inscription':
@@ -251,6 +295,17 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
           Row(
             children: [
               _buildActionButton(
+                Symbols.verified,
+                "Voir les Soldés",
+                isDark,
+                theme,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (c) => const PaidStudentsPage()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              _buildActionButton(
                 Symbols.download,
                 "Exporter les impayés",
                 isDark,
@@ -319,11 +374,16 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
   Widget _buildFilters(bool isDark, ThemeData theme) {
     return Row(
       children: [
-        _buildFilterChip(_activeAnneeLabel, Symbols.calendar_today, isDark),
+        _buildFilterChip(
+          _activeAnneeLabel,
+          Symbols.calendar_today,
+          isDark,
+          showArrow: false,
+        ),
         const SizedBox(width: 12),
-        _buildFilterChip("Primaire", Symbols.school, isDark),
+        _buildCycleFilter(isDark),
         const SizedBox(width: 12),
-        _buildFilterChip("Toutes les classes", Symbols.meeting_room, isDark),
+        _buildClasseFilter(isDark),
         const SizedBox(width: 24),
         Expanded(
           child: TextField(
@@ -357,7 +417,12 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
     );
   }
 
-  Widget _buildFilterChip(String label, IconData icon, bool isDark) {
+  Widget _buildFilterChip(
+    String label,
+    IconData icon,
+    bool isDark, {
+    bool showArrow = true,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
@@ -375,8 +440,10 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
             label,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
-          const SizedBox(width: 4),
-          const Icon(Symbols.expand_more, size: 16, color: Colors.grey),
+          if (showArrow) ...[
+            const SizedBox(width: 4),
+            const Icon(Symbols.expand_more, size: 16, color: Colors.grey),
+          ],
         ],
       ),
     );
@@ -389,7 +456,7 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
           child: _buildStatCard(
             "En règle",
             _enRegle.toString(),
-            "+5%",
+            "",
             Symbols.verified,
             AppTheme.successColor,
             isDark,
@@ -400,7 +467,7 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
           child: _buildStatCard(
             "En retard",
             _enRetard.toString(),
-            "-2%",
+            "",
             Symbols.warning,
             AppTheme.errorColor,
             isDark,
@@ -411,7 +478,7 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
           child: _buildStatCard(
             "Taux de recouvrement",
             "${_tauxRecouvrement.toStringAsFixed(1)}%",
-            "+12%",
+            "",
             Symbols.pie_chart,
             AppTheme.primaryColor,
             isDark,
@@ -472,28 +539,19 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                trend,
-                style: TextStyle(
-                  color: trend.startsWith('+')
-                      ? AppTheme.successColor
-                      : AppTheme.errorColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: title == "En règle"
-                  ? (_enRegle / (_enRegle + _enRetard + 0.1))
-                  : (title == "En retard"
-                        ? (_enRetard / (_enRegle + _enRetard + 0.1))
-                        : (_tauxRecouvrement / 100)),
+              value: (_enRegle + _enRetard) > 0
+                  ? (title == "En règle"
+                        ? (_enRegle / (_enRegle + _enRetard))
+                        : (title == "En retard"
+                              ? (_enRetard / (_enRegle + _enRetard))
+                              : (_tauxRecouvrement / 100)))
+                  : 0,
               backgroundColor: isDark ? Colors.white10 : Colors.grey.shade100,
               color: color,
               minHeight: 6,
@@ -525,224 +583,360 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
                   "Liste des Élèves",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Symbols.filter_list, color: Colors.grey),
-                    ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Symbols.more_vert, color: Colors.grey),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: MediaQuery.of(context).size.width - 48,
-              ),
-              child: DataTable(
-                horizontalMargin: 24,
-                columnSpacing: 40,
-                dataRowMaxHeight: 70,
-                dataRowMinHeight: 60,
-                headingRowHeight: 60,
-                headingRowColor: WidgetStateProperty.all(
-                  isDark ? Colors.white.withOpacity(0.02) : Colors.grey.shade50,
-                ),
-                columns: const [
-                  DataColumn(
-                    label: Text(
-                      "ÉLÈVE",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      "CLASSE",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      "INSCRIPTION",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      "TRANCHE 1",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      "TRANCHE 2",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      "TRANCHE 3",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      "ACTIONS",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                ],
-                rows: _filteredData.map((student) {
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 16,
-                              backgroundColor: AppTheme.primaryColor
-                                  .withOpacity(0.1),
-                              child: Text(
-                                student['nom'][0],
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "${student['prenom']} ${student['nom']}",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                Text(
-                                  student['matricule'] ?? "",
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      DataCell(
-                        Text(
-                          student['classe_nom'] ?? "",
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                      DataCell(
-                        _buildStatusBadge(_getStatus(student, 'Inscription')),
-                      ),
-                      DataCell(
-                        _buildStatusBadge(_getStatus(student, 'Tranche 1')),
-                      ),
-                      DataCell(
-                        _buildStatusBadge(_getStatus(student, 'Tranche 2')),
-                      ),
-                      DataCell(
-                        _buildStatusBadge(_getStatus(student, 'Tranche 3')),
-                      ),
-                      DataCell(
-                        _getStatus(student, 'Tranche 3') == "Payé"
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  "À jour",
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              )
-                            : ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryColor
-                                      .withOpacity(0.1),
-                                  foregroundColor: AppTheme.primaryColor,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 0,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(0, 32),
-                                ),
-                                child: const Text(
-                                  "Relancer",
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
+          _buildDataTableContent(isDark, theme),
+          _buildPagination(isDark, theme),
           const SizedBox(height: 20),
         ],
       ),
+    );
+  }
+
+  Widget _buildDataTableContent(bool isDark, ThemeData theme) {
+    if (_filteredData.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            children: [
+              Icon(
+                Symbols.search_off,
+                size: 48,
+                color: Colors.grey.withOpacity(0.5),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Aucun élève trouvé avec les filtres actuels.",
+                style: TextStyle(color: Colors.grey, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final start = (_currentPage - 1) * _pageSize;
+    final end = start + _pageSize;
+    final pagedData = _filteredData.sublist(
+      start,
+      end > _filteredData.length ? _filteredData.length : end,
+    );
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: MediaQuery.of(context).size.width - 48,
+        ),
+        child: DataTable(
+          horizontalMargin: 24,
+          columnSpacing: 40,
+          dataRowMaxHeight: 70,
+          dataRowMinHeight: 60,
+          headingRowHeight: 60,
+          headingRowColor: WidgetStateProperty.all(
+            isDark ? Colors.white.withOpacity(0.02) : Colors.grey.shade50,
+          ),
+          columns: const [
+            DataColumn(
+              label: Text(
+                "ÉLÈVE",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "CLASSE",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "INSCRIPTION",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "RÉINSCRIPTION",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "TRANCHE 1",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "TRANCHE 2",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "TRANCHE 3",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "ACTIONS",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+          ],
+          rows: pagedData.map((student) {
+            final bool isInscrit = student['eleve_statut'] == 'inscrit';
+            return DataRow(
+              cells: [
+                DataCell(
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                        child: Text(
+                          student['nom'][0],
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.primaryColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "${student['prenom']} ${student['nom']}",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            student['matricule'] ?? "",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    student['classe_nom'] ?? "",
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                DataCell(
+                  isInscrit
+                      ? _buildStatusBadge(_getStatus(student, 'Inscription'))
+                      : const Center(child: Text("-")),
+                ),
+                DataCell(
+                  !isInscrit
+                      ? _buildStatusBadge(_getStatus(student, 'Inscription'))
+                      : const Center(child: Text("-")),
+                ),
+                DataCell(_buildStatusBadge(_getStatus(student, 'Tranche 1'))),
+                DataCell(_buildStatusBadge(_getStatus(student, 'Tranche 2'))),
+                DataCell(_buildStatusBadge(_getStatus(student, 'Tranche 3'))),
+                DataCell(
+                  ((student['montant_restant'] != null &&
+                              (student['montant_restant'] as num).toDouble() <=
+                                  0) ||
+                          _getStatus(student, 'Tranche 3') == "Payé")
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            "À jour",
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor.withOpacity(
+                              0.1,
+                            ),
+                            foregroundColor: AppTheme.primaryColor,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 0,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            minimumSize: const Size(0, 32),
+                          ),
+                          child: const Text(
+                            "Relancer",
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPagination(bool isDark, ThemeData theme) {
+    final int totalPages = (_filteredData.length / _pageSize).ceil();
+    if (totalPages <= 1) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            "Affichage de ${((_currentPage - 1) * _pageSize) + 1} à ${(_currentPage * _pageSize) > _filteredData.length ? _filteredData.length : (_currentPage * _pageSize)} sur ${_filteredData.length} élèves",
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.grey : AppTheme.textSecondary,
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: _currentPage > 1
+                    ? () => setState(() => _currentPage--)
+                    : null,
+                icon: const Icon(Symbols.chevron_left),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "Page $_currentPage sur $totalPages",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _currentPage < totalPages
+                    ? () => setState(() => _currentPage++)
+                    : null,
+                icon: const Icon(Symbols.chevron_right),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCycleFilter(bool isDark) {
+    return PopupMenuButton<String>(
+      onSelected: (val) {
+        setState(() {
+          _selectedCycle = val;
+          _selectedClasseId = null; // Reset classe when cycle changes
+          _applyFilters();
+        });
+      },
+      itemBuilder: (context) {
+        return [
+          const PopupMenuItem(value: "Tous", child: Text("Tous les cycles")),
+          ..._cycles.map(
+            (c) => PopupMenuItem(value: c['nom'], child: Text(c['nom'])),
+          ),
+        ];
+      },
+      child: _buildFilterChip(_selectedCycle, Symbols.school, isDark),
+    );
+  }
+
+  Widget _buildClasseFilter(bool isDark) {
+    String label = "Toutes les classes";
+    if (_selectedClasseId != null) {
+      final c = _classes.firstWhere(
+        (element) => element['id'] == _selectedClasseId,
+        orElse: () => {},
+      );
+      if (c.isNotEmpty) label = c['nom'];
+    }
+
+    // Filter classes list based on selected cycle
+    final filteredClasses = _classes.where((c) {
+      if (_selectedCycle == "Tous") return true;
+      return c['cycle_nom'] == _selectedCycle;
+    }).toList();
+
+    return PopupMenuButton<int?>(
+      onSelected: (val) {
+        setState(() {
+          _selectedClasseId = val;
+          _applyFilters();
+        });
+      },
+      itemBuilder: (context) {
+        return [
+          const PopupMenuItem(value: null, child: Text("Toutes les classes")),
+          ...filteredClasses.map(
+            (c) => PopupMenuItem(value: c['id'], child: Text(c['nom'])),
+          ),
+        ];
+      },
+      child: _buildFilterChip(label, Symbols.meeting_room, isDark),
     );
   }
 

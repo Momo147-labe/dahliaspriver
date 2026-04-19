@@ -38,6 +38,10 @@ class _AddStudentModalState extends State<AddStudentModal> {
       TextEditingController();
   final TextEditingController _contactUrgenceController =
       TextEditingController();
+  final TextEditingController _nomPereController = TextEditingController();
+  final TextEditingController _prenomPereController = TextEditingController();
+  final TextEditingController _nomMereController = TextEditingController();
+  final TextEditingController _prenomMereController = TextEditingController();
 
   String _selectedSexe = 'M';
   String _selectedAnneeScolaire = '';
@@ -181,6 +185,10 @@ class _AddStudentModalState extends State<AddStudentModal> {
     _referenceController.dispose();
     _personneAPrevenirController.dispose();
     _contactUrgenceController.dispose();
+    _nomPereController.dispose();
+    _prenomPereController.dispose();
+    _nomMereController.dispose();
+    _prenomMereController.dispose();
     super.dispose();
   }
 
@@ -346,6 +354,10 @@ class _AddStudentModalState extends State<AddStudentModal> {
         'photo': _selectedImage?.path ?? '',
         'personne_a_prevenir': _personneAPrevenirController.text.trim(),
         'contact_urgence': _contactUrgenceController.text.trim(),
+        'nom_pere': _nomPereController.text.trim(),
+        'prenom_pere': _prenomPereController.text.trim(),
+        'nom_mere': _nomMereController.text.trim(),
+        'prenom_mere': _prenomMereController.text.trim(),
         'statut': _selectedTypeInscription == 'reinscrit'
             ? 'reinscrit'
             : 'inscrit',
@@ -518,6 +530,8 @@ class _AddStudentModalState extends State<AddStudentModal> {
                   child: Column(
                     children: [
                       _buildPersonalInfo(),
+                      const SizedBox(height: 32),
+                      _buildParentsInfo(),
                       const SizedBox(height: 32),
                       _buildAcademicInfo(),
                       const SizedBox(height: 32),
@@ -709,6 +723,64 @@ class _AddStudentModalState extends State<AddStudentModal> {
                       ],
                     ),
                   ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParentsInfo() {
+    return _buildSection(
+      title: 'Informations des Parents',
+      icon: Icons.family_restroom,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: _nomPereController,
+                  label: 'Nom du Père',
+                  hintText: 'Nom',
+                  icon: Icons.person,
+                  isRequired: false,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildTextField(
+                  controller: _prenomPereController,
+                  label: 'Prénom du Père',
+                  hintText: 'Prénom',
+                  icon: Icons.person_outline,
+                  isRequired: false,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: _nomMereController,
+                  label: 'Nom de la Mère',
+                  hintText: 'Nom',
+                  icon: Icons.person,
+                  isRequired: false,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildTextField(
+                  controller: _prenomMereController,
+                  label: 'Prénom de la Mère',
+                  hintText: 'Prénom',
+                  icon: Icons.person_outline,
+                  isRequired: false,
                 ),
               ),
             ],

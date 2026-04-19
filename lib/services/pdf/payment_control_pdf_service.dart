@@ -21,6 +21,12 @@ class PaymentControlPdfService {
     double sum3 = sum2 + t2;
     double sum4 = sum3 + t3;
 
+    final double? rest = student['montant_restant'] != null
+        ? (student['montant_restant'] as num).toDouble()
+        : null;
+
+    if (rest != null && rest <= 0) return 'Payé';
+
     switch (type) {
       case 'Inscription':
         if (totalPaid >= sum1) return 'Payé';
@@ -60,28 +66,62 @@ class PaymentControlPdfService {
     List<Map<String, dynamic>> students,
     String anneeLabel, {
     bool impayesOnly = false,
+    bool isPaidOnly = false,
   }) async {
     final pdf = pw.Document();
     final currency = NumberFormat.currency(
       locale: 'fr_FR',
-      symbol: 'FCFA',
+      symbol: 'GNF',
       decimalDigits: 0,
     );
 
-    final filteredStudents = impayesOnly
+    final filteredStudents = isPaidOnly
         ? students.where((s) {
-            final paid = (s['total_paye'] as num?)?.toDouble() ?? 0.0;
+            final double? rest = s['montant_restant'] != null
+                ? (s['montant_restant'] as num).toDouble()
+                : null;
             final total = (s['montant_total'] as num?)?.toDouble() ?? 0.0;
+            final paid = (s['total_paye'] as num?)?.toDouble() ?? 0.0;
+
+            if (rest != null) return rest <= 0 && total > 0;
+            return total > 0 && paid >= total;
+          }).toList()
+        : impayesOnly
+        ? students.where((s) {
+            final double? rest = s['montant_restant'] != null
+                ? (s['montant_restant'] as num).toDouble()
+                : null;
+            final total = (s['montant_total'] as num?)?.toDouble() ?? 0.0;
+            final paid = (s['total_paye'] as num?)?.toDouble() ?? 0.0;
+
+            if (total == 0) return false;
+            if (rest != null) return rest > 0;
             return paid < total;
           }).toList()
         : students;
 
+    final displayedLabel = isPaidOnly
+        ? 'Liste des Élèves Soldés'
+        : impayesOnly
+        ? 'Liste des Élèves Impayés'
+        : 'Contrôle des Frais Scolaires';
+
     final int enRegle = students.where((s) {
-      final paid = (s['total_paye'] as num?)?.toDouble() ?? 0.0;
+      final double? rest = s['montant_restant'] != null
+          ? (s['montant_restant'] as num).toDouble()
+          : null;
       final total = (s['montant_total'] as num?)?.toDouble() ?? 0.0;
+      final paid = (s['total_paye'] as num?)?.toDouble() ?? 0.0;
+
+      if (total == 0) return false;
+      if (rest != null) return rest <= 0;
       return paid >= total;
     }).length;
-    final int enRetard = students.length - enRegle;
+    final int enRetard =
+        students
+            .where((s) => ((s['montant_total'] as num?)?.toDouble() ?? 0.0) > 0)
+            .length -
+        enRegle;
     final double totalExpected = students.fold(
       0,
       (sum, s) => sum + ((s['montant_total'] as num?)?.toDouble() ?? 0.0),
@@ -100,7 +140,7 @@ class PaymentControlPdfService {
         margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 28),
         header: (ctx) => _buildHeader(
           anneeLabel,
-          impayesOnly,
+          displayedLabel,
           currency,
           enRegle,
           enRetard,
@@ -281,7 +321,7 @@ class PaymentControlPdfService {
           ),
           pw.SizedBox(height: 16),
           pw.Text(
-            'Total: ${filteredStudents.length} élève(s) — Impayés: $enRetard — En règle: $enRegle',
+            'Total: ${filteredStudents.length} élève(s);  Impayés: $enRetard; En règle: $enRegle',
             style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
           ),
         ],
@@ -293,7 +333,7 @@ class PaymentControlPdfService {
 
   pw.Widget _buildHeader(
     String anneeLabel,
-    bool impayesOnly,
+    String title,
     NumberFormat currency,
     int enRegle,
     int enRetard,
@@ -311,9 +351,7 @@ class PaymentControlPdfService {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
-                  impayesOnly
-                      ? 'Liste des Élèves Impayés'
-                      : 'Contrôle des Frais Scolaires',
+                  title,
                   style: pw.TextStyle(
                     fontSize: 18,
                     fontWeight: pw.FontWeight.bold,

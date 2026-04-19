@@ -63,14 +63,12 @@ class _TeachersPageState extends State<TeachersPage>
 
       // Charger les classes pour chaque enseignant
       Map<int, List<Map<String, dynamic>>> teacherClasses = {};
-      if (anneeId != null) {
-        for (var teacherData in teachersData) {
-          final classes = await db.getClassesByTeacher(
-            teacherData['id'],
-            anneeId,
-          );
-          teacherClasses[teacherData['id']] = classes;
-        }
+      for (var teacherData in teachersData) {
+        final classes = await db.getClassesByTeacher(
+          teacherData['id'],
+          anneeId,
+        );
+        teacherClasses[teacherData['id']] = classes;
       }
 
       if (mounted) {
@@ -245,19 +243,6 @@ class _TeachersPageState extends State<TeachersPage>
                 Icons.person_add,
                 const Color(0xFF9333EA),
                 _openAddModal,
-              ),
-              const SizedBox(width: 12),
-              _buildActionButton(
-                'Affecter à une classe',
-                Icons.assignment_ind,
-                const Color(0xFF10B981),
-                () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Fonctionnalité d\'affectation à venir...'),
-                    ),
-                  );
-                },
               ),
             ],
           ),
@@ -621,7 +606,7 @@ class _TeachersPageState extends State<TeachersPage>
         crossAxisCount: 3,
         crossAxisSpacing: 24,
         mainAxisSpacing: 24,
-        childAspectRatio: 1.2,
+        childAspectRatio: 1.0,
       ),
       itemCount: _filteredTeachers.length,
       itemBuilder: (context, index) =>
@@ -668,7 +653,7 @@ class _TeachersPageState extends State<TeachersPage>
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -766,7 +751,7 @@ class _TeachersPageState extends State<TeachersPage>
                 fontSize: 14,
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 12),
             // Afficher les classes assignées
             if (_teacherClasses[teacher.id] != null &&
                 _teacherClasses[teacher.id]!.isNotEmpty) ...[

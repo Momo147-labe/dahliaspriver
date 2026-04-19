@@ -147,7 +147,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 47,
+      version: 49,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -440,9 +440,12 @@ class DatabaseHelper {
         frais_id INTEGER,
         annee_scolaire_id INTEGER,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        created_by_id INTEGER, -- ID de l'utilisateur qui a créé le paiement
+        numero_recu TEXT,      -- Numéro de reçu officiel (ex: REC-2024-001)
         FOREIGN KEY (eleve_id) REFERENCES eleve(id),
         FOREIGN KEY (classe_id) REFERENCES classe(id),
         FOREIGN KEY (frais_id) REFERENCES frais_scolarite(id),
+        FOREIGN KEY (created_by_id) REFERENCES user(id),
         FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
       )
     ''');
@@ -466,6 +469,7 @@ class DatabaseHelper {
       CREATE TABLE IF NOT EXISTS user (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         pseudo TEXT NOT NULL,
+        nom_complet TEXT, -- Nom complet pour l'affichage (ex: sur les reçus)
         email TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
         codesecret TEXT NOT NULL,
@@ -1481,6 +1485,43 @@ class DatabaseHelper {
         debugPrint('Erreur lors de la migration v47 : $e');
       }
     }
+
+    if (oldVersion < 48) {
+      debugPrint('Mise à jour vers la version 48 : Traçabilité des paiements');
+      try {
+        // 1. Ajouter nom_complet à la table user
+        await _addColumnSafely(db, 'user', 'nom_complet', 'TEXT');
+
+        // 2. Initialiser nom_complet avec pseudo pour les utilisateurs existants
+        await db.execute(
+          'UPDATE user SET nom_complet = pseudo WHERE nom_complet IS NULL',
+        );
+
+        // 3. Ajouter created_by_id à la table paiement_detail
+        await _addColumnSafely(
+          db,
+          'paiement_detail',
+          'created_by_id',
+          'INTEGER REFERENCES user(id)',
+        );
+
+        debugPrint('Migration vers la version 48 terminée avec succès.');
+      } catch (e) {
+        debugPrint('Erreur lors de la migration v48 : $e');
+      }
+    }
+
+    if (oldVersion < 49) {
+      try {
+        await _addColumnSafely(db, 'paiement_detail', 'numero_recu', 'TEXT');
+        await db.execute(
+          "UPDATE paiement_detail SET numero_recu = 'OLD-' || id WHERE numero_recu IS NULL",
+        );
+        debugPrint('Migration vers la version 49 terminée avec succès.');
+      } catch (e) {
+        debugPrint('Erreur lors de la migration v49 : $e');
+      }
+    }
   }
 
   Future<void> _addColumnSafely(
@@ -1720,7 +1761,6 @@ class DatabaseHelper {
       JOIN eleve e ON n.eleve_id = e.id
       JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id 
         AND cm.classe_id = e.classe_id 
-        AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.annee_scolaire_id = ?
     ''',
       [eleveId, anneeId],
@@ -2125,7 +2165,6 @@ class DatabaseHelper {
       JOIN eleve e ON n.eleve_id = e.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
-           AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
     ''',
       [studentId, trimestre, anneeId],
@@ -2155,7 +2194,6 @@ class DatabaseHelper {
       LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
-           AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
       GROUP BY cy.moyenne_passage, cy.note_min, cy.note_max
     ''',
@@ -2180,7 +2218,6 @@ class DatabaseHelper {
       JOIN matiere m ON n.matiere_id = m.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
-           AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE e.classe_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
       GROUP BY e.id
       ORDER BY average DESC
@@ -2210,7 +2247,6 @@ class DatabaseHelper {
       JOIN eleve e ON n.eleve_id = e.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
-           AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
     ''',
       [studentId, trimestre, anneeId],
@@ -2264,7 +2300,6 @@ class DatabaseHelper {
       JOIN eleve e ON n.eleve_id = e.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
            AND cm.classe_id = e.classe_id
-           AND cm.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.eleve_id = ? AND n.annee_scolaire_id = ?
       ORDER BY m.nom
     ''',
@@ -2319,10 +2354,14 @@ class DatabaseHelper {
       }
 
       results.add({
-        'matiere_nom': stat['matiere_nom'],
+        'matiere_id': stat['matiere_id'],
+        'matiere': stat['matiere_nom'],
         'coefficient': stat['coefficient'],
+        'coeff': stat['coefficient'],
         'notes_par_trimestre': notesMap,
         'moy_annuelle': moyAnnuelle,
+        'note': moyAnnuelle,
+        'total': moyAnnuelle * (stat['coefficient'] ?? 1.0),
         'rang': rank,
         'appreciation': appreciationAutomatique(moyAnnuelle),
       });
@@ -2380,6 +2419,7 @@ class DatabaseHelper {
     int studentId,
     int classId,
     int anneeId,
+    Future<List<Map<String, dynamic>>> Function(int) getStudentsByClasse,
   ) async {
     final db = await database;
     final grades = await getAnnualGradesForStudent(studentId, anneeId);
@@ -2441,6 +2481,8 @@ class DatabaseHelper {
       'moyenne_passage': passMark,
       'note_min': noteMin,
       'note_max': noteMax,
+      'totalPoints': totalPoints,
+      'totalCoeff': totalCoeff,
     };
   }
 
@@ -3233,6 +3275,21 @@ class DatabaseHelper {
   Future<Map<String, dynamic>> getDashboardStats(int anneeId) =>
       dashboardDao.getDashboardData(anneeId);
 
+  Future<List<Map<String, dynamic>>> getAllClasses() async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT c.*, cy.nom as cycle_nom 
+      FROM classe c 
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id 
+      ORDER BY c.nom ASC
+    ''');
+  }
+
+  Future<List<Map<String, dynamic>>> getCycles() async {
+    final db = await database;
+    return await db.query('cycles_scolaires', orderBy: 'ordre ASC');
+  }
+
   Future<List<Map<String, dynamic>>> getStudentPaymentControlData(
     int anneeId,
   ) async {
@@ -3241,11 +3298,13 @@ class DatabaseHelper {
       '''
       SELECT 
         e.id, e.nom, e.prenom, e.matricule, e.statut as eleve_statut, e.photo,
-        c.nom as classe_nom,
+        c.nom as classe_nom, c.id as classe_id,
+        cy.nom as cycle_nom,
         fs.inscription, fs.reinscription, fs.tranche1, fs.tranche2, fs.tranche3, fs.montant_total,
         COALESCE(p.montant_paye, 0) as total_paye
       FROM eleve e
       JOIN classe c ON e.classe_id = c.id
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN frais_scolarite fs ON e.classe_id = fs.classe_id AND e.annee_scolaire_id = fs.annee_scolaire_id
       LEFT JOIN paiement p ON p.eleve_id = e.id AND p.annee_scolaire_id = e.annee_scolaire_id
       WHERE e.annee_scolaire_id = ?
@@ -3727,21 +3786,21 @@ class DatabaseHelper {
   }
 
   Future<List<Map<String, dynamic>>> getClassesByTeacher(
-    int enseignantId,
-    int anneeId,
-  ) async {
+    int enseignantId, [
+    int? anneeId,
+  ]) async {
     final db = await database;
     return await db.rawQuery(
       '''
       SELECT DISTINCT c.nom, cy.nom as cycle, n.nom as niveau
       FROM classe c
-      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      JOIN niveaux n ON c.niveau_id = n.id
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+      LEFT JOIN niveaux n ON c.niveau_id = n.id
       JOIN attribution_enseignant ae ON c.id = ae.classe_id
-      WHERE ae.enseignant_id = ? AND ae.annee_scolaire_id = ?
+      WHERE ae.enseignant_id = ?
       ORDER BY c.nom ASC
     ''',
-      [enseignantId, anneeId],
+      [enseignantId],
     );
   }
 

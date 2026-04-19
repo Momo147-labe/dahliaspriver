@@ -13,10 +13,11 @@ class PaiementDao extends BaseDao {
   }) async {
     String queryStr =
         '''
-      SELECT pd.*, c.nom as classe_nom, a.libelle as annee_nom
+      SELECT pd.*, c.nom as classe_nom, a.libelle as annee_nom, u.nom_complet as agent_nom, u.pseudo as agent_pseudo
       FROM ${PaiementDetailSchema.tableName} pd
       LEFT JOIN classe c ON pd.classe_id = c.id
       LEFT JOIN annee_scolaire a ON pd.annee_scolaire_id = a.id
+      LEFT JOIN user u ON pd.created_by_id = u.id
       WHERE pd.eleve_id = ?
     ''';
     List<dynamic> args = [eleveId];
@@ -69,6 +70,13 @@ class PaiementDao extends BaseDao {
             data['frais_id'] = fees.first['id'];
           }
         }
+      }
+
+      if (!data.containsKey('numero_recu')) {
+        data['numero_recu'] = await generateNextReceiptNumber(
+          txn,
+          data['annee_scolaire_id'],
+        );
       }
 
       await txn.insert(PaiementDetailSchema.tableName, data);
@@ -266,10 +274,11 @@ class PaiementDao extends BaseDao {
   }) async {
     String queryStr =
         '''
-      SELECT pd.*, e.nom as eleve_nom, e.prenom as eleve_prenom, e.id as eleve_id, e.photo as eleve_photo, c.nom as classe_nom
+      SELECT pd.*, e.nom as eleve_nom, e.prenom as eleve_prenom, e.id as eleve_id, e.photo as eleve_photo, c.nom as classe_nom, u.nom_complet as agent_nom, u.pseudo as agent_pseudo
       FROM ${PaiementDetailSchema.tableName} pd
       JOIN eleve e ON pd.eleve_id = e.id
       JOIN classe c ON e.classe_id = c.id
+      LEFT JOIN user u ON pd.created_by_id = u.id
       WHERE pd.annee_scolaire_id = ?
     ''';
     List<dynamic> args = [anneeId];
@@ -414,15 +423,18 @@ class PaiementDao extends BaseDao {
       '''
       SELECT 
         e.id, e.nom, e.prenom, e.matricule, e.statut as eleve_statut, e.photo,
-        c.nom as classe_nom,
+        e.classe_id, c.nom as classe_nom,
+        cy.nom as cycle_nom,
         fs.inscription, fs.reinscription, fs.tranche1, fs.tranche2, fs.tranche3, fs.montant_total,
-        COALESCE(p.montant_paye, 0) as total_paye
+        COALESCE(p.montant_paye, 0) as total_paye,
+        p.montant_restant
       FROM eleve e
       JOIN classe c ON e.classe_id = c.id
+      JOIN cycle cy ON c.cycle_id = cy.id
       LEFT JOIN frais_scolarite fs ON e.classe_id = fs.classe_id AND e.annee_scolaire_id = fs.annee_scolaire_id
       LEFT JOIN ${PaiementSchema.tableName} p ON p.eleve_id = e.id AND p.annee_scolaire_id = e.annee_scolaire_id
       WHERE e.annee_scolaire_id = ?
-      ORDER BY c.nom ASC, e.nom ASC
+      ORDER BY cy.nom ASC, c.nom ASC, e.nom ASC
     ''',
       [anneeId],
     );
@@ -607,5 +619,44 @@ class PaiementDao extends BaseDao {
       'previous': previousFinances,
       'paymentMethods': paymentMethods,
     };
+  }
+
+  Future<String> generateNextReceiptNumber(
+    DatabaseExecutor db,
+    int anneeId,
+  ) async {
+    final yearResult = await db.query(
+      'annee_scolaire',
+      columns: ['libelle'],
+      where: 'id = ?',
+      whereArgs: [anneeId],
+    );
+
+    String yearPrefix = '';
+    if (yearResult.isNotEmpty) {
+      final libelle = yearResult.first['libelle'] as String;
+      // Get the last two digits of the year (e.g., 2023-2024 -> 24)
+      final years = libelle.split('-');
+      if (years.isNotEmpty) {
+        final lastYear = years.last.trim();
+        if (lastYear.length >= 2) {
+          yearPrefix = lastYear.substring(lastYear.length - 2);
+        }
+      }
+    }
+
+    if (yearPrefix.isEmpty) {
+      yearPrefix = DateTime.now().year.toString().substring(2);
+    }
+
+    final countResult = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM ${PaiementDetailSchema.tableName} WHERE annee_scolaire_id = ?',
+      [anneeId],
+    );
+
+    int count = Sqflite.firstIntValue(countResult) ?? 0;
+    String sequence = (count + 1).toString().padLeft(4, '0');
+
+    return 'REC-$yearPrefix-$sequence';
   }
 }

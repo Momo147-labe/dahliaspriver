@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../models/student.dart';
+import '../../../theme/app_theme.dart';
 
 class StudentDetailPage extends StatefulWidget {
   final int studentId;
@@ -24,13 +25,12 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   List<Map<String, dynamic>> _payments = [];
   List<Map<String, dynamic>> _results = [];
 
-  // Design Tokens from Template
-  final Color _primaryColor = const Color(0xFF22C3C3);
-  final Color _headerEndColor = const Color(0xFF1A9B9B);
-  final Color _bgLight = const Color(0xFFF9FAFA);
-  final Color _bgDark = const Color(0xFF21262C);
-  final Color _textMain = const Color(0xFF121717);
-  final Color _textSecondary = const Color(0xFF658686);
+  // Design Tokens (Refined for Premium look)
+  static const Color _accentColor = Color(
+    0xFF22C3C3,
+  ); // Keeping the teal accent
+  final Color _primaryColor = AppTheme.primaryColor;
+  final Color _textSecondary = AppTheme.textSecondary;
 
   // Calculated Stats
   double _totalAverage = 0.0;
@@ -40,7 +40,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadData();
   }
 
@@ -127,20 +127,28 @@ class _StudentDetailPageState extends State<StudentDetailPage>
 
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: isDark ? _bgDark : _bgLight,
-        body: Center(child: CircularProgressIndicator(color: _primaryColor)),
+        backgroundColor: isDark
+            ? AppTheme.backgroundDark
+            : AppTheme.backgroundLight,
+        body: Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryColor),
+        ),
       );
     }
 
     if (_student == null) {
       return Scaffold(
-        backgroundColor: isDark ? _bgDark : _bgLight,
-        body: Center(child: Text('Élève introuvable')),
+        backgroundColor: isDark
+            ? AppTheme.backgroundDark
+            : AppTheme.backgroundLight,
+        body: const Center(child: Text('Élève introuvable')),
       );
     }
 
     return Scaffold(
-      backgroundColor: isDark ? _bgDark : _bgLight,
+      backgroundColor: isDark
+          ? AppTheme.backgroundDark
+          : AppTheme.backgroundLight,
       body: CustomScrollView(
         slivers: [
           _buildSliverHeader(isDark),
@@ -163,7 +171,6 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                 _buildParcoursTab(isDark),
                 _buildResultsTab(isDark),
                 _buildFinanceTab(isDark),
-                _buildAttendanceTab(isDark),
               ],
             ),
           ),
@@ -199,16 +206,6 @@ class _StudentDetailPageState extends State<StudentDetailPage>
           const SizedBox(width: 16),
           Expanded(
             child: _buildSummaryItem(
-              Icons.calendar_month,
-              'Assiduité',
-              '95%',
-              isDark,
-              Colors.orange,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildSummaryItem(
               Icons.account_balance_wallet,
               'Solde',
               _formatCurrency(_totalBalance),
@@ -231,36 +228,50 @@ class _StudentDetailPageState extends State<StudentDetailPage>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[100]!),
+        color: isDark ? AppTheme.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? AppTheme.borderDark.withOpacity(0.2)
+              : Colors.grey[100]!,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 20),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
           const SizedBox(height: 12),
           Text(
             label,
             style: TextStyle(
-              color: _textSecondary,
+              color: isDark
+                  ? AppTheme.textDarkSecondary
+                  : AppTheme.textSecondary,
               fontSize: 11,
               fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
-              color: isDark ? Colors.white : _textMain,
-              fontSize: 16,
+              color: isDark ? Colors.white : AppTheme.textPrimary,
+              fontSize: 15,
               fontWeight: FontWeight.w900,
               overflow: TextOverflow.ellipsis,
             ),
@@ -272,94 +283,138 @@ class _StudentDetailPageState extends State<StudentDetailPage>
 
   Widget _buildSliverHeader(bool isDark) {
     final s = _student!;
+    final Color headerColor = isDark ? AppTheme.surfaceDark : _primaryColor;
+    final Color headerEnd = isDark
+        ? AppTheme.backgroundDark
+        : const Color(0xFF4F46E5);
+
     return SliverToBoxAdapter(
       child: Column(
         children: [
-          // Banner
+          // Banner with Glassmorphism and better Profile Pic
           Stack(
             clipBehavior: Clip.none,
             children: [
               Container(
-                height: 160,
+                height: 200,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [_primaryColor, _headerEndColor],
+                    colors: [headerColor, headerEnd],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back_ios,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          onPressed: () => Navigator.pop(context),
+                child: Stack(
+                  children: [
+                    // Abstract pattern decoration
+                    Positioned(
+                      right: -50,
+                      top: -50,
+                      child: CircleAvatar(
+                        radius: 100,
+                        backgroundColor: Colors.white.withOpacity(0.05),
+                      ),
+                    ),
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
                         ),
-                        Row(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildBannerButton(Icons.print, 'Imprimer', () {}),
-                            const SizedBox(width: 8),
-                            _buildBannerButton(
-                              Icons.edit,
-                              'Modifier',
-                              () {},
-                              isWhite: true,
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.arrow_back_ios_new,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                _buildBannerButton(
+                                  Icons.print_outlined,
+                                  'Imprimer',
+                                  () {},
+                                ),
+                                const SizedBox(width: 8),
+                                _buildBannerButton(
+                                  Icons.edit_outlined,
+                                  'Modifier',
+                                  () {},
+                                  isWhite: true,
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-              // Profile Pic Overlap
+              // Profile Pic Overlap - Centered slightly on mobile/Desktop
               Positioned(
-                bottom: -40,
+                bottom: -50,
                 left: 24,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? _bgDark : Colors.white,
-                      width: 4,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                child: Hero(
+                  tag: 'student_photo_${widget.studentId}',
+                  child: Container(
+                    width: 130,
+                    height: 130,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? AppTheme.backgroundDark : Colors.white,
+                        width: 5,
                       ),
-                    ],
-                  ),
-                  child: CircleAvatar(
-                    backgroundImage:
-                        s['photo'] != null && s['photo'].toString().isNotEmpty
-                        ? FileImage(File(s['photo'].toString()))
-                        : null,
-                    backgroundColor: Colors.grey[200],
-                    child: s['photo'] == null || s['photo'].toString().isEmpty
-                        ? Icon(Icons.person, size: 60, color: _textSecondary)
-                        : null,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(65),
+                      child: Container(
+                        color: isDark ? AppTheme.cardDark : Colors.grey[100],
+                        child:
+                            s['photo'] != null &&
+                                s['photo'].toString().isNotEmpty
+                            ? Image.file(
+                                File(s['photo'].toString()),
+                                fit: BoxFit.cover,
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 70,
+                                color: isDark
+                                    ? AppTheme.textDarkSecondary
+                                    : AppTheme.textSecondary,
+                              ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 50),
+          const SizedBox(height: 60),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
                   child: Column(
@@ -368,26 +423,30 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                       Text(
                         '${s['prenom']} ${s['nom']}',
                         style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : _textMain,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? Colors.white : AppTheme.textPrimary,
+                          letterSpacing: -0.5,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Wrap(
                         crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
+                        spacing: 12,
+                        runSpacing: 8,
                         children: [
                           _buildHeaderSubtitle(
                             Icons.fingerprint,
                             s['matricule'] ?? 'N/A',
+                            isDark,
                           ),
-                          _buildHeaderSeparator(),
+                          _buildHeaderSeparator(isDark),
                           _buildHeaderSubtitle(
-                            Icons.school,
+                            Icons.school_outlined,
                             s['classe_nom'] ?? 'Sans classe',
+                            isDark,
                           ),
-                          _buildHeaderSeparator(),
+                          _buildHeaderSeparator(isDark),
                           _buildStatusBadge(s['statut'] ?? 'Inscrit'),
                         ],
                       ),
@@ -396,19 +455,20 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                 ),
                 ElevatedButton.icon(
                   onPressed: () {},
-                  icon: const Icon(Icons.call, size: 18),
-                  label: const Text('Contacter Parent'),
+                  icon: const Icon(Icons.phone_in_talk_outlined, size: 18),
+                  label: const Text('Contacter'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _primaryColor,
+                    backgroundColor: AppTheme.primaryColor,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
+                      horizontal: 24,
+                      vertical: 16,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(15),
                     ),
-                    elevation: 0,
+                    elevation: 5,
+                    shadowColor: AppTheme.primaryColor.withOpacity(0.3),
                   ),
                 ),
               ],
@@ -427,34 +487,42 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   }) {
     return TextButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon, size: 16, color: isWhite ? _primaryColor : Colors.white),
+      icon: Icon(
+        icon,
+        size: 16,
+        color: isWhite ? AppTheme.primaryColor : Colors.white,
+      ),
       label: Text(
         label,
         style: TextStyle(
-          color: isWhite ? _primaryColor : Colors.white,
+          color: isWhite ? AppTheme.primaryColor : Colors.white,
           fontWeight: FontWeight.bold,
           fontSize: 13,
         ),
       ),
       style: TextButton.styleFrom(
         backgroundColor: isWhite ? Colors.white : Colors.white.withOpacity(0.2),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
-  Widget _buildHeaderSubtitle(IconData icon, String text) {
+  Widget _buildHeaderSubtitle(IconData icon, String text, bool isDark) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: _textSecondary),
-        const SizedBox(width: 4),
+        Icon(
+          icon,
+          size: 16,
+          color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
+        ),
+        const SizedBox(width: 6),
         Text(
           text,
           style: TextStyle(
-            color: _textSecondary,
-            fontWeight: FontWeight.w500,
+            color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
+            fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
         ),
@@ -462,31 +530,31 @@ class _StudentDetailPageState extends State<StudentDetailPage>
     );
   }
 
-  Widget _buildHeaderSeparator() {
+  Widget _buildHeaderSeparator(bool isDark) {
     return Container(
       width: 4,
       height: 4,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.grey[300],
+        color: isDark ? AppTheme.borderDark : Colors.grey[300],
       ),
     );
   }
 
   Widget _buildStatusBadge(String status) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: _primaryColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
+        color: _accentColor.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         status.toUpperCase(),
-        style: TextStyle(
-          color: _primaryColor,
+        style: const TextStyle(
+          color: _accentColor,
           fontSize: 10,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.0,
         ),
       ),
     );
@@ -495,54 +563,65 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   Widget _buildTabNavigation(bool isDark) {
     return Container(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+        color: isDark ? AppTheme.backgroundDark : AppTheme.backgroundLight,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark
+                ? AppTheme.borderDark.withOpacity(0.1)
+                : Colors.grey[200]!,
+          ),
+        ),
       ),
       child: TabBar(
         controller: _tabController,
         isScrollable: true,
         tabAlignment: TabAlignment.start,
-        labelPadding: const EdgeInsets.only(right: 24),
-        indicatorColor: _primaryColor,
-        indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: _primaryColor,
-        unselectedLabelColor: _textSecondary,
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        indicatorWeight: 3,
+        labelPadding: const EdgeInsets.symmetric(horizontal: 20),
+        indicatorColor: AppTheme.primaryColor,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelColor: AppTheme.primaryColor,
+        unselectedLabelColor: isDark
+            ? AppTheme.textDarkSecondary
+            : AppTheme.textSecondary,
+        labelStyle: const TextStyle(
+          fontWeight: FontWeight.w900,
+          fontSize: 14,
+          letterSpacing: 0.2,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
+        indicatorWeight: 4,
         dividerColor: Colors.transparent,
         tabs: const [
           Tab(
+            height: 50,
             child: Row(
               children: [
-                Icon(Icons.history_edu, size: 18),
-                SizedBox(width: 8),
+                Icon(Icons.history_edu_outlined, size: 20),
+                SizedBox(width: 10),
                 Text('Parcours'),
               ],
             ),
           ),
           Tab(
+            height: 50,
             child: Row(
               children: [
-                Icon(Icons.assessment, size: 18),
-                SizedBox(width: 8),
+                Icon(Icons.analytics_outlined, size: 20),
+                SizedBox(width: 10),
                 Text('Résultats'),
               ],
             ),
           ),
           Tab(
+            height: 50,
             child: Row(
               children: [
-                Icon(Icons.payments, size: 18),
-                SizedBox(width: 8),
-                Text('Paiements'),
-              ],
-            ),
-          ),
-          Tab(
-            child: Row(
-              children: [
-                Icon(Icons.calendar_month, size: 18),
-                SizedBox(width: 8),
-                Text('Absences'),
+                Icon(Icons.account_balance_wallet_outlined, size: 20),
+                SizedBox(width: 10),
+                Text('Finances'),
               ],
             ),
           ),
@@ -569,6 +648,13 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                 const SizedBox(height: 16),
                 _buildBioCard(isDark),
                 const SizedBox(height: 32),
+                _buildContentHeader(
+                  Icons.family_restroom_outlined,
+                  'Informations Parentales',
+                ),
+                const SizedBox(height: 16),
+                _buildParentCard(isDark),
+                const SizedBox(height: 32),
                 _buildContentHeader(Icons.timeline, 'Cycle Scolaire'),
                 const SizedBox(height: 24),
                 _buildTimeline(isDark),
@@ -585,43 +671,132 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   Widget _buildBioCard(bool isDark) {
     final s = _student!;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[100]!),
+        color: isDark ? AppTheme.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark
+              ? AppTheme.borderDark.withOpacity(0.2)
+              : Colors.grey[100]!,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Row(
             children: [
               _buildBioItem(
-                Icons.cake,
+                Icons.cake_outlined,
                 'Né(e) le',
                 s['date_naissance'] ?? 'Non renseigné',
                 isDark,
               ),
+              const SizedBox(width: 16),
               _buildBioItem(
-                Icons.location_on,
-                'Lieu',
+                Icons.location_on_outlined,
+                'Lieu de naissance',
                 s['lieu_naissance'] ?? 'Non renseigné',
                 isDark,
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Divider(height: 1),
+          ),
           Row(
             children: [
               _buildBioItem(
-                Icons.wc,
-                'Genre',
+                Icons.wc_outlined,
+                'Sexe / Genre',
                 s['sexe'] == 'M' ? 'Masculin' : 'Féminin',
                 isDark,
               ),
+              const SizedBox(width: 16),
               _buildBioItem(
-                Icons.badge,
-                'Matricule',
+                Icons.badge_outlined,
+                'Matricule Scolaire',
                 s['matricule'] ?? 'N/A',
+                isDark,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParentCard(bool isDark) {
+    final s = _student!;
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark
+              ? AppTheme.borderDark.withOpacity(0.2)
+              : Colors.grey[100]!,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _buildBioItem(
+                Icons.person_pin_outlined,
+                'Père',
+                '${s['prenom_pere'] ?? ""} ${s['nom_pere'] ?? ""}'
+                        .trim()
+                        .isEmpty
+                    ? 'Non renseigné'
+                    : '${s['prenom_pere'] ?? ""} ${s['nom_pere'] ?? ""}',
+                isDark,
+              ),
+              const SizedBox(width: 16),
+              _buildBioItem(
+                Icons.person_pin_outlined,
+                'Mère',
+                '${s['prenom_mere'] ?? ""} ${s['nom_mere'] ?? ""}'
+                        .trim()
+                        .isEmpty
+                    ? 'Non renseigné'
+                    : '${s['prenom_mere'] ?? ""} ${s['nom_mere'] ?? ""}',
+                isDark,
+              ),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Divider(height: 1),
+          ),
+          Row(
+            children: [
+              _buildBioItem(
+                Icons.emergency_outlined,
+                'Urgence (Nom)',
+                s['personne_a_prevenir'] ?? 'Non renseigné',
+                isDark,
+              ),
+              const SizedBox(width: 16),
+              _buildBioItem(
+                Icons.phone_android_outlined,
+                'Urgence (Contact)',
+                s['contact_urgence'] ?? 'Non renseigné',
                 isDark,
               ),
             ],
@@ -636,14 +811,14 @@ class _StudentDetailPageState extends State<StudentDetailPage>
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: _primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: AppTheme.primaryColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, size: 16, color: _primaryColor),
+            child: Icon(icon, size: 20, color: AppTheme.primaryColor),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -651,17 +826,21 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                 Text(
                   label,
                   style: TextStyle(
-                    color: _textSecondary,
+                    color: isDark
+                        ? AppTheme.textDarkSecondary
+                        : AppTheme.textSecondary,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   value,
                   style: TextStyle(
-                    color: isDark ? Colors.white : _textMain,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    color: isDark ? Colors.white : AppTheme.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -673,7 +852,8 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   }
 
   Widget _buildTimeline(bool isDark) {
-    if (_parcours.isEmpty) return _buildEmptyState('Aucun parcours enregistré');
+    if (_parcours.isEmpty)
+      return _buildEmptyState('Aucun parcours enregistré', isDark);
 
     return ListView.builder(
       shrinkWrap: true,
@@ -698,7 +878,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                           ? _primaryColor
                           : (isDark ? Colors.grey[800] : Colors.grey[100]),
                       border: Border.all(
-                        color: isDark ? _bgDark : Colors.white,
+                        color: isDark ? AppTheme.surfaceDark : Colors.white,
                         width: 4,
                       ),
                     ),
@@ -724,30 +904,40 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                       Text(
                         p['classe_nom'] ?? 'N/A',
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : _textMain,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: isDark ? Colors.white : AppTheme.textPrimary,
                         ),
                       ),
                       Text(
                         p['annee_nom'] ?? 'N/A',
                         style: TextStyle(
-                          color: isFirst ? _primaryColor : _textSecondary,
-                          fontSize: 12,
+                          color: isFirst
+                              ? AppTheme.primaryColor
+                              : AppTheme.textSecondary,
+                          fontSize: 13,
                           fontWeight: isFirst
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                              ? FontWeight.w800
+                              : FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isFirst
-                              ? _primaryColor.withOpacity(0.05)
+                              ? AppTheme.primaryColor.withOpacity(0.06)
                               : (isDark
-                                    ? Colors.white.withOpacity(0.02)
-                                    : Colors.grey[50]),
-                          borderRadius: BorderRadius.circular(12),
+                                    ? AppTheme.cardDark
+                                    : AppTheme.backgroundLight),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(
+                            color: isFirst
+                                ? AppTheme.primaryColor.withOpacity(0.1)
+                                : (isDark
+                                      ? AppTheme.borderDark
+                                      : Colors.grey[200]!),
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -755,19 +945,26 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                             Text(
                               'Moyenne Générale',
                               style: TextStyle(
-                                color: _textSecondary,
+                                color: isDark
+                                    ? AppTheme.textDarkSecondary
+                                    : AppTheme.textSecondary,
                                 fontSize: 11,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
+                            const SizedBox(height: 4),
                             Text(
                               _yearlyAverages[p['annee_id']] != null
                                   ? '${_yearlyAverages[p['annee_id']]!.toStringAsFixed(2)} / 20'
                                   : '-- / 20',
                               style: TextStyle(
                                 fontWeight: FontWeight.w900,
+                                fontSize: 18,
                                 color: isFirst
-                                    ? _primaryColor
-                                    : (isDark ? Colors.white : _textMain),
+                                    ? AppTheme.primaryColor
+                                    : (isDark
+                                          ? Colors.white
+                                          : AppTheme.textPrimary),
                               ),
                             ),
                           ],
@@ -787,11 +984,15 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   Widget _buildContentHeader(IconData icon, String title) {
     return Row(
       children: [
-        Icon(icon, color: _primaryColor, size: 20),
-        const SizedBox(width: 8),
+        Icon(icon, color: AppTheme.primaryColor, size: 22),
+        const SizedBox(width: 12),
         Text(
           title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.3,
+          ),
         ),
       ],
     );
@@ -804,8 +1005,15 @@ class _StudentDetailPageState extends State<StudentDetailPage>
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? Colors.black : _textMain,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? AppTheme.surfaceDark : AppTheme.textPrimary,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,9 +1143,10 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         Text(
           label,
           style: TextStyle(
-            color: _textSecondary,
+            color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
             fontSize: 11,
             fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
           ),
         ),
         const SizedBox(height: 4),
@@ -946,7 +1155,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
-            color: color ?? (isDark ? Colors.white : _textMain),
+            color: color ?? (isDark ? Colors.white : AppTheme.textPrimary),
           ),
         ),
       ],
@@ -983,21 +1192,32 @@ class _StudentDetailPageState extends State<StudentDetailPage>
             },
             children: [
               TableRow(
-                decoration: BoxDecoration(color: Colors.grey[50]),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.05)
+                      : Colors.grey[50],
+                ),
                 children: [
-                  _buildCell('DATE', isHeader: true),
-                  _buildCell('LIBELLÉ', isHeader: true),
-                  _buildCell('MONTANT', isHeader: true),
-                  _buildCell('STATUT', isHeader: true),
+                  _buildCell('DATE', isDark: isDark, isHeader: true),
+                  _buildCell('LIBELLÉ', isDark: isDark, isHeader: true),
+                  _buildCell('MONTANT', isDark: isDark, isHeader: true),
+                  _buildCell('STATUT', isDark: isDark, isHeader: true),
                 ],
               ),
               ..._payments.expand(
                 (p) => (p['details'] as List? ?? []).map(
                   (d) => TableRow(
                     children: [
-                      _buildCell(_formatDate(d['date_paiement'])),
-                      _buildCell(d['type_frais'] ?? 'Paiement'),
-                      _buildCell(_formatCurrency(d['montant']), isBold: true),
+                      _buildCell(
+                        _formatDate(d['date_paiement']),
+                        isDark: isDark,
+                      ),
+                      _buildCell(d['type_frais'] ?? 'Paiement', isDark: isDark),
+                      _buildCell(
+                        _formatCurrency(d['montant']),
+                        isBold: true,
+                        isDark: isDark,
+                      ),
                       _buildCellBadge('Payé', Colors.green),
                     ],
                   ),
@@ -1011,7 +1231,8 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   }
 
   Widget _buildResultsTab(bool isDark) {
-    if (_results.isEmpty) return _buildEmptyState('Aucune note enregistrée');
+    if (_results.isEmpty)
+      return _buildEmptyState('Aucune note enregistrée', isDark);
 
     final Map<int, List<Map<String, dynamic>>> grouped = {};
     for (var r in _results) {
@@ -1042,14 +1263,19 @@ class _StudentDetailPageState extends State<StudentDetailPage>
     bool isDark,
   ) {
     double sum = 0;
-    for (var n in notes) sum += (n['note'] as num? ?? 0.0).toDouble();
+    for (var n in notes) {
+      sum += (n['note'] as num? ?? 0.0).toDouble();
+    }
     double avg = sum / notes.length;
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[100]!),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
+        ),
       ),
       child: Column(
         children: [
@@ -1060,12 +1286,12 @@ class _StudentDetailPageState extends State<StudentDetailPage>
               children: [
                 _buildContentHeader(
                   Icons.analytics,
-                  '${trimester}${trimester == 1 ? "er" : "ème"} Trimestre',
+                  '$trimester${trimester == 1 ? "er" : "ème"} Trimestre',
                 ),
                 Text(
                   'Moyenne: ${avg.toStringAsFixed(2)}/20',
                   style: TextStyle(
-                    color: _primaryColor,
+                    color: AppTheme.primaryColor,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -1089,35 +1315,62 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                       : Colors.grey[50],
                 ),
                 children: [
-                  _buildCell('MATIÈRE', isHeader: true),
-                  _buildCell('COEFF', isHeader: true, alignCenter: true),
-                  _buildCell('SEQ 1', isHeader: true, alignCenter: true),
-                  _buildCell('SEQ 2', isHeader: true, alignCenter: true),
-                  _buildCell('MOYENNE', isHeader: true, alignRight: true),
+                  _buildCell('MATIÈRE', isDark: isDark, isHeader: true),
+                  _buildCell(
+                    'COEFF',
+                    isDark: isDark,
+                    isHeader: true,
+                    alignCenter: true,
+                  ),
+                  _buildCell(
+                    'SEQ 1',
+                    isDark: isDark,
+                    isHeader: true,
+                    alignCenter: true,
+                  ),
+                  _buildCell(
+                    'SEQ 2',
+                    isDark: isDark,
+                    isHeader: true,
+                    alignCenter: true,
+                  ),
+                  _buildCell(
+                    'MOYENNE',
+                    isDark: isDark,
+                    isHeader: true,
+                    alignRight: true,
+                  ),
                 ],
               ),
-              ...notes.map(
-                (r) => TableRow(
+              ...notes.map((r) {
+                return TableRow(
                   children: [
-                    _buildCell(r['matiere_nom'] ?? 'N/A', isBold: true),
-                    _buildCell('4', alignCenter: true), // Placeholder coeff
+                    _buildCell(
+                      r['matiere_nom'] ?? 'N/A',
+                      isBold: true,
+                      isDark: isDark,
+                    ),
+                    _buildCell('4', alignCenter: true, isDark: isDark),
                     _buildCell(
                       r['sequence'] == 1 ? r['note'].toString() : '--',
                       alignCenter: true,
+                      isDark: isDark,
                     ),
                     _buildCell(
                       r['sequence'] == 2 ? r['note'].toString() : '--',
                       alignCenter: true,
+                      isDark: isDark,
                     ),
                     _buildCell(
                       r['note']?.toString() ?? '--',
+                      isDark: isDark,
                       alignRight: true,
-                      color: _primaryColor,
+                      color: AppTheme.primaryColor,
                       isBold: true,
                     ),
                   ],
-                ),
-              ),
+                );
+              }),
             ],
           ),
         ],
@@ -1127,6 +1380,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
 
   Widget _buildCell(
     String text, {
+    required bool isDark,
     bool isHeader = false,
     bool alignCenter = false,
     bool alignRight = false,
@@ -1143,7 +1397,9 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         style: TextStyle(
           fontSize: isHeader ? 11 : 13,
           fontWeight: isHeader || isBold ? FontWeight.bold : FontWeight.normal,
-          color: isHeader ? _textSecondary : (color ?? _textMain),
+          color: isHeader
+              ? (isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary)
+              : (color ?? (isDark ? Colors.white : AppTheme.textPrimary)),
         ),
       ),
     );
@@ -1172,221 +1428,21 @@ class _StudentDetailPageState extends State<StudentDetailPage>
     );
   }
 
-  Widget _buildAttendanceTab(bool isDark) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildContentHeader(
-            Icons.calendar_month,
-            'Suivi des Présences - Janvier 2026',
-          ),
-          const SizedBox(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 2, child: _buildCalendarGrid(isDark)),
-              const SizedBox(width: 24),
-              Expanded(flex: 1, child: _buildAttendanceSummary(isDark)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCalendarGrid(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[100]!),
-      ),
-      child: Column(
-        children: [
-          // Days of Week Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-                .map(
-                  (d) => Expanded(
-                    child: Center(
-                      child: Text(
-                        d,
-                        style: TextStyle(
-                          color: _textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 16),
-          // Grid
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-            ),
-            itemCount: 31,
-            itemBuilder: (context, index) {
-              final day = index + 1;
-              Color indicatorColor = Colors.green;
-              if (day == 12 || day == 24) indicatorColor = Colors.red;
-              if (day == 8 || day == 19) indicatorColor = Colors.orange;
-
-              return Container(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.05)
-                      : Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '$day',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white70 : _textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: indicatorColor,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          // Legend
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildLegendRow(Colors.green, 'Présent'),
-              const SizedBox(width: 16),
-              _buildLegendRow(Colors.red, 'Absent'),
-              const SizedBox(width: 16),
-              _buildLegendRow(Colors.orange, 'Retard'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLegendRow(Color color, String label) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-        ),
-        const SizedBox(width: 8),
-        Text(label, style: TextStyle(color: _textSecondary, fontSize: 11)),
-      ],
-    );
-  }
-
-  Widget _buildAttendanceSummary(bool isDark) {
-    return Column(
-      children: [
-        _buildTrendItem(
-          'Taux de Présence',
-          '95%',
-          Icons.check_circle_outline,
-          Colors.green,
-          isDark,
-        ),
-        const SizedBox(height: 16),
-        _buildTrendItem(
-          'Absences Inj.',
-          '2 jours',
-          Icons.error_outline,
-          Colors.red,
-          isDark,
-        ),
-        const SizedBox(height: 16),
-        _buildTrendItem(
-          'Retards cumulés',
-          '45 min',
-          Icons.timer_outlined,
-          Colors.orange,
-          isDark,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTrendItem(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-    bool isDark,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[100]!),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(color: _textSecondary, fontSize: 11),
-                ),
-                Text(
-                  value,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : _textMain,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(String msg) {
+  Widget _buildEmptyState(String msg, bool isDark) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.hourglass_empty, size: 48, color: Colors.grey[200]),
           const SizedBox(height: 16),
-          Text(msg, style: TextStyle(color: _textSecondary)),
+          Text(
+            msg,
+            style: TextStyle(
+              color: isDark
+                  ? AppTheme.textDarkSecondary
+                  : AppTheme.textSecondary,
+            ),
+          ),
         ],
       ),
     );

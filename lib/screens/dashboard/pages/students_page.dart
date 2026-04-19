@@ -9,6 +9,8 @@ import '../../../widgets/student/add_student_modal.dart';
 import '../../../widgets/student/edit_student_modal.dart';
 import './student_detail_page.dart';
 import '../../carte_scolaire_page.dart';
+import '../../../widgets/carteele.dart';
+import 'honor_roll_page.dart';
 
 class StudentsPage extends StatefulWidget {
   const StudentsPage({super.key});
@@ -265,7 +267,12 @@ class _StudentsPageState extends State<StudentsPage> {
           'Tableau d\'honneur',
           Icons.stars,
           const Color(0xFF10B981),
-          () {},
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => HonorRollPage(isDark: isDark)),
+            );
+          },
         ),
         _buildActionButton(
           'Générer Cartes',
@@ -799,6 +806,12 @@ class _StudentsPageState extends State<StudentsPage> {
               ),
               DataColumn(
                 label: Text(
+                  'Lieu de Naiss.',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+              DataColumn(
+                label: Text(
                   'Classe',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
@@ -850,6 +863,7 @@ class _StudentsPageState extends State<StudentsPage> {
                         ),
                       ),
                       DataCell(Text(s.dateNaissance)),
+                      DataCell(Text(s.lieuNaissance)),
                       DataCell(Text(s.classe)),
                       DataCell(_buildStatusBadge(s.statut)),
                       DataCell(
@@ -891,7 +905,7 @@ class _StudentsPageState extends State<StudentsPage> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) =>
-                                        CarteScolairePage(student: s),
+                                        CarteScolaireGuinee(studentId: s.id),
                                   ),
                                 ),
                               ),

@@ -5,6 +5,7 @@ class BulletinGradesTable extends StatelessWidget {
   final double noteMax;
   final List<Map<String, dynamic>>
   columns; // e.g. [{'label': 'S1', 'key': 1}, ...]
+  final List<Map<String, dynamic>> mentions;
   final String noteKey; // 'notes_par_sequence' or 'notes_par_trimestre'
 
   const BulletinGradesTable({
@@ -13,6 +14,7 @@ class BulletinGradesTable extends StatelessWidget {
     required this.columns,
     this.noteMax = 20.0,
     this.noteKey = 'notes_par_sequence',
+    this.mentions = const [],
   });
 
   @override
@@ -65,7 +67,16 @@ class BulletinGradesTable extends StatelessWidget {
                 isCenter: true,
                 isBold: true,
               ),
-              _buildTableCell((grade['obs']?.toString() ?? ''), isItalic: true),
+              Builder(
+                builder: (context) {
+                  // If mentions provided, we can re-calculate or use pre-calculated 'obs'
+                  // For parity with PDF helper, we check mentions first
+                  String observation = grade['obs']?.toString() ?? '';
+                  // Note: We don't re-calculate here because reports_page does it.
+                  // But we could if needed.
+                  return _buildTableCell(observation, isItalic: true);
+                },
+              ),
             ],
           );
         }),

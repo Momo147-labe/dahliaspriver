@@ -14,6 +14,7 @@ class UserSettingsPage extends StatefulWidget {
 class _UserSettingsPageState extends State<UserSettingsPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController =
       TextEditingController(); // Note: DB doesn't have phone, we might omit or add column
@@ -45,6 +46,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
         _currentUser = await DatabaseHelper.instance.getUser(_currentUserId!);
         if (_currentUser != null) {
           _nameController.text = _currentUser!['pseudo'] ?? '';
+          _fullNameController.text = _currentUser!['nom_complet'] ?? '';
           _emailController.text = _currentUser!['email'] ?? '';
           // _phoneController.text = ... (pas de champ téléphone dans la DB user pour l'instant)
         }
@@ -62,6 +64,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
   @override
   void dispose() {
     _nameController.dispose();
+    _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _currentPasswordController.dispose();
@@ -192,6 +195,13 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                                   label: 'NOM D\'UTILISATEUR / PSEUDO',
                                   hint: 'Entrez votre pseudo',
                                   icon: Icons.badge_outlined,
+                                ),
+                                const SizedBox(height: 20),
+                                _buildTextField(
+                                  controller: _fullNameController,
+                                  label: 'NOM COMPLET (POUR LES REÇUS)',
+                                  hint: 'Prénom et Nom',
+                                  icon: Icons.person_outline,
                                 ),
                                 const SizedBox(height: 20),
                                 _buildTextField(
@@ -614,6 +624,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
     try {
       final updatedUser = Map<String, dynamic>.from(_currentUser!);
       updatedUser['pseudo'] = _nameController.text.trim();
+      updatedUser['nom_complet'] = _fullNameController.text.trim();
       updatedUser['email'] = _emailController.text.trim();
 
       await DatabaseHelper.instance.updateUser(updatedUser);
@@ -748,8 +759,9 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
   }
 
   void _showAddUserDialog() {
-    final nameCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
+    final nameController = TextEditingController();
+    final fullNameController = TextEditingController();
+    final emailController = TextEditingController();
     final pwdCtrl = TextEditingController();
     final secretCtrl = TextEditingController();
     String role = 'enseignant';
@@ -760,62 +772,89 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Ajouter un utilisateur'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom d\'utilisateur',
+          title: const Text('AJOUTER UN UTILISATEUR'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Pseudo / Nom d\'utilisateur',
+                      hintText: 'ex: jmbarga',
+                    ),
+                    validator: (v) => v!.isEmpty ? 'Requis' : null,
                   ),
-                  validator: (v) => v!.isEmpty ? 'Requis' : null,
-                ),
-                TextFormField(
-                  controller: emailCtrl,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  validator: (v) => v!.isEmpty ? 'Requis' : null,
-                ),
-                TextFormField(
-                  controller: pwdCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Mot de passe',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        obscurePwd ? Icons.visibility : Icons.visibility_off,
-                        size: 18,
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: fullNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nom complet',
+                      hintText: 'ex: Justin MBARGA',
+                    ),
+                    validator: (v) => v!.isEmpty ? 'Requis' : null,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      hintText: 'email@exemple.com',
+                    ),
+                    validator: (v) => v!.isEmpty ? 'Requis' : null,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: pwdCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Mot de passe',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePwd ? Icons.visibility : Icons.visibility_off,
+                          size: 18,
+                        ),
+                        onPressed: () =>
+                            setDialogState(() => obscurePwd = !obscurePwd),
                       ),
-                      onPressed: () =>
-                          setDialogState(() => obscurePwd = !obscurePwd),
                     ),
+                    obscureText: obscurePwd,
+                    validator: (v) => v!.isEmpty ? 'Requis' : null,
                   ),
-                  obscureText: obscurePwd,
-                  validator: (v) => v!.isEmpty ? 'Requis' : null,
-                ),
-                TextFormField(
-                  controller: secretCtrl,
-                  decoration: const InputDecoration(labelText: 'Code Secret'),
-                  validator: (v) => v!.isEmpty ? 'Requis' : null,
-                ),
-                DropdownButtonFormField<String>(
-                  value: role,
-                  items: const [
-                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                    DropdownMenuItem(
-                      value: 'enseignant',
-                      child: Text('Enseignant'),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: secretCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Code Secret (4 chiffres)',
+                      hintText: 'ex: 1234',
                     ),
-                    DropdownMenuItem(
-                      value: 'comptable',
-                      child: Text('Comptable'),
-                    ),
-                  ],
-                  onChanged: (v) => role = v!,
-                  decoration: const InputDecoration(labelText: 'Rôle'),
-                ),
-              ],
+                    validator: (v) {
+                      if (v!.isEmpty) return 'Requis';
+                      if (v.length != 4) return 'Doit contenir 4 chiffres';
+                      return null;
+                    },
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: role,
+                    items: const [
+                      DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                      DropdownMenuItem(
+                        value: 'enseignant',
+                        child: Text('Enseignant'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'comptable',
+                        child: Text('Comptable'),
+                      ),
+                    ],
+                    onChanged: (v) => setDialogState(() => role = v!),
+                    decoration: const InputDecoration(labelText: 'Rôle'),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -830,8 +869,11 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                   setState(() => _isLoading = true);
                   try {
                     await DatabaseHelper.instance.addUser({
-                      'pseudo': nameCtrl.text.trim(),
-                      'email': emailCtrl.text.trim(),
+                      'pseudo': nameController.text.trim(),
+                      'nom_complet': fullNameController.text.trim().isEmpty
+                          ? nameController.text.trim()
+                          : fullNameController.text.trim(),
+                      'email': emailController.text.trim(),
                       'password': SecurityUtils.hashPassword(pwdCtrl.text),
                       'role': role,
                       'codesecret': secretCtrl.text,
@@ -840,7 +882,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Utilisateur créé'),
+                          content: Text('Utilisateur créé avec succès'),
                           backgroundColor: Colors.green,
                         ),
                       );

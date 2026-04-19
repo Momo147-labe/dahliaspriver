@@ -652,6 +652,10 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setInt('userId', user['id'] as int);
         await prefs.setString('userRole', user['role'] as String);
         await prefs.setString('userName', user['pseudo'] as String);
+        await prefs.setString(
+          'userFullName',
+          (user['nom_complet'] as String?) ?? (user['pseudo'] as String),
+        );
         await prefs.setBool('rememberMe', _rememberMe);
 
         // Vérifier si c'est un administrateur

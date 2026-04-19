@@ -6,6 +6,7 @@ import '../../../../core/database/database_helper.dart';
 import '../../../../providers/academic_year_provider.dart';
 import '../../../../theme/app_theme.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NewPaymentPage extends StatefulWidget {
   const NewPaymentPage({super.key});
@@ -128,6 +129,9 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
     setState(() => _isSaving = true);
     try {
       if (_selectedAnneeId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final int? userId = prefs.getInt('userId');
+
         await dbHelper.addPaiement({
           'eleve_id': _selectedEleve!['id'],
           'classe_id': _selectedEleve!['classe_id'],
@@ -139,6 +143,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           'type_frais': _selectedTranche,
           'mois': DateFormat('MMMM', 'fr_FR').format(DateTime.now()),
           'observation': _refController.text.trim(),
+          'created_by_id': userId,
         });
 
         if (mounted) {

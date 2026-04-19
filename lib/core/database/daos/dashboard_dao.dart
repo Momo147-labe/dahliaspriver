@@ -154,14 +154,14 @@ class DashboardDao extends BaseDao {
           JOIN classe c ON e.classe_id = c.id
           LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
           LEFT JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id
-            AND cm.classe_id = e.classe_id AND cm.annee_scolaire_id = ?
+            AND cm.classe_id = e.classe_id
           WHERE n.annee_scolaire_id = ?
           GROUP BY n.eleve_id, n.matiere_id, cm.coefficient, cy.moyenne_passage
         ) as sub
         GROUP BY sub.eleve_id
       ) as sub_student
     ''',
-      [anneeId, anneeId],
+      [anneeId],
     );
 
     final academicData = academicStatsResult.first;
@@ -191,14 +191,13 @@ class DashboardDao extends BaseDao {
             LEFT JOIN classe_matiere cm
               ON cm.matiere_id = n.matiere_id
               AND cm.classe_id = e.classe_id
-              AND cm.annee_scolaire_id = ?
             WHERE n.annee_scolaire_id = ? AND e.sexe = ?
             GROUP BY n.eleve_id, n.matiere_id, cm.coefficient, cy.moyenne_passage
           ) as sub
           GROUP BY sub.eleve_id
         ) as per_student
         ''',
-        [anneeId, anneeId, sexe],
+        [anneeId, sexe],
       );
       final row = result.first;
       final total = (row['total'] as num?)?.toInt() ?? 0;

@@ -36,6 +36,9 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
   List<Map<String, dynamic>> _studentResults = [];
   Map<String, dynamic> _classStats = {};
 
+  /// Map de trimestre -> nom du trimestre (ex: {1: "1er Trimestre", 2: "2ème Trimestre"})
+  Map<int, String> _trimesterNames = {};
+
   @override
   void initState() {
     super.initState();
@@ -91,6 +94,33 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
 
       _subjects = List<Map<String, dynamic>>.from(subjectsRes);
 
+      // 2.1 Load trimester names from sequence_planification
+      if (widget.trimestre == 4) {
+        final trimRows = await db.rawQuery(
+          '''
+          SELECT DISTINCT trimestre, MIN(nom) as nom
+          FROM sequence_planification
+          WHERE annee_scolaire_id = ?
+          GROUP BY trimestre
+          ORDER BY trimestre ASC
+        ''',
+          [widget.anneeId],
+        );
+        if (trimRows.isNotEmpty) {
+          // Build a name from the first sequence name of each trimester
+          // e.g. "Séquence 1" → strip to "1er Trim." or use trimestre number
+          // But best: derive trim name from trimestre number
+          for (var row in trimRows) {
+            final t = row['trimestre'] as int;
+            _trimesterNames[t] = t == 1 ? '1er Trim.' : '${t}ème Trim.';
+          }
+        }
+        // If no sequences found, fallback to default 1..3
+        if (_trimesterNames.isEmpty) {
+          _trimesterNames = {1: '1er Trim.', 2: '2ème Trim.', 3: '3ème Trim.'};
+        }
+      }
+
       // 3. Load Students
       final students = await db.rawQuery(
         'SELECT * FROM eleve WHERE classe_id = ? ORDER BY nom, prenom',
@@ -104,40 +134,83 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
         final student = Student.fromMap(sRow);
         Map<int, double> subjectAverages = {};
         double totalPoints = 0;
+        double totalCoeffs = 0;
+
+        Map<int, double> trimPoints = {};
+        Map<int, double> trimCoeffs = {};
 
         // Fetch grades for this student
         String periodWhere = '';
-        List<dynamic> periodArgs = [student.id, widget.anneeId];
 
         if (widget.trimestre > 0 && widget.trimestre < 4) {
           periodWhere = 'AND trimestre = ?';
-          periodArgs.add(widget.trimestre);
         }
 
         for (var subj in _subjects) {
-          final grades = await db.rawQuery(
-            '''
-            SELECT note FROM notes 
+          List<dynamic> args = [student.id, widget.anneeId, subj['id']];
+          if (widget.trimestre > 0 && widget.trimestre < 4) {
+            args.add(widget.trimestre);
+          }
+
+          final grades = await db.rawQuery('''
+            SELECT note, coefficient, trimestre FROM notes 
             WHERE eleve_id = ? AND annee_scolaire_id = ? AND matiere_id = ? $periodWhere
-          ''',
-            [...periodArgs, subj['id']],
-          );
+          ''', args);
 
           if (grades.isNotEmpty) {
-            double sum = 0;
-            for (var g in grades) {
-              double val = (g['note'] as num).toDouble();
-              sum += val;
+            double finalAvg = 0;
+            // The coefficient is pulled from the grade record directly
+            double coeff =
+                (grades.first['coefficient'] as num?)?.toDouble() ?? 1.0;
+
+            if (widget.trimestre == 4) {
+              // BILAN ANNUEL: Moyenne des moyennes trimestrielles
+              Map<int, List<double>> trimGrades = {};
+              for (var g in grades) {
+                int trim = g['trimestre'] as int;
+                double val = (g['note'] as num).toDouble();
+                trimGrades.putIfAbsent(trim, () => []).add(val);
+              }
+
+              double trimSum = 0;
+              for (var trim in trimGrades.keys) {
+                var trimList = trimGrades[trim]!;
+                double tSum = 0;
+                for (var note in trimList) tSum += note;
+                double tAvg = (tSum / trimList.length);
+                trimSum += tAvg;
+
+                trimPoints[trim] = (trimPoints[trim] ?? 0) + (tAvg * coeff);
+                trimCoeffs[trim] = (trimCoeffs[trim] ?? 0) + coeff;
+              }
+              finalAvg = trimSum / trimGrades.length; // Moyenne des trimestres
+            } else {
+              // TRIMESTRE: Moyenne des séquences
+              double sum = 0;
+              for (var g in grades) {
+                double val = (g['note'] as num).toDouble();
+                sum += val;
+              }
+              finalAvg = sum / grades.length;
             }
-            double avg = sum / grades.length;
-            subjectAverages[subj['id']] = avg;
-            totalPoints += avg;
+
+            subjectAverages[subj['id']] = finalAvg;
+            totalPoints += (finalAvg * coeff);
+            totalCoeffs += coeff;
           }
         }
 
-        double generalAvg = _subjects.isNotEmpty
-            ? totalPoints / _subjects.length
-            : 0;
+        double generalAvg = totalCoeffs > 0 ? totalPoints / totalCoeffs : 0;
+
+        Map<int, double> studentTrimAvgs = {};
+        if (widget.trimestre == 4) {
+          for (var t in trimPoints.keys) {
+            final tc = trimCoeffs[t] ?? 0;
+            if (tc > 0) {
+              studentTrimAvgs[t] = trimPoints[t]! / tc;
+            }
+          }
+        }
 
         final double passMark =
             (_classe?['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
@@ -148,6 +221,7 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
           'subject_avgs': subjectAverages,
           'total_points': totalPoints,
           'moyenne_generale': generalAvg,
+          'trim_avgs': studentTrimAvgs,
           'rang_str': '',
           'is_admis': isAdmis,
           'decision': isAdmis ? 'ADMIS' : 'REDOUBLE',
@@ -470,7 +544,12 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
                   w: 35,
                 ),
               ),
-              _th("Total", w: 40, bg: Colors.grey[50]),
+              if (widget.trimestre == 4)
+                ..._trimesterNames.entries
+                    .map((e) => _th(e.value, w: 35, bg: Colors.blue[50]))
+                    .toList(),
+              if (widget.trimestre != 4)
+                _th("Total", w: 40, bg: Colors.grey[50]),
               _th("Moy\nGén", w: 45, bg: Colors.grey[200]),
               _th("Décision", w: 50, bg: Colors.grey[50]),
             ],
@@ -514,12 +593,24 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
                         align: Alignment.center,
                       );
                     }),
-                    _td(
-                      (res['total_points'] as double).toStringAsFixed(2),
-                      w: 40,
-                      bg: Colors.grey[50],
-                      bold: true,
-                    ),
+                    if (widget.trimestre == 4)
+                      ..._trimesterNames.entries.map((e) {
+                        final trimIdx = e.key;
+                        final avg = (res['trim_avgs']?[trimIdx] as double?);
+                        return _td(
+                          avg?.toStringAsFixed(2) ?? "-",
+                          w: 35,
+                          align: Alignment.center,
+                          bg: Colors.blue[50],
+                        );
+                      }).toList(),
+                    if (widget.trimestre != 4)
+                      _td(
+                        (res['total_points'] as double).toStringAsFixed(2),
+                        w: 40,
+                        bg: Colors.grey[50],
+                        bold: true,
+                      ),
                     _td(
                       (res['moyenne_generale'] as double).toStringAsFixed(2),
                       w: 45,
@@ -667,20 +758,6 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
                 const SizedBox(height: 40),
                 Container(width: 180, height: 1, color: Colors.black),
               ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Document généré par Guinée École le $dateStr',
-              style: const TextStyle(fontSize: 6, color: Colors.grey),
-            ),
-            const Text(
-              'Page 1/1',
-              style: TextStyle(fontSize: 6, color: Colors.grey),
             ),
           ],
         ),
@@ -897,7 +974,14 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
     for (var i = 0; i < _subjects.length; i++) {
       columnWidths[colIdx++] = const pw.FixedColumnWidth(30);
     }
-    columnWidths[colIdx++] = const pw.FixedColumnWidth(35); // Total Points
+    if (widget.trimestre == 4) {
+      for (var _ in _trimesterNames.entries) {
+        columnWidths[colIdx++] = const pw.FixedColumnWidth(30);
+      }
+    }
+    if (widget.trimestre != 4) {
+      columnWidths[colIdx++] = const pw.FixedColumnWidth(35); // Total Points
+    }
     columnWidths[colIdx++] = const pw.FixedColumnWidth(40); // Moyenne
     columnWidths[colIdx++] = const pw.FixedColumnWidth(45); // Decision
 
@@ -919,7 +1003,11 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
                 name.substring(0, min(name.length, 4)).toUpperCase(),
               );
             }),
-            _pdfHeaderCell("Total\nPoints"),
+            if (widget.trimestre == 4)
+              ..._trimesterNames.entries
+                  .map((e) => _pdfHeaderCell(e.value))
+                  .toList(),
+            if (widget.trimestre != 4) _pdfHeaderCell("Total\nPoints"),
             _pdfHeaderCell("Moyenne\nGénérale"),
             _pdfHeaderCell("Décision"),
           ],
@@ -958,10 +1046,16 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
                 final avg = avgs[s['id']];
                 return _pdfDataCell(avg != null ? avg.toStringAsFixed(2) : "-");
               }),
-              _pdfDataCell(
-                (res['total_points'] as double).toStringAsFixed(2),
-                bold: true,
-              ),
+              if (widget.trimestre == 4)
+                ..._trimesterNames.entries.map((e) {
+                  final avg = (res['trim_avgs']?[e.key] as double?);
+                  return _pdfDataCell(avg?.toStringAsFixed(2) ?? "-");
+                }).toList(),
+              if (widget.trimestre != 4)
+                _pdfDataCell(
+                  (res['total_points'] as double).toStringAsFixed(2),
+                  bold: true,
+                ),
               _pdfDataCell(
                 (res['moyenne_generale'] as double).toStringAsFixed(2),
                 bold: true,

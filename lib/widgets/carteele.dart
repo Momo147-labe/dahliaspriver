@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/student.dart';
 import '../models/ecole.dart';
 import '../core/database/database_helper.dart';
+import '../services/pdf/student_card_pdf_service.dart';
 import 'student_card_design.dart';
 
 class CarteScolaireGuinee extends StatefulWidget {
@@ -93,10 +94,13 @@ class _CarteScolaireGuineeState extends State<CarteScolaireGuinee> {
           IconButton(
             icon: const Icon(Icons.print),
             onPressed: () {
-              // TODO: Implement print for individual card
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Impression en cours...')),
-              );
+              if (student != null) {
+                StudentCardPdfService.generateAndPrintSingle(
+                  student: student!,
+                  ecole: ecole,
+                  anneeLibelle: anneeLibelle,
+                );
+              }
             },
           ),
         ],
