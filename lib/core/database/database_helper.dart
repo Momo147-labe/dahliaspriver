@@ -147,7 +147,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 49,
+      version: 50,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -1520,6 +1520,41 @@ class DatabaseHelper {
         debugPrint('Migration vers la version 49 terminée avec succès.');
       } catch (e) {
         debugPrint('Erreur lors de la migration v49 : $e');
+      }
+    }
+
+    if (oldVersion < 50) {
+      try {
+        // Index sur les élèves
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_eleve_annee ON eleve(annee_scolaire_id)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_eleve_classe ON eleve(classe_id)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_eleve_matricule ON eleve(matricule)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_eleve_nom_prenom ON eleve(nom, prenom)',
+        );
+
+        // Index sur les notes (très important pour les bulletins)
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_note_eleve_annee ON note(eleve_id, annee_scolaire_id)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_note_matiere_trim ON note(matiere_id, trimestre, sequence)',
+        );
+
+        // Index sur les paiements
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_paiement_eleve_annee ON paiement_detail(eleve_id, annee_scolaire_id)',
+        );
+
+        debugPrint('Migration vers la version 50 (indexation) terminée.');
+      } catch (e) {
+        debugPrint('Erreur lors de la migration v50 : $e');
       }
     }
   }

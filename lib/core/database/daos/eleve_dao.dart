@@ -26,6 +26,98 @@ class EleveDao extends BaseDao {
     );
   }
 
+  Future<List<Map<String, dynamic>>> getElevesPaginated({
+    required int anneeId,
+    required int limit,
+    required int offset,
+    String? search,
+    String? selectedClass,
+    String? selectedStatus,
+    String? selectedGender,
+  }) async {
+    List<String> whereClauses = ['e.annee_scolaire_id = ?'];
+    List<dynamic> whereArgs = [anneeId];
+
+    if (search != null && search.isNotEmpty) {
+      whereClauses.add(
+        '(e.nom LIKE ? OR e.prenom LIKE ? OR e.matricule LIKE ?)',
+      );
+      whereArgs.addAll(['%$search%', '%$search%', '%$search%']);
+    }
+
+    if (selectedClass != null && selectedClass != 'Toutes les classes') {
+      whereClauses.add('c.nom = ?');
+      whereArgs.add(selectedClass);
+    }
+
+    if (selectedStatus != null && selectedStatus != 'Tous les statuts') {
+      whereClauses.add('e.statut = ?');
+      whereArgs.add(selectedStatus.toLowerCase());
+    }
+
+    if (selectedGender != null && selectedGender != 'Tous les sexes') {
+      whereClauses.add('e.sexe = ?');
+      whereArgs.add(selectedGender == 'Masculin' ? 'M' : 'F');
+    }
+
+    final String whereString = whereClauses.join(' AND ');
+
+    return await db.rawQuery(
+      '''
+      SELECT e.*, c.nom as classe_nom 
+      FROM ${EleveSchema.tableName} e
+      LEFT JOIN classe c ON e.classe_id = c.id
+      WHERE $whereString
+      ORDER BY e.nom ASC, e.prenom ASC
+      LIMIT ? OFFSET ?
+    ''',
+      [...whereArgs, limit, offset],
+    );
+  }
+
+  Future<int> getElevesFilteredCount({
+    required int anneeId,
+    String? search,
+    String? selectedClass,
+    String? selectedStatus,
+    String? selectedGender,
+  }) async {
+    List<String> whereClauses = ['e.annee_scolaire_id = ?'];
+    List<dynamic> whereArgs = [anneeId];
+
+    if (search != null && search.isNotEmpty) {
+      whereClauses.add(
+        '(e.nom LIKE ? OR e.prenom LIKE ? OR e.matricule LIKE ?)',
+      );
+      whereArgs.addAll(['%$search%', '%$search%', '%$search%']);
+    }
+
+    if (selectedClass != null && selectedClass != 'Toutes les classes') {
+      whereClauses.add('c.nom = ?');
+      whereArgs.add(selectedClass);
+    }
+
+    if (selectedStatus != null && selectedStatus != 'Tous les statuts') {
+      whereClauses.add('e.statut = ?');
+      whereArgs.add(selectedStatus.toLowerCase());
+    }
+
+    if (selectedGender != null && selectedGender != 'Tous les sexes') {
+      whereClauses.add('e.sexe = ?');
+      whereArgs.add(selectedGender == 'Masculin' ? 'M' : 'F');
+    }
+
+    final String whereString = whereClauses.join(' AND ');
+
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count 
+      FROM ${EleveSchema.tableName} e
+      LEFT JOIN classe c ON e.classe_id = c.id
+      WHERE $whereString
+    ''', whereArgs);
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
   Future<List<Map<String, dynamic>>> searchEleves(String query) async {
     return await db.rawQuery(
       '''
@@ -111,36 +203,24 @@ class EleveDao extends BaseDao {
     int currentYearId, {
     int? previousYearId,
   }) async {
-    final currentStudents = await db.rawQuery(
+    final currentStats = await db.rawQuery(
       '''
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN sexe = 'M' THEN 1 ELSE 0 END) as males,
         SUM(CASE WHEN sexe = 'F' THEN 1 ELSE 0 END) as females,
         SUM(CASE WHEN statut = 'inscrit' THEN 1 ELSE 0 END) as new_students,
-        SUM(CASE WHEN statut = 'reinscrit' THEN 1 ELSE 0 END) as returning_students
+        SUM(CASE WHEN statut = 'reinscrit' THEN 1 ELSE 0 END) as returning_students,
+        AVG(CASE 
+          WHEN date_naissance IS NOT NULL AND date_naissance != '' 
+          THEN (strftime('%Y', 'now') - strftime('%Y', date_naissance)) 
+          ELSE NULL 
+        END) as average_age
       FROM ${EleveSchema.tableName}
       WHERE annee_scolaire_id = ?
     ''',
       [currentYearId],
     );
-
-    // Previous year students
-    Map<String, dynamic>? previousStudents;
-    if (previousYearId != null) {
-      final prevResult = await db.rawQuery(
-        '''
-        SELECT 
-          COUNT(*) as total,
-          SUM(CASE WHEN sexe = 'M' THEN 1 ELSE 0 END) as males,
-          SUM(CASE WHEN sexe = 'F' THEN 1 ELSE 0 END) as females
-        FROM ${EleveSchema.tableName}
-        WHERE annee_scolaire_id = ?
-      ''',
-        [previousYearId],
-      );
-      previousStudents = prevResult.isNotEmpty ? prevResult.first : null;
-    }
 
     final cycleDistribution = await db.rawQuery(
       '''
@@ -154,10 +234,21 @@ class EleveDao extends BaseDao {
       [currentYearId],
     );
 
+    final classDistribution = await db.rawQuery(
+      '''
+      SELECT c.nom as classe, COUNT(e.id) as count
+      FROM ${EleveSchema.tableName} e
+      JOIN classe c ON e.classe_id = c.id
+      WHERE e.annee_scolaire_id = ?
+      GROUP BY c.nom
+    ''',
+      [currentYearId],
+    );
+
     return {
-      'current': currentStudents.first,
-      'previous': previousStudents,
+      'stats': currentStats.first,
       'cycleDistribution': cycleDistribution,
+      'classDistribution': classDistribution,
     };
   }
 

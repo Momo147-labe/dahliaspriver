@@ -29,6 +29,7 @@ class TimetableDao extends BaseDao {
     int? enseignantId,
     int? classeId,
     int? excludeId,
+    Transaction? txn,
   }) async {
     String queryStr =
         '''
@@ -58,8 +59,32 @@ class TimetableDao extends BaseDao {
       args.add(excludeId);
     }
 
-    final result = await db.rawQuery(queryStr, args);
+    final executor = txn ?? db;
+    final result = await executor.rawQuery(queryStr, args);
     return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<void> bulkSaveTimetableEntries(
+    List<Map<String, dynamic>> entries,
+  ) async {
+    await db.transaction((txn) async {
+      for (var entry in entries) {
+        // En mode bulk save, si c'est une mise à jour ou un ajout on peut insérer
+        // (La logique de conflit est déjà validée côté DAO si on veut, ou on peut lancer une exception ici)
+        // Mais AddScheduleModal utilise checkConflicts pour l'UI, alors on l'insère / met à jour ici.
+        if (entry['id'] != null) {
+          entry['updated_at'] = DateTime.now().toIso8601String();
+          await txn.update(
+            EmploiDuTempsSchema.tableName,
+            entry,
+            where: 'id = ?',
+            whereArgs: [entry['id']],
+          );
+        } else {
+          await txn.insert(EmploiDuTempsSchema.tableName, entry);
+        }
+      }
+    });
   }
 
   Future<int> insertTimetableEntry(Map<String, dynamic> entry) async {

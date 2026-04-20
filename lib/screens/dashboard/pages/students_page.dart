@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/database/daos/eleve_dao.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../theme/app_theme.dart';
 import '../../../models/student.dart';
@@ -21,14 +22,15 @@ class StudentsPage extends StatefulWidget {
 
 class _StudentsPageState extends State<StudentsPage> {
   final TextEditingController _searchController = TextEditingController();
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _showFilters = false;
 
   // Pagination
   int _currentPage = 0;
-  static const int _itemsPerPage = 50;
+  final int _pageSize = 50;
+  int _totalItems = 0;
 
-  List<Map<String, dynamic>> _students = [];
+  // Données
   List<Map<String, dynamic>> _filteredStudents = [];
   List<String> _uniqueClasses = [];
 
@@ -50,119 +52,104 @@ class _StudentsPageState extends State<StudentsPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final anneeId = context.watch<AcademicYearProvider>().selectedAnneeId;
+    // Utiliser listen: false pour éviter que les changements du provider ne redéclenchent didChangeDependencies à l'infini
+    final academicProvider = Provider.of<AcademicYearProvider>(
+      context,
+      listen: false,
+    );
+    final anneeId = academicProvider.selectedAnneeId;
+
     if (anneeId != null && anneeId != _lastLoadedAnneeId) {
       _lastLoadedAnneeId = anneeId;
-      _loadData(anneeId);
+      // On utilise Future.microtask pour s'assurer que le build actuel est terminé
+      Future.microtask(() => _loadData(anneeId));
     }
   }
 
   Future<void> _loadData(int anneeId) async {
+    if (_isLoading) return;
     setState(() => _isLoading = true);
-    try {
-      final db = await DatabaseHelper.instance.database;
 
-      final students = await db.rawQuery(
-        '''
-        SELECT 
-          e.*,
-          c.nom as classe_nom,
-          n.nom as classe_niveau
-        FROM eleve e
-        LEFT JOIN classe c ON e.classe_id = c.id
-        LEFT JOIN niveaux n ON c.niveau_id = n.id
-        WHERE e.annee_scolaire_id = ?
-        ORDER BY e.nom, e.prenom
-      ''',
-        [anneeId],
+    try {
+      final eleveDao = EleveDao(await DatabaseHelper.instance.database);
+
+      // 1. Charger les statistiques globales et par classe
+      final analytics = await eleveDao.getStudentAnalytics(anneeId);
+
+      // 2. Charger le nombre total filtré pour la pagination
+      final totalCount = await eleveDao.getElevesFilteredCount(
+        anneeId: anneeId,
+        search: _searchController.text,
+        selectedClass: _selectedClassPrefix,
+        selectedStatus: _selectedStatus,
+        selectedGender: _selectedGender,
       );
 
-      setState(() {
-        _students = students;
-        _filteredStudents = students;
-        _calculateStats(students);
+      // 3. Charger les élèves de la page actuelle
+      final students = await eleveDao.getElevesPaginated(
+        anneeId: anneeId,
+        limit: _pageSize,
+        offset: _currentPage * _pageSize,
+        search: _searchController.text,
+        selectedClass: _selectedClassPrefix,
+        selectedStatus: _selectedStatus,
+        selectedGender: _selectedGender,
+      );
 
+      // 4. Charger les classes uniques pour le filtre (une seule fois ou à chaque changement d'année)
+      if (_uniqueClasses.length <= 1) {
+        final db = await DatabaseHelper.instance.database;
+        final classes = await db.query(
+          'classe',
+          columns: ['nom'],
+          orderBy: 'nom',
+        );
         _uniqueClasses = [
           'Toutes les classes',
-          ...students
-              .map((e) => e['classe_nom']?.toString() ?? 'Non défini')
-              .toSet()
-              .toList(),
+          ...classes.map((c) => c['nom'].toString()),
         ];
+      }
+
+      setState(() {
+        _filteredStudents = students;
+        _totalItems = totalCount;
+        _updateDisplayStats(analytics);
         _isLoading = false;
       });
-
-      _filterStudents();
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors du chargement : $e')),
+        );
       }
     }
   }
 
-  void _calculateStats(List<Map<String, dynamic>> students) {
-    _totalEleves = students.length;
-    _elevesInscrits = students.where((e) => e['statut'] == 'inscrit').length;
-    _elevesReinscrits = students
-        .where((e) => e['statut'] == 'reinscrit')
-        .length;
-    _elevesMasculins = students.where((e) => e['sexe'] == 'M').length;
-    _elevesFeminins = students.where((e) => e['sexe'] == 'F').length;
+  void _updateDisplayStats(Map<String, dynamic> analytics) {
+    final stats = analytics['stats'] as Map<String, dynamic>;
+    _totalEleves = stats['total'] ?? 0;
+    _elevesInscrits = stats['new_students'] ?? 0;
+    _elevesReinscrits = stats['returning_students'] ?? 0;
+    _elevesMasculins = stats['males'] ?? 0;
+    _elevesFeminins = stats['females'] ?? 0;
+    _ageMoyen = (stats['average_age'] ?? 0.0).round();
 
-    double totalAge = 0;
     _classesStats = {};
-
-    for (var s in students) {
-      final String birthDate = s['date_naissance']?.toString() ?? '';
-      if (birthDate.isNotEmpty) {
-        try {
-          final dt = DateTime.parse(birthDate);
-          totalAge += DateTime.now().year - dt.year;
-        } catch (_) {}
-      }
-
-      final String cls = s['classe_nom']?.toString() ?? 'Non assigné';
-      _classesStats[cls] = (_classesStats[cls] ?? 0) + 1;
+    final classDist =
+        analytics['classDistribution'] as List<Map<String, dynamic>>;
+    for (var item in classDist) {
+      _classesStats[item['classe'].toString()] = item['count'] as int;
     }
-
-    _ageMoyen = _totalEleves > 0 ? (totalAge / _totalEleves).round() : 0;
   }
 
   void _filterStudents() {
     setState(() {
-      _filteredStudents = _students.where((student) {
-        final searchText = _searchController.text.toLowerCase();
-        final matchesSearch =
-            (student['nom']?.toString().toLowerCase().contains(searchText) ??
-                false) ||
-            (student['prenom']?.toString().toLowerCase().contains(searchText) ??
-                false) ||
-            (student['matricule']?.toString().toLowerCase().contains(
-                  searchText,
-                ) ??
-                false) ||
-            (student['classe_nom']?.toString().toLowerCase().contains(
-                  searchText,
-                ) ??
-                false);
-
-        final matchesClass =
-            _selectedClassPrefix == 'Toutes les classes' ||
-            student['classe_nom'] == _selectedClassPrefix;
-        final matchesStatus =
-            _selectedStatus == 'Tous les statuts' ||
-            student['statut'] == _selectedStatus.toLowerCase();
-        final matchesGender =
-            _selectedGender == 'Tous les sexes' ||
-            student['sexe'] == (_selectedGender == 'Masculin' ? 'M' : 'F');
-
-        return matchesSearch && matchesClass && matchesStatus && matchesGender;
-      }).toList();
       _currentPage = 0;
     });
+    if (_lastLoadedAnneeId != null) {
+      _loadData(_lastLoadedAnneeId!);
+    }
   }
 
   @override
@@ -829,94 +816,89 @@ class _StudentsPageState extends State<StudentsPage> {
                 ),
               ),
             ],
-            rows: _filteredStudents
-                .skip(_currentPage * _itemsPerPage)
-                .take(_itemsPerPage)
-                .map((eleve) {
-                  final s = Student.fromMap(eleve);
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundImage: s.photo.isNotEmpty
-                              ? (s.photo.startsWith('/') ||
-                                        s.photo.contains(':\\')
-                                    ? FileImage(File(s.photo)) as ImageProvider
-                                    : AssetImage(s.photo))
-                              : null,
-                          child: s.photo.isEmpty
-                              ? const Icon(Icons.person, size: 20)
-                              : null,
+            rows: _filteredStudents.map((eleve) {
+              final s = Student.fromMap(eleve);
+              return DataRow(
+                cells: [
+                  DataCell(
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundImage: s.photo.isNotEmpty
+                          ? (s.photo.startsWith('/') || s.photo.contains(':\\')
+                                ? FileImage(File(s.photo)) as ImageProvider
+                                : AssetImage(s.photo))
+                          : null,
+                      child: s.photo.isEmpty
+                          ? const Icon(Icons.person, size: 20)
+                          : null,
+                    ),
+                  ),
+                  DataCell(
+                    Text(s.matricule, style: const TextStyle(fontSize: 14)),
+                  ),
+                  DataCell(
+                    Text(
+                      s.fullName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  DataCell(Text(s.dateNaissance)),
+                  DataCell(Text(s.lieuNaissance)),
+                  DataCell(Text(s.classe)),
+                  DataCell(_buildStatusBadge(s.statut)),
+                  DataCell(
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            size: 20,
+                            color: Colors.blue,
+                          ),
+                          onPressed: () => _openEditModal(s),
                         ),
-                      ),
-                      DataCell(
-                        Text(s.matricule, style: const TextStyle(fontSize: 14)),
-                      ),
-                      DataCell(
-                        Text(
-                          s.fullName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            size: 20,
+                            color: Colors.red,
+                          ),
+                          onPressed: () => _handleDelete(s),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.visibility_outlined,
+                            size: 20,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () => _openDetail(int.parse(s.id)),
+                        ),
+                        Tooltip(
+                          message: 'Carte Scolaire',
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.badge,
+                              size: 20,
+                              color: Color(0xFF22C3C3),
+                            ),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    CarteScolaireGuinee(studentId: s.id),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                      DataCell(Text(s.dateNaissance)),
-                      DataCell(Text(s.lieuNaissance)),
-                      DataCell(Text(s.classe)),
-                      DataCell(_buildStatusBadge(s.statut)),
-                      DataCell(
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(
-                                Icons.edit_outlined,
-                                size: 20,
-                                color: Colors.blue,
-                              ),
-                              onPressed: () => _openEditModal(s),
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                size: 20,
-                                color: Colors.red,
-                              ),
-                              onPressed: () => _handleDelete(s),
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.visibility_outlined,
-                                size: 20,
-                                color: Colors.grey,
-                              ),
-                              onPressed: () => _openDetail(int.parse(s.id)),
-                            ),
-                            Tooltip(
-                              message: 'Carte Scolaire',
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.badge,
-                                  size: 20,
-                                  color: Color(0xFF22C3C3),
-                                ),
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        CarteScolaireGuinee(studentId: s.id),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                })
-                .toList(),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
           ),
         ),
       ),
@@ -1065,8 +1047,8 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   void _openCardsModal() {
-    if (_students.isEmpty) return;
-    final studentMap = _students.first;
+    if (_filteredStudents.isEmpty) return;
+    final studentMap = _filteredStudents.first;
     final student = Student.fromMap(studentMap);
     Navigator.push(
       context,
@@ -1138,12 +1120,9 @@ class _StudentsPageState extends State<StudentsPage> {
   Widget _buildPaginationControls(bool isDark) {
     if (_filteredStudents.isEmpty) return const SizedBox.shrink();
 
-    final int totalPages = (_filteredStudents.length / _itemsPerPage).ceil();
-    final int startItem = (_currentPage * _itemsPerPage) + 1;
-    final int endItem = ((_currentPage + 1) * _itemsPerPage).clamp(
-      0,
-      _filteredStudents.length,
-    );
+    final int totalPages = (_totalItems / _pageSize).ceil();
+    final int startItem = _totalItems == 0 ? 0 : (_currentPage * _pageSize) + 1;
+    final int endItem = ((_currentPage + 1) * _pageSize).clamp(0, _totalItems);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
@@ -1158,7 +1137,7 @@ class _StudentsPageState extends State<StudentsPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Affichage $startItem à $endItem sur ${_filteredStudents.length} élèves',
+            'Affichage $startItem à $endItem sur $_totalItems élèves',
             style: TextStyle(
               color: isDark ? Colors.white70 : AppTheme.textSecondary,
               fontSize: 14,

@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/academic_year_provider.dart';
+import '../../../services/pdf/master_schedule_pdf_service.dart';
 
 class MasterSchedulePage extends StatefulWidget {
   const MasterSchedulePage({super.key});
@@ -12,12 +14,52 @@ class MasterSchedulePage extends StatefulWidget {
   State<MasterSchedulePage> createState() => _MasterSchedulePageState();
 }
 
+Map<String, dynamic> _buildMatrixIsolate(List<dynamic> args) {
+  final schedule = args[0] as List<Map<String, dynamic>>;
+
+  final Map<int, Map<String, Map<int, Map<String, dynamic>>>> matrix = {};
+  final Map<int, Map<String, Map<int, List<int>>>> teacherConflicts = {};
+
+  for (var course in schedule) {
+    final jour = course['jour_semaine'] as int;
+    final timeSlot = '${course['heure_debut']} - ${course['heure_fin']}';
+    final classeId = course['classe_id'] as int;
+    final enseignantId = course['enseignant_id'] as int?;
+
+    matrix.putIfAbsent(jour, () => {});
+    matrix[jour]!.putIfAbsent(timeSlot, () => {});
+    matrix[jour]![timeSlot]![classeId] = course;
+
+    if (enseignantId != null) {
+      teacherConflicts.putIfAbsent(jour, () => {});
+      teacherConflicts[jour]!.putIfAbsent(timeSlot, () => {});
+      teacherConflicts[jour]![timeSlot]!.putIfAbsent(enseignantId, () => []);
+      teacherConflicts[jour]![timeSlot]![enseignantId]!.add(classeId);
+    }
+  }
+
+  return {'matrix': matrix, 'conflicts': teacherConflicts};
+}
+
 class _MasterSchedulePageState extends State<MasterSchedulePage> {
   bool _isLoading = true;
+  bool _hideEmptyClasses = false;
   List<Map<String, dynamic>> _classes = [];
 
-  // Structure: _matrix[jour][heure_debut_fin][classe_id] = course
-  final Map<int, Map<String, Map<int, Map<String, dynamic>>>> _matrix = {};
+  Map<int, Map<String, Map<int, Map<String, dynamic>>>> _matrix = {};
+  Map<int, Map<String, Map<int, List<int>>>> _teacherConflicts = {};
+
+  List<Map<String, dynamic>> get _visibleClasses {
+    if (!_hideEmptyClasses) return _classes;
+    return _classes.where((c) {
+      for (var dayData in _matrix.values) {
+        for (var timeSlotData in dayData.values) {
+          if (timeSlotData.containsKey(c['id'])) return true;
+        }
+      }
+      return false;
+    }).toList();
+  }
 
   final ScrollController _verticalController = ScrollController();
   final ScrollController _horizontalController = ScrollController();
@@ -86,12 +128,21 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
         [anneeId],
       );
 
-      _buildMatrix(schedule);
+      final result = await compute(_buildMatrixIsolate, [schedule]);
 
       if (mounted) {
         setState(() {
           _classes = classes;
+          _matrix =
+              result['matrix']
+                  as Map<int, Map<String, Map<int, Map<String, dynamic>>>>;
+          _teacherConflicts =
+              result['conflicts'] as Map<int, Map<String, Map<int, List<int>>>>;
           _isLoading = false;
+        });
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToToday();
         });
       }
     } catch (e) {
@@ -104,17 +155,26 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
     }
   }
 
-  void _buildMatrix(List<Map<String, dynamic>> schedule) {
-    _matrix.clear();
-    for (var course in schedule) {
-      final jour = course['jour_semaine'] as int;
-      final timeSlot = '${course['heure_debut']} - ${course['heure_fin']}';
-      final classeId = course['classe_id'] as int;
+  void _scrollToToday() {
+    if (!_verticalController.hasClients) return;
+    final today = DateTime.now().weekday;
+    if (today > 7) return;
 
-      _matrix.putIfAbsent(jour, () => {});
-      _matrix[jour]!.putIfAbsent(timeSlot, () => {});
-      _matrix[jour]![timeSlot]![classeId] = course;
+    double offset = 0.0;
+    final cellHeight = 80.0;
+    final dayHeaderHeight = 50.0;
+
+    for (int day = 1; day < today; day++) {
+      if (!_matrix.containsKey(day)) continue;
+      final timeSlots = _matrix[day]!.keys.length;
+      offset += 16.0 + dayHeaderHeight + (timeSlots * cellHeight);
     }
+
+    _verticalController.animateTo(
+      offset,
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
@@ -144,9 +204,56 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
           ),
         ),
         actions: [
+          Row(
+            children: [
+              Text(
+                'Masquer vides',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black87,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Switch(
+                value: _hideEmptyClasses,
+                onChanged: (val) => setState(() => _hideEmptyClasses = val),
+                activeColor: AppTheme.primaryColor,
+              ),
+            ],
+          ),
+          IconButton(
+            icon: Icon(Icons.picture_as_pdf, color: AppTheme.primaryColor),
+            onPressed: () async {
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Préparation du PDF, veuillez patienter...'),
+                  ),
+                );
+                final yearProvider = context.read<AcademicYearProvider>();
+                final activeYearLabel =
+                    yearProvider.selectedAnnee?['periode'] ?? '2024-2025';
+                await MasterSchedulePdfService.generateAndPrint(
+                  classes: _visibleClasses,
+                  matrix: _matrix,
+                  schoolName: 'Dahlias Priver',
+                  schoolYear: activeYearLabel,
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erreur PDF: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            tooltip: 'Exporter en PDF',
+          ),
           IconButton(
             icon: Icon(Icons.refresh, color: AppTheme.primaryColor),
             onPressed: _loadData,
+            tooltip: 'Rafraîchir',
           ),
         ],
       ),
@@ -176,9 +283,12 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
 
   Widget _buildMatrixTable(bool isDark) {
     // Collect all unique timeslots per day
-    final List<Widget> rows = [];
+    final List<Widget> leftRows = [];
+    final List<Widget> rightRows = [];
     final cellWidth = 160.0;
     final headerWidth = 140.0;
+    final cellHeight = 80.0;
+    final dayHeaderHeight = 50.0;
 
     for (int day = 1; day <= 7; day++) {
       if (!_matrix.containsKey(day)) continue; // Skip empty days
@@ -188,12 +298,15 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
         ..sort(); // Sort chronologically
 
       // Add Day Header Row spanning the whole table
-      rows.add(
+      // Left side (Day Name)
+      leftRows.add(
         Container(
-          width: headerWidth + (cellWidth * _classes.length),
+          width: headerWidth,
+          height: dayHeaderHeight,
           color: isDark ? Colors.white10 : Colors.blue.shade50,
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           margin: const EdgeInsets.only(top: 16),
+          alignment: Alignment.centerLeft,
           child: Text(
             _days[day].toUpperCase(),
             style: TextStyle(
@@ -205,16 +318,75 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
           ),
         ),
       );
+      // Right side (Blank continuation of the bar)
+      rightRows.add(
+        Container(
+          width: cellWidth * _visibleClasses.length,
+          height: dayHeaderHeight,
+          color: isDark ? Colors.white10 : Colors.blue.shade50,
+          margin: const EdgeInsets.only(top: 16),
+        ),
+      );
 
       // Add rows for each timeslot
       for (var slot in timeSlots) {
-        rows.add(
+        // Left side: Fixed TimeSlot Header
+        leftRows.add(
+          Container(
+            width: headerWidth,
+            height: cellHeight,
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.surfaceDark : Colors.white,
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.grey.shade200,
+                ),
+                right: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.grey.shade200,
+                ),
+              ),
+            ),
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Symbols.schedule, size: 16, color: Colors.grey.shade500),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    slot,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+
+        // Right side: Class Cells
+        rightRows.add(
           Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Fixed TimeSlot Header
-              Container(
-                width: headerWidth,
+            children: _visibleClasses.map((c) {
+              final course = timeSlotsMap[slot]?[c['id']];
+
+              bool hasConflict = false;
+              if (course != null && course['enseignant_id'] != null) {
+                final profId = course['enseignant_id'] as int;
+                if (_teacherConflicts[day] != null &&
+                    _teacherConflicts[day]![slot] != null &&
+                    _teacherConflicts[day]![slot]![profId] != null &&
+                    _teacherConflicts[day]![slot]![profId]!.length > 1) {
+                  hasConflict = true;
+                }
+              }
+
+              return Container(
+                width: cellWidth,
+                height: cellHeight,
                 decoration: BoxDecoration(
                   color: isDark ? AppTheme.surfaceDark : Colors.white,
                   border: Border(
@@ -226,57 +398,15 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
                     ),
                   ),
                 ),
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Symbols.schedule,
-                      size: 16,
-                      color: Colors.grey.shade500,
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        slot,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white70 : Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Class Cells
-              ..._classes.map((c) {
-                final course = timeSlotsMap[slot]?[c['id']];
-                return Container(
-                  width: cellWidth,
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTheme.surfaceDark : Colors.white,
-                    border: Border(
-                      bottom: BorderSide(
-                        color: isDark ? Colors.white10 : Colors.grey.shade200,
-                      ),
-                      right: BorderSide(
-                        color: isDark ? Colors.white10 : Colors.grey.shade200,
-                      ),
-                    ),
-                  ),
-                  child: _buildCell(course, isDark),
-                );
-              }).toList(),
-            ],
+                child: _buildCell(course, isDark, hasConflict),
+              );
+            }).toList(),
           ),
         );
       }
     }
 
-    if (rows.isEmpty) {
+    if (leftRows.isEmpty) {
       return _buildEmptyState(isDark);
     }
 
@@ -324,7 +454,7 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
                       const ClampingScrollPhysics(), // Prevent bounce desync
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: _classes.map((c) {
+                    children: _visibleClasses.map((c) {
                       return Container(
                         width: cellWidth,
                         height: 50,
@@ -358,19 +488,29 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
         Expanded(
           child: SingleChildScrollView(
             controller: _verticalController,
-            child: SingleChildScrollView(
-              controller: _horizontalController,
-              scrollDirection: Axis.horizontal,
-              child: IntrinsicHeight(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var r in rows)
-                      // Provide an intrinsic height to force children to expand
-                      IntrinsicHeight(child: r),
-                  ],
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // LEFT FIXED COLUMN
+                Container(
+                  width: headerWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: leftRows,
+                  ),
                 ),
-              ),
+                // RIGHT SCROLLABLE MATRIX
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _horizontalController,
+                    scrollDirection: Axis.horizontal,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: rightRows,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -378,7 +518,11 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
     );
   }
 
-  Widget _buildCell(Map<String, dynamic>? course, bool isDark) {
+  Widget _buildCell(
+    Map<String, dynamic>? course,
+    bool isDark,
+    bool hasConflict,
+  ) {
     if (course == null) {
       return Container(
         color: isDark ? Colors.transparent : Colors.grey.shade50,
@@ -392,8 +536,15 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
       padding: const EdgeInsets.all(8),
       margin: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: subjectColor.withOpacity(0.1),
-        border: Border.all(color: subjectColor.withOpacity(0.3)),
+        color: hasConflict
+            ? Colors.red.withOpacity(0.1)
+            : subjectColor.withOpacity(0.1),
+        border: Border.all(
+          color: hasConflict
+              ? Colors.red.withOpacity(0.8)
+              : subjectColor.withOpacity(0.3),
+          width: hasConflict ? 2.0 : 1.0,
+        ),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
