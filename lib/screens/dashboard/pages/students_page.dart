@@ -724,6 +724,34 @@ class _StudentsPageState extends State<StudentsPage> {
     );
   }
 
+  Future<void> _onStudentTap(Map<String, dynamic> eleve) async {
+    // Si déjà confirmé, on peut ouvrir le détail ou ne rien faire
+    if (eleve['confirmation_statut'] != 'En attente') {
+      _openDetail(int.parse(eleve['id'].toString()));
+      return;
+    }
+
+    if (_lastLoadedAnneeId == null) return;
+
+    final student = Student.fromMap(eleve);
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AddStudentModal(
+          initialStudent: student,
+          isValidationMode: true,
+          onSuccess: () {
+            if (_lastLoadedAnneeId != null) {
+              _loadData(_lastLoadedAnneeId!);
+            }
+          },
+          onClose: () => Navigator.pop(context),
+        ),
+      );
+    }
+  }
+
   Widget _buildStudentsList(BuildContext context, bool isDark) {
     if (MediaQuery.of(context).size.width > 1000) {
       return _buildDesktopTable(isDark);
@@ -787,25 +815,31 @@ class _StudentsPageState extends State<StudentsPage> {
               ),
               DataColumn(
                 label: Text(
-                  'Date de Naiss.',
+                  'Né(e) le',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
               DataColumn(
                 label: Text(
-                  'Lieu de Naiss.',
+                  'À',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+              DataColumn(
+                label: Text(
+                  'Type',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+              DataColumn(
+                label: Text(
+                  'État',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
               DataColumn(
                 label: Text(
                   'Classe',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-              ),
-              DataColumn(
-                label: Text(
-                  'Statut',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
@@ -819,6 +853,11 @@ class _StudentsPageState extends State<StudentsPage> {
             rows: _filteredStudents.map((eleve) {
               final s = Student.fromMap(eleve);
               return DataRow(
+                onSelectChanged: (selected) {
+                  if (selected == true) {
+                    _onStudentTap(eleve);
+                  }
+                },
                 cells: [
                   DataCell(
                     CircleAvatar(
@@ -845,10 +884,17 @@ class _StudentsPageState extends State<StudentsPage> {
                       ),
                     ),
                   ),
-                  DataCell(Text(s.dateNaissance)),
-                  DataCell(Text(s.lieuNaissance)),
+                  DataCell(
+                    Text(s.dateNaissance, style: const TextStyle(fontSize: 14)),
+                  ),
+                  DataCell(
+                    Text(s.lieuNaissance, style: const TextStyle(fontSize: 14)),
+                  ),
+                  DataCell(_buildInscriptionBadge(eleve['type_inscription'])),
+                  DataCell(
+                    _buildConfirmationBadge(eleve['confirmation_statut']),
+                  ),
                   DataCell(Text(s.classe)),
-                  DataCell(_buildStatusBadge(s.statut)),
                   DataCell(
                     Row(
                       children: [
@@ -905,23 +951,59 @@ class _StudentsPageState extends State<StudentsPage> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    final bool isInscrit = status.toLowerCase() == 'inscrit';
+  Widget _buildInscriptionBadge(String? type) {
+    if (type == null) return const Text('-');
+    Color color = Colors.blue;
+    if (type == 'Redoublement') color = Colors.orange;
+    if (type == 'Réinscription') color = Colors.purple;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: isInscrit
-            ? Colors.green.withOpacity(0.1)
-            : Colors.blue.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        status.toUpperCase(),
+        type,
         style: TextStyle(
-          color: isInscrit ? Colors.green : Colors.blue,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
         ),
+      ),
+    );
+  }
+
+  Widget _buildConfirmationBadge(String? state) {
+    final bool isConfirmed = state == 'Confirmé';
+    final String label = isConfirmed ? 'ACTIVE' : 'EN ATTENTE';
+    final Color color = isConfirmed ? Colors.teal : Colors.amber;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isConfirmed ? Icons.check_circle : Icons.timer,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -939,74 +1021,93 @@ class _StudentsPageState extends State<StudentsPage> {
       itemCount: _filteredStudents.length,
       itemBuilder: (context, index) {
         final s = Student.fromMap(_filteredStudents[index]);
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1F2937) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              CircleAvatar(
-                radius: 35,
-                backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-                backgroundImage: s.photo.isNotEmpty
-                    ? (s.photo.startsWith('/') || s.photo.contains(':\\')
-                          ? FileImage(File(s.photo)) as ImageProvider
-                          : AssetImage(s.photo))
-                    : null,
-                child: s.photo.isEmpty
-                    ? const Icon(
-                        Icons.person,
-                        size: 40,
-                        color: AppTheme.primaryColor,
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                s.fullName,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+        return InkWell(
+          onTap: () => _onStudentTap(_filteredStudents[index]),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1F2937) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-              const SizedBox(height: 4),
-              _buildStatusBadge(s.statut),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildMobileAction(
-                    'Détails',
-                    Icons.visibility,
-                    const Color(0xFF8B5CF6),
-                    () => _openDetail(int.parse(s.id)),
+              ],
+            ),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 35,
+                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                  backgroundImage: s.photo.isNotEmpty
+                      ? (s.photo.startsWith('/') || s.photo.contains(':\\')
+                            ? FileImage(File(s.photo)) as ImageProvider
+                            : AssetImage(s.photo))
+                      : null,
+                  child: s.photo.isEmpty
+                      ? const Icon(
+                          Icons.person,
+                          size: 40,
+                          color: AppTheme.primaryColor,
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  s.fullName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 8),
-                  _buildMobileAction(
-                    'Modifier',
-                    Icons.edit,
-                    Colors.blue,
-                    () => _openEditModal(s),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildMobileAction(
-                    'Supprimer',
-                    Icons.delete,
-                    Colors.red,
-                    () => _handleDelete(s),
-                  ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildInscriptionBadge(
+                      _filteredStudents[index]['type_inscription'],
+                    ),
+                    const SizedBox(width: 8),
+                    _buildConfirmationBadge(
+                      _filteredStudents[index]['confirmation_statut'],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Né(e) le: ${s.dateNaissance} à ${s.lieuNaissance}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildMobileAction(
+                      'Détails',
+                      Icons.visibility,
+                      const Color(0xFF8B5CF6),
+                      () => _openDetail(int.parse(s.id)),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildMobileAction(
+                      'Modifier',
+                      Icons.edit,
+                      Colors.blue,
+                      () => _openEditModal(s),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildMobileAction(
+                      'Supprimer',
+                      Icons.delete,
+                      Colors.red,
+                      () => _handleDelete(s),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },

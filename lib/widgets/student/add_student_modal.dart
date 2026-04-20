@@ -7,14 +7,20 @@ import '../../../core/database/database_helper.dart';
 import '../../../core/services/file_service.dart';
 import '../../../theme/app_theme.dart';
 
+import '../../../models/student.dart';
+
 class AddStudentModal extends StatefulWidget {
   final VoidCallback onSuccess;
   final VoidCallback onClose;
+  final Student? initialStudent;
+  final bool isValidationMode;
 
   const AddStudentModal({
     super.key,
     required this.onSuccess,
     required this.onClose,
+    this.initialStudent,
+    this.isValidationMode = false,
   });
 
   @override
@@ -62,6 +68,9 @@ class _AddStudentModalState extends State<AddStudentModal> {
   @override
   void initState() {
     super.initState();
+    if (widget.isValidationMode && widget.initialStudent != null) {
+      _prefillData();
+    }
     _loadData();
     // Générer la référence initiale
     _generateReference(_selectedModePaiement).then((ref) {
@@ -71,6 +80,36 @@ class _AddStudentModalState extends State<AddStudentModal> {
         });
       }
     });
+  }
+
+  void _prefillData() {
+    final s = widget.initialStudent!;
+    _nomController.text = s.nom;
+    _prenomController.text = s.prenom;
+    _matriculeController.text = s.matricule;
+    _dateNaissanceController.text = s.dateNaissance;
+    _lieuNaissanceController.text = s.lieuNaissance;
+    _selectedSexe = s.sexe;
+    _nomPereController.text = s.nomPere ?? '';
+    _prenomPereController.text = s.prenomPere ?? '';
+    _nomMereController.text = s.nomMere ?? '';
+    _prenomMereController.text = s.prenomMere ?? '';
+    _personneAPrevenirController.text = s.personneAPrevenir ?? '';
+    _contactUrgenceController.text = s.contactUrgence ?? '';
+    _selectedClasse = s.classe;
+    // On garde le statut ou on mappe vers nouveau/reinscrit si nécessaire
+    // Si c'est une validation d'un candidat "En attente", c'est souvent un nouveau
+    if (s.statut == 'En attente') {
+      _selectedTypeInscription = 'nouveau';
+      _selectedTypePaiement = 'inscription';
+    } else {
+      _selectedTypeInscription = s.statut.toLowerCase() == 'reinscrit'
+          ? 'reinscrit'
+          : 'nouveau';
+      _selectedTypePaiement = _selectedTypeInscription == 'reinscrit'
+          ? 'reinscription'
+          : 'inscription';
+    }
   }
 
   Future<void> _loadData() async {
@@ -87,11 +126,13 @@ class _AddStudentModalState extends State<AddStudentModal> {
       });
 
       // Charger les informations de l'école pour le contact par défaut
-      final ecoleInfo = await DatabaseHelper.instance.getEcoleInfo();
-      if (mounted) {
-        setState(() {
-          _contactUrgenceController.text = ecoleInfo['telephone'] ?? '';
-        });
+      if (!widget.isValidationMode) {
+        final ecoleInfo = await DatabaseHelper.instance.getEcoleInfo();
+        if (mounted) {
+          setState(() {
+            _contactUrgenceController.text = ecoleInfo['telephone'] ?? '';
+          });
+        }
       }
 
       // Charger les classes pour l'année scolaire active uniquement
@@ -314,15 +355,6 @@ class _AddStudentModalState extends State<AddStudentModal> {
       final classeId = _getClasseId(_selectedClasse);
       final anneeScolaireId = _getAnneeScolaireId(_selectedAnneeScolaire);
 
-      // Générer matricule automatiquement si non fourni
-      if (_matriculeController.text.isEmpty) {
-        final year = DateTime.now().year;
-        final count = await db.rawQuery('SELECT COUNT(*) as count FROM eleve');
-        final studentCount = ((count.first['count'] as int?) ?? 0) + 1;
-        _matriculeController.text =
-            '$year-STUD-${studentCount.toString().padLeft(4, '0')}';
-      }
-
       // Calculer le montant payé et restant
       final montantPayeText = _montantPayeController.text.trim();
       final montantPaye = montantPayeText.isEmpty
@@ -340,40 +372,86 @@ class _AddStudentModalState extends State<AddStudentModal> {
         );
       }
 
-      // Insérer l'élève avec les champs requis selon le schéma
-      final eleveData = {
-        'matricule': _matriculeController.text,
-        'nom': _nomController.text,
-        'prenom': _prenomController.text,
-        'date_naissance': _dateNaissanceController.text,
-        'lieu_naissance': _lieuNaissanceController.text,
-        'sexe': _selectedSexe,
-        'classe_id': classeId,
-        'annee_scolaire_id': anneeScolaireId,
-        'frais_id': _fraisId,
-        'photo': _selectedImage?.path ?? '',
-        'personne_a_prevenir': _personneAPrevenirController.text.trim(),
-        'contact_urgence': _contactUrgenceController.text.trim(),
-        'nom_pere': _nomPereController.text.trim(),
-        'prenom_pere': _prenomPereController.text.trim(),
-        'nom_mere': _nomMereController.text.trim(),
-        'prenom_mere': _prenomMereController.text.trim(),
-        'statut': _selectedTypeInscription == 'reinscrit'
-            ? 'reinscrit'
-            : 'inscrit',
-        'created_at': DateTime.now().toIso8601String(),
-      };
+      int eleveId;
 
-      final eleveId = await db.insert('eleve', eleveData);
+      if (widget.isValidationMode && widget.initialStudent != null) {
+        eleveId = int.parse(widget.initialStudent!.id);
+        // Mettre à jour le statut de l'élève
+        await db.update(
+          'eleve',
+          {
+            'statut': _selectedTypeInscription == 'reinscrit'
+                ? 'reinscrit'
+                : 'inscrit',
+            'classe_id': classeId,
+            'annee_scolaire_id': anneeScolaireId,
+            'frais_id': _fraisId,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [eleveId],
+        );
+      } else {
+        // Générer matricule automatiquement si non fourni
+        if (_matriculeController.text.isEmpty) {
+          final year = DateTime.now().year;
+          final count = await db.rawQuery(
+            'SELECT COUNT(*) as count FROM eleve',
+          );
+          final studentCount = ((count.first['count'] as int?) ?? 0) + 1;
+          _matriculeController.text =
+              '$year-STUD-${studentCount.toString().padLeft(4, '0')}';
+        }
 
-      // Insérer le parcours de l'élève
-      await db.insert('eleve_parcours', {
-        'eleve_id': eleveId,
-        'classe_id': classeId,
-        'annee_scolaire_id': anneeScolaireId,
-        'type_inscription': _selectedTypeInscription,
-        'date_inscription': DateTime.now().toIso8601String(),
-      });
+        // Insérer l'élève avec les champs requis selon le schéma
+        final eleveData = {
+          'matricule': _matriculeController.text,
+          'nom': _nomController.text,
+          'prenom': _prenomController.text,
+          'date_naissance': _dateNaissanceController.text,
+          'lieu_naissance': _lieuNaissanceController.text,
+          'sexe': _selectedSexe,
+          'classe_id': classeId,
+          'annee_scolaire_id': anneeScolaireId,
+          'frais_id': _fraisId,
+          'photo': _selectedImage?.path ?? '',
+          'personne_a_prevenir': _personneAPrevenirController.text.trim(),
+          'contact_urgence': _contactUrgenceController.text.trim(),
+          'nom_pere': _nomPereController.text.trim(),
+          'prenom_pere': _prenomPereController.text.trim(),
+          'nom_mere': _nomMereController.text.trim(),
+          'prenom_mere': _prenomMereController.text.trim(),
+          'statut': _selectedTypeInscription == 'reinscrit'
+              ? 'reinscrit'
+              : 'inscrit',
+          'created_at': DateTime.now().toIso8601String(),
+        };
+
+        eleveId = await db.insert('eleve', eleveData);
+      }
+
+      if (widget.isValidationMode && widget.initialStudent != null) {
+        // Mettre à jour le parcours existant pour marquer comme confirmé
+        await db.update(
+          'eleve_parcours',
+          {
+            'confirmation_statut': 'Confirmé',
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'eleve_id = ? AND annee_scolaire_id = ?',
+          whereArgs: [eleveId, anneeScolaireId],
+        );
+      } else {
+        // Insérer le nouveau parcours de l'élève
+        await db.insert('eleve_parcours', {
+          'eleve_id': eleveId,
+          'classe_id': classeId,
+          'annee_scolaire_id': anneeScolaireId,
+          'type_inscription': _selectedTypeInscription,
+          'date_inscription': DateTime.now().toIso8601String(),
+          'confirmation_statut': 'Confirmé',
+        });
+      }
 
       // Insérer le paiement avec le frais_id
       await db.insert('paiement', {
@@ -529,10 +607,12 @@ class _AddStudentModalState extends State<AddStudentModal> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      _buildPersonalInfo(),
-                      const SizedBox(height: 32),
-                      _buildParentsInfo(),
-                      const SizedBox(height: 32),
+                      if (!widget.isValidationMode) ...[
+                        _buildPersonalInfo(),
+                        const SizedBox(height: 32),
+                        _buildParentsInfo(),
+                        const SizedBox(height: 32),
+                      ],
                       _buildAcademicInfo(),
                       const SizedBox(height: 32),
                       _buildFinancialInfo(),
@@ -580,9 +660,11 @@ class _AddStudentModalState extends State<AddStudentModal> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Inscription Élève',
-                style: TextStyle(
+              Text(
+                widget.isValidationMode
+                    ? 'Validation & Paiement'
+                    : 'Inscription Élève',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -590,7 +672,9 @@ class _AddStudentModalState extends State<AddStudentModal> {
                 ),
               ),
               Text(
-                'Nouveau formulaire d\'admission scolaire',
+                widget.isValidationMode
+                    ? 'Finalisation de l\'admission pour ${widget.initialStudent?.fullName} (${widget.initialStudent?.matricule})'
+                    : 'Nouveau formulaire d\'admission scolaire',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.8),
                   fontSize: 14,
@@ -1015,42 +1099,62 @@ class _AddStudentModalState extends State<AddStudentModal> {
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: _buildDropdownField(
-              label: 'Classe',
-              selectedValue: _selectedClasse,
-              values: _classes.map((c) => c['nom']?.toString() ?? '').toList(),
-              displayValues: _classes
-                  .map((c) => c['nom']?.toString() ?? '')
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) {
-                  setState(() => _selectedClasse = v);
-                  _loadFraisScolarite();
-                }
-              },
-              isRequired: true,
-            ),
+            child: widget.isValidationMode
+                ? _buildTextField(
+                    controller: TextEditingController(text: _selectedClasse),
+                    label: 'Classe',
+                    icon: Icons.class_outlined,
+                    isRequired: false,
+                    isReadOnly: true,
+                  )
+                : _buildDropdownField(
+                    label: 'Classe',
+                    selectedValue: _selectedClasse,
+                    values: _classes
+                        .map((c) => c['nom']?.toString() ?? '')
+                        .toList(),
+                    displayValues: _classes
+                        .map((c) => c['nom']?.toString() ?? '')
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() => _selectedClasse = v);
+                        _loadFraisScolarite();
+                      }
+                    },
+                    isRequired: true,
+                  ),
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: _buildDropdownField(
-              label: 'Type d\'inscription',
-              selectedValue: _selectedTypeInscription,
-              values: ['nouveau', 'redoublant', 'reinscrit'],
-              displayValues: ['Nouveau', 'Redoublant', 'Réinscrit'],
-              onChanged: (v) {
-                if (v != null) {
-                  setState(() {
-                    _selectedTypeInscription = v;
-                    _selectedTypePaiement = (v == 'reinscrit')
-                        ? 'reinscription'
-                        : 'inscription';
-                  });
-                  _loadFraisScolarite();
-                }
-              },
-              isRequired: true,
-            ),
+            child: widget.isValidationMode
+                ? _buildTextField(
+                    controller: TextEditingController(
+                      text: _selectedTypeInscription.toUpperCase(),
+                    ),
+                    label: 'Type d\'inscription',
+                    icon: Icons.app_registration_rounded,
+                    isRequired: false,
+                    isReadOnly: true,
+                  )
+                : _buildDropdownField(
+                    label: 'Type d\'inscription',
+                    selectedValue: _selectedTypeInscription,
+                    values: ['nouveau', 'redoublant', 'reinscrit'],
+                    displayValues: ['Nouveau', 'Redoublant', 'Réinscrit'],
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() {
+                          _selectedTypeInscription = v;
+                          _selectedTypePaiement = (v == 'reinscrit')
+                              ? 'reinscription'
+                              : 'inscription';
+                        });
+                        _loadFraisScolarite();
+                      }
+                    },
+                    isRequired: true,
+                  ),
           ),
         ],
       ),
@@ -1226,19 +1330,31 @@ class _AddStudentModalState extends State<AddStudentModal> {
           Row(
             children: [
               Expanded(
-                child: _buildDropdownField(
-                  label: 'Type de paiement',
-                  selectedValue: _selectedTypePaiement,
-                  values: ['inscription', 'reinscription'],
-                  displayValues: ['Inscription', 'Réinscription'],
-                  onChanged: (v) {
-                    if (v != null) {
-                      setState(() => _selectedTypePaiement = v);
-                      _loadFraisScolarite();
-                    }
-                  },
-                  isRequired: true,
-                ),
+                child: widget.isValidationMode
+                    ? _buildTextField(
+                        controller: TextEditingController(
+                          text: _selectedTypePaiement == 'inscription'
+                              ? 'Inscription'
+                              : 'Réinscription',
+                        ),
+                        label: 'Type de paiement',
+                        icon: Icons.payment_rounded,
+                        isRequired: false,
+                        isReadOnly: true,
+                      )
+                    : _buildDropdownField(
+                        label: 'Type de paiement',
+                        selectedValue: _selectedTypePaiement,
+                        values: ['inscription', 'reinscription'],
+                        displayValues: ['Inscription', 'Réinscription'],
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() => _selectedTypePaiement = v);
+                            _loadFraisScolarite();
+                          }
+                        },
+                        isRequired: true,
+                      ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1334,14 +1450,16 @@ class _AddStudentModalState extends State<AddStudentModal> {
                       strokeWidth: 2,
                     ),
                   )
-                : const Row(
+                : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.check_circle_outline, size: 20),
-                      SizedBox(width: 12),
+                      const Icon(Icons.check_circle_outline, size: 20),
+                      const SizedBox(width: 12),
                       Text(
-                        'Finaliser l\'Inscription',
-                        style: TextStyle(
+                        widget.isValidationMode
+                            ? 'Valider & Confirmer'
+                            : 'Finaliser l\'Inscription',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,

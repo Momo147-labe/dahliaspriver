@@ -114,6 +114,19 @@ class PaiementDao extends BaseDao {
           where: 'id = ?',
           whereArgs: [existing.first['id']],
         );
+
+        // Confirmation automatique du statut de l'élève dans son parcours
+        await txn.update(
+          'eleve_parcours',
+          {'confirmation_statut': 'Confirmé'},
+          where:
+              'eleve_id = ? AND annee_scolaire_id = ? AND confirmation_statut = ?',
+          whereArgs: [
+            data['eleve_id'],
+            data['annee_scolaire_id'],
+            'En attente',
+          ],
+        );
       } else {
         final eleve = await txn.query(
           'eleve',

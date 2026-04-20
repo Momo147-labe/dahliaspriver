@@ -134,6 +134,10 @@ class DatabaseHelper {
     _dbCompleter = Completer<Database>();
     try {
       _db = await _initDatabase();
+
+      // Force addition of missing columns if any
+      await _manualSchemaFix(_db!);
+
       _dbCompleter!.complete(_db!);
       return _db!;
     } catch (e) {
@@ -143,11 +147,28 @@ class DatabaseHelper {
     }
   }
 
+  /// Manually ensure critical columns are present, bypasses migration lifecycle issues
+  Future<void> _manualSchemaFix(Database db) async {
+    try {
+      await _addColumnSafely(db, 'eleve_parcours', 'updated_at', 'TEXT');
+      await _addColumnSafely(
+        db,
+        'eleve_parcours',
+        'confirmation_statut',
+        "TEXT",
+      );
+      await _addColumnSafely(db, 'niveaux', 'next_niveau_id', 'INTEGER');
+      debugPrint('Manual schema fix applied successfully.');
+    } catch (e) {
+      debugPrint('Error during manual schema fix: $e');
+    }
+  }
+
   Future<Database> _initDatabase() async {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 51,
+      version: 54,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -164,7 +185,7 @@ class DatabaseHelper {
         date_debut TEXT NOT NULL,
         date_fin TEXT NOT NULL,
         active INTEGER DEFAULT 0,
-        statut TEXT CHECK (statut IN ('Active', 'Inactive')) DEFAULT 'Active',
+        statut TEXT CHECK (statut IN ('Active', 'Inactive', 'Terminée')) DEFAULT 'Active',
         annee_precedente_id INTEGER,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -196,13 +217,11 @@ class DatabaseHelper {
         salle TEXT,
         niveau_id INTEGER,
         eff_max INTEGER DEFAULT 100,
-        next_class_id INTEGER,
         is_final_class INTEGER DEFAULT 0,
         prof_principal_id INTEGER,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (prof_principal_id) REFERENCES enseignant(id),
-        FOREIGN KEY (next_class_id) REFERENCES classe(id),
         FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id),
         FOREIGN KEY (niveau_id) REFERENCES niveaux(id)
       )
@@ -328,11 +347,13 @@ class DatabaseHelper {
         ordre INTEGER NOT NULL,
         cycle_id INTEGER NOT NULL,
         moyenne_passage REAL,
+        next_niveau_id INTEGER,
         is_examen INTEGER DEFAULT 0,
         actif INTEGER DEFAULT 1,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id)
+        FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id),
+        FOREIGN KEY (next_niveau_id) REFERENCES niveaux(id)
       )
     ''');
 
@@ -458,7 +479,12 @@ class DatabaseHelper {
         annee_scolaire_id INTEGER NOT NULL,
         type_inscription TEXT,
         date_inscription TEXT,
+        decision TEXT,
+        moyenne REAL,
+        rang INTEGER,
+        confirmation_statut TEXT DEFAULT 'Confirmé',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (eleve_id) REFERENCES eleve(id),
         FOREIGN KEY (classe_id) REFERENCES classe(id),
         FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
@@ -1569,6 +1595,79 @@ class DatabaseHelper {
         );
       } catch (e) {
         debugPrint('Erreur migration v51: $e');
+      }
+    }
+
+    if (oldVersion < 52) {
+      debugPrint(
+        'Migration v52: Refonte de la promotion et statuts des années',
+      );
+      try {
+        // 1. Recreer annee_scolaire pour la nouvelle contrainte CHECK
+        await db.execute(
+          'ALTER TABLE annee_scolaire RENAME TO annee_scolaire_old',
+        );
+        await db.execute('''
+          CREATE TABLE annee_scolaire (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            libelle TEXT NOT NULL,
+            date_debut TEXT NOT NULL,
+            date_fin TEXT NOT NULL,
+            active INTEGER DEFAULT 0,
+            statut TEXT CHECK (statut IN ('Active', 'Inactive', 'Terminée')) DEFAULT 'Active',
+            annee_precedente_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (annee_precedente_id) REFERENCES annee_scolaire(id)
+          )
+        ''');
+        await db.execute('''
+          INSERT INTO annee_scolaire (id, libelle, date_debut, date_fin, active, statut, annee_precedente_id, created_at, updated_at)
+          SELECT id, libelle, date_debut, date_fin, active, statut, annee_precedente_id, created_at, updated_at FROM annee_scolaire_old
+        ''');
+        await db.execute('DROP TABLE annee_scolaire_old');
+
+        // 2. Ajouter next_niveau_id à niveaux
+        await _addColumnSafely(
+          db,
+          'niveaux',
+          'next_niveau_id',
+          'INTEGER REFERENCES niveaux(id)',
+        );
+
+        // 3. Ajouter confirmation_statut à eleve_parcours
+        await _addColumnSafely(
+          db,
+          'eleve_parcours',
+          'confirmation_statut',
+          "TEXT DEFAULT 'Confirmé'",
+        );
+
+        // 4. Note: next_class_id reste dans la table classe pour compatibilité mais ne sera plus utilisé
+        // Sa suppression complète nécessiterait une recréation de table complexe.
+
+        debugPrint('Migration v52 terminée avec succès.');
+      } catch (e) {
+        debugPrint('Erreur migration v52: $e');
+      }
+    }
+
+    if (oldVersion < 54) {
+      try {
+        // Double check all needed columns in eleve_parcours
+        // Note: SQLite ALTER TABLE doesn't allow CURRENT_TIMESTAMP as default for new columns
+        await _addColumnSafely(db, 'eleve_parcours', 'updated_at', 'TEXT');
+        await _addColumnSafely(
+          db,
+          'eleve_parcours',
+          'confirmation_statut',
+          "TEXT",
+        );
+        debugPrint(
+          'Migration v54: Verification des colonnes eleve_parcours terminée.',
+        );
+      } catch (e) {
+        debugPrint('Erreur migration v54: $e');
       }
     }
   }

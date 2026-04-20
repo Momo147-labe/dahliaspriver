@@ -10,6 +10,15 @@ class ClasseDao extends BaseDao {
     return await db.query(ClasseSchema.tableName, orderBy: 'nom ASC');
   }
 
+  Future<List<Map<String, dynamic>>> getClassesByNiveau(int niveauId) async {
+    return await db.query(
+      ClasseSchema.tableName,
+      where: 'niveau_id = ?',
+      whereArgs: [niveauId],
+      orderBy: 'nom ASC',
+    );
+  }
+
   Future<Map<String, dynamic>?> getClasseById(int id) async {
     final result = await db.query(
       ClasseSchema.tableName,

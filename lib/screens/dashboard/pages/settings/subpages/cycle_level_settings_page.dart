@@ -27,7 +27,17 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
       List<Map<String, dynamic>> enrichedCycles = [];
 
       for (var cycle in cycles) {
-        final levels = await _db.getNiveauxByCycle(cycle['id']);
+        final levels = await _db.rawQuery(
+          '''
+          SELECT n.*, next.nom as next_niveau_nom, c.nom as cycle_nom
+          FROM niveaux n
+          LEFT JOIN niveaux next ON n.next_niveau_id = next.id
+          LEFT JOIN cycles_scolaires c ON n.cycle_id = c.id
+          WHERE n.cycle_id = ?
+          ORDER BY n.ordre ASC
+        ''',
+          [cycle['id']],
+        );
         enrichedCycles.add({...cycle, 'niveaux': levels});
       }
 
@@ -363,6 +373,31 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
                 : 'Seuil hérité',
             style: TextStyle(color: Colors.grey[500], fontSize: 11),
           ),
+          if (lvl['next_niveau_id'] != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.arrow_forward,
+                    size: 10,
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Vers: ${lvl['next_niveau_nom'] ?? 'Chargement...'}',
+                      style: const TextStyle(
+                        color: Colors.green,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -594,7 +629,14 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
     final moyController = TextEditingController(
       text: (level?['moyenne_passage']?.toString() ?? ''),
     );
+    int? selectedNextNiveauId = level?['next_niveau_id'] as int?;
     bool isExamen = (level?['is_examen'] ?? 0) == 1;
+
+    // Récupérer tous les niveaux pour le dropdown (sauf soi-même)
+    final allLevels = _cyclesWithLevels
+        .expand((c) => c['niveaux'] as List<Map<String, dynamic>>)
+        .where((l) => l['id'] != level?['id'])
+        .toList();
 
     showDialog(
       context: context,
@@ -679,6 +721,43 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
                         onChanged: (v) => setDialogState(() => isExamen = v),
                         activeColor: AppTheme.primaryColor,
                       ),
+                      const SizedBox(height: 20),
+                      DropdownButtonFormField<int>(
+                        value: selectedNextNiveauId,
+                        decoration: InputDecoration(
+                          labelText: 'NIVEAU SUIVANT (PROMOTION)',
+                          labelStyle: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                            color: Colors.grey[500],
+                          ),
+                          filled: true,
+                          fillColor: isDark
+                              ? Colors.grey[900]
+                              : Colors.grey[50],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        items: [
+                          const DropdownMenuItem<int>(
+                            value: null,
+                            child: Text('Aucun (Fin de cycle/Terminal)'),
+                          ),
+                          ...allLevels.map(
+                            (l) => DropdownMenuItem<int>(
+                              value: l['id'] as int,
+                              child: Text(
+                                '${l['nom']} (${l['cycle_nom'] ?? ''})',
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) =>
+                            setDialogState(() => selectedNextNiveauId = v),
+                      ),
                     ],
                   ),
                 ),
@@ -705,6 +784,7 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
                                 moyController.text,
                               ),
                               'is_examen': isExamen ? 1 : 0,
+                              'next_niveau_id': selectedNextNiveauId,
                             };
                             await _db.saveNiveau(data);
                             Navigator.pop(context);

@@ -20,8 +20,10 @@ class _PromotionPageState extends State<PromotionPage> {
   int? _newAnneeId;
 
   List<Map<String, dynamic>> _classes = [];
+  List<Map<String, dynamic>> _destClasses = [];
   int? _oldClasseId;
   int? _newClasseId;
+  int? _nextNiveauId;
 
   // Students list with averages
   List<Map<String, dynamic>> _students = [];
@@ -30,6 +32,8 @@ class _PromotionPageState extends State<PromotionPage> {
 
   // Cycle pass mark
   double _moyennePassage = 10.0;
+  double _noteMax = 20.0;
+  bool _isFinalClass = false;
 
   @override
   void initState() {
@@ -75,12 +79,13 @@ class _PromotionPageState extends State<PromotionPage> {
       _classes = await _dbHelper.classeDao.getClassesByAnnee(_oldAnneeId!);
       if (_classes.isNotEmpty) {
         _oldClasseId = _classes.first['id'];
-        // Use next_class_id to auto-select the destination class
-        await _resolveNextClass(_oldClasseId!);
+        // Charger les classes de destination basées sur le niveau
+        await _resolveDestinationClasses(_oldClasseId!);
         await _loadStudentsWithAverages();
       } else {
         _oldClasseId = null;
         _newClasseId = null;
+        _destClasses = [];
         _students = [];
         _selectedAdmisIds.clear();
         _selectedRedoublantIds.clear();
@@ -91,20 +96,54 @@ class _PromotionPageState extends State<PromotionPage> {
     }
   }
 
-  /// Resolves next_class_id from the database for a given class
-  Future<void> _resolveNextClass(int classeId) async {
+  /// Résout les classes de destination via le lien entre niveaux
+  Future<void> _resolveDestinationClasses(int sourceClasseId) async {
     final db = await _dbHelper.database;
-    final result = await db.query(
+    setState(() {
+      _destClasses = [];
+      _nextNiveauId = null;
+      _newClasseId = null;
+    });
+
+    // 1. Trouver le niveau de la classe source
+    final sourceResult = await db.query(
       'classe',
-      columns: ['next_class_id'],
+      columns: ['niveau_id'],
       where: 'id = ?',
-      whereArgs: [classeId],
+      whereArgs: [sourceClasseId],
     );
-    if (result.isNotEmpty && result.first['next_class_id'] != null) {
-      _newClasseId = result.first['next_class_id'] as int;
-    } else {
-      // Fallback: keep same class (redoublement case)
-      _newClasseId = classeId;
+
+    if (sourceResult.isNotEmpty && sourceResult.first['niveau_id'] != null) {
+      int niveauId = sourceResult.first['niveau_id'] as int;
+
+      // 2. Trouver le niveau suivant
+      final niveauResult = await db.query(
+        'niveaux',
+        columns: ['next_niveau_id'],
+        where: 'id = ?',
+        whereArgs: [niveauId],
+      );
+
+      if (niveauResult.isNotEmpty &&
+          niveauResult.first['next_niveau_id'] != null) {
+        _nextNiveauId = niveauResult.first['next_niveau_id'] as int;
+
+        // 3. Charger les classes de ce niveau
+        _destClasses = await _dbHelper.classeDao.getClassesByNiveau(
+          _nextNiveauId!,
+        );
+
+        if (_destClasses.isNotEmpty) {
+          _newClasseId = _destClasses.first['id'];
+        } else {
+          _newClasseId = null;
+        }
+      } else {
+        // Pas de niveau suivant défini (classe finale ?)
+        _nextNiveauId = null;
+        _destClasses = [];
+        _newClasseId = null;
+      }
     }
   }
 
@@ -112,18 +151,25 @@ class _PromotionPageState extends State<PromotionPage> {
     if (_oldClasseId == null || _oldAnneeId == null) return;
     setState(() => _isLoading = true);
     try {
-      // 1. Get the moyenne_passage from the cycle linked to the class
+      // 1. Get the moyenne_passage, note_max and is_final_class from the cycle linked to the class
       final db = await _dbHelper.database;
       final cycleResult = await db.rawQuery(
-        '''SELECT cy.moyenne_passage 
+        '''SELECT cy.moyenne_passage, cy.note_max, c.is_final_class 
            FROM classe c 
            JOIN cycles_scolaires cy ON c.cycle_id = cy.id 
            WHERE c.id = ?''',
         [_oldClasseId],
       );
-      _moyennePassage = cycleResult.isNotEmpty
-          ? (cycleResult.first['moyenne_passage'] as num?)?.toDouble() ?? 10.0
-          : 10.0;
+      if (cycleResult.isNotEmpty) {
+        _moyennePassage =
+            (cycleResult.first['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
+        _noteMax = (cycleResult.first['note_max'] as num?)?.toDouble() ?? 20.0;
+        _isFinalClass = cycleResult.first['is_final_class'] == 1;
+      } else {
+        _moyennePassage = 10.0;
+        _noteMax = 20.0;
+        _isFinalClass = false;
+      }
 
       // 2. Get students
       final rawStudents = await _dbHelper.eleveDao.getElevesByClasse(
@@ -168,20 +214,43 @@ class _PromotionPageState extends State<PromotionPage> {
   }
 
   Future<void> _executePromotion() async {
+    if (_oldAnneeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Promotion bloquée : l\'année sélectionnée n\'a pas d\'historique défini.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     if (_selectedAdmisIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Aucun élève admis sélectionné.')),
       );
       return;
     }
-    if (_newClasseId == null || _newAnneeId == null) return;
+    // Validate destination class OR check if it's a final class
+    if (!_isFinalClass && (_newClasseId == null || _newAnneeId == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner une classe de destination.'),
+        ),
+      );
+      return;
+    }
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirmer la promotion'),
+        title: Text(
+          _isFinalClass ? 'Confirmer l\'archivage' : 'Confirmer la promotion',
+        ),
         content: Text(
-          'Promouvoir ${_selectedAdmisIds.length} élève(s) admis vers la classe de destination ?',
+          _isFinalClass
+              ? 'Archiver ${_selectedAdmisIds.length} élève(s) diplômé(s) ? (Statut: Sorti)'
+              : 'Promouvoir ${_selectedAdmisIds.length} élève(s) admis vers la classe de destination ?',
         ),
         actions: [
           TextButton(
@@ -203,19 +272,44 @@ class _PromotionPageState extends State<PromotionPage> {
 
     setState(() => _isLoading = true);
     try {
-      await _dbHelper.eleveDao.executeBulkPromotion(
-        eleveIds: _selectedAdmisIds.toList(),
-        oldClasseId: _oldClasseId!,
-        oldAnneeId: _oldAnneeId!,
-        newClasseId: _newClasseId!,
-        newAnneeId: _newAnneeId!,
-        decision: 'Admis',
-      );
+      final db = await _dbHelper.database;
+      await db.transaction((txn) async {
+        for (var id in _selectedAdmisIds) {
+          if (_isFinalClass) {
+            // Archive terminal class students
+            await txn.update(
+              'eleve',
+              {
+                'statut': 'sorti',
+                'updated_at': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [id],
+            );
+          } else {
+            // Standard promotion
+            await txn.update(
+              'eleve',
+              {
+                'classe_id': _newClasseId,
+                'annee_scolaire_id': _newAnneeId,
+                'statut': 'reinscrit',
+                'updated_at': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [id],
+            );
+          }
+        }
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${_selectedAdmisIds.length} élève(s) promu(s) avec succès.',
+              _isFinalClass
+                  ? '${_selectedAdmisIds.length} élève(s) archivé(s) comme diplômé(s).'
+                  : '${_selectedAdmisIds.length} élève(s) promu(s) avec succès.',
             ),
             backgroundColor: Colors.green,
           ),
@@ -268,14 +362,22 @@ class _PromotionPageState extends State<PromotionPage> {
 
     setState(() => _isLoading = true);
     try {
-      await _dbHelper.eleveDao.executeBulkPromotion(
-        eleveIds: _selectedRedoublantIds.toList(),
-        oldClasseId: _oldClasseId!,
-        oldAnneeId: _oldAnneeId!,
-        newClasseId: _oldClasseId!, // Same class for redoublement
-        newAnneeId: _newAnneeId!,
-        decision: 'Redoublant',
-      );
+      final db = await _dbHelper.database;
+      await db.transaction((txn) async {
+        for (var id in _selectedRedoublantIds) {
+          await txn.update(
+            'eleve',
+            {
+              'annee_scolaire_id': _newAnneeId,
+              'statut': 'reinscrit', // Re-enrolled for redoublement
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [id],
+          );
+        }
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -301,6 +403,8 @@ class _PromotionPageState extends State<PromotionPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final width = MediaQuery.of(context).size.width;
+    final isNarrow = width < 1000;
 
     return Scaffold(
       backgroundColor: isDark
@@ -308,29 +412,38 @@ class _PromotionPageState extends State<PromotionPage> {
           : AppTheme.backgroundLight,
       body: _isLoading && _annees.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildControls(isDark),
-                  const SizedBox(height: 12),
-                  _buildPassMarkBanner(isDark),
-                  const SizedBox(height: 12),
-                  _buildActionButtons(isDark),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: _isLoading && _annees.isNotEmpty
-                        ? const Center(child: CircularProgressIndicator())
-                        : _buildStudentsList(isDark),
-                  ),
-                ],
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildControls(isDark, isNarrow),
+                    const SizedBox(height: 12),
+                    _buildPassMarkBanner(isDark),
+                    const SizedBox(height: 12),
+                    _buildActionButtons(isDark, isNarrow),
+                    const SizedBox(height: 12),
+                    if (_isLoading && _annees.isNotEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else
+                      _buildStudentsList(isDark),
+                  ],
+                ),
               ),
             ),
     );
   }
 
   Widget _buildPassMarkBanner(bool isDark) {
+    if (_oldAnneeId == null || _oldClasseId == null)
+      return const SizedBox.shrink();
+
     final admisCount = _students.where((s) => s['isAdmis'] == true).length;
     final redoublantCount = _students.length - admisCount;
 
@@ -357,7 +470,8 @@ class _PromotionPageState extends State<PromotionPage> {
                 children: [
                   const TextSpan(text: 'Note de passage du cycle : '),
                   TextSpan(
-                    text: '${_moyennePassage.toStringAsFixed(1)} / 20',
+                    text:
+                        '${_moyennePassage.toStringAsFixed(1)} / ${_noteMax.toStringAsFixed(0)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const TextSpan(text: '  •  '),
@@ -385,42 +499,56 @@ class _PromotionPageState extends State<PromotionPage> {
     );
   }
 
-  Widget _buildActionButtons(bool isDark) {
-    return Row(
-      children: [
-        const Spacer(),
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red[700],
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+  Widget _buildActionButtons(bool isDark, bool isNarrow) {
+    if (_students.isEmpty) return const SizedBox.shrink();
+
+    final buttons = [
+      ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red[700],
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
-          onPressed: _isLoading ? null : _executeRedoublement,
-          icon: const Icon(Icons.replay, size: 18),
-          label: Text('Redoubler (${_selectedRedoublantIds.length})'),
+          minimumSize: isNarrow ? const Size(double.infinity, 45) : null,
         ),
-        const SizedBox(width: 12),
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green[700],
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+        onPressed: _isLoading ? null : _executeRedoublement,
+        icon: const Icon(Icons.replay, size: 18),
+        label: Text('Redoubler (${_selectedRedoublantIds.length})'),
+      ),
+      if (!isNarrow) const SizedBox(width: 12) else const SizedBox(height: 8),
+      ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green[700],
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
-          onPressed: _isLoading ? null : _executePromotion,
-          icon: const Icon(Icons.arrow_upward, size: 18),
-          label: Text('Promouvoir (${_selectedAdmisIds.length})'),
+          minimumSize: isNarrow ? const Size(double.infinity, 45) : null,
         ),
-      ],
-    );
+        onPressed: _isLoading ? null : _executePromotion,
+        icon: Icon(
+          _isFinalClass ? Icons.archive_rounded : Icons.trending_up,
+          size: 18,
+        ),
+        label: Text(
+          _isFinalClass
+              ? 'ARCHIVER LES DIPLÔMÉS (${_selectedAdmisIds.length})'
+              : 'PROMOUVOIR (${_selectedAdmisIds.length})',
+        ),
+      ),
+    ];
+
+    if (isNarrow) {
+      return Column(children: buttons);
+    }
+
+    return Row(children: [const Spacer(), ...buttons]);
   }
 
-  Widget _buildControls(bool isDark) {
+  Widget _buildControls(bool isDark, bool isNarrow) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -430,131 +558,33 @@ class _PromotionPageState extends State<PromotionPage> {
           color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
         ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Flex(
+        direction: isNarrow ? Axis.vertical : Axis.horizontal,
+        crossAxisAlignment: isNarrow
+            ? CrossAxisAlignment.stretch
+            : CrossAxisAlignment.end,
         children: [
           // FROM block
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'ORIGINE',
-                        style: TextStyle(
-                          color: Colors.blue[400],
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  decoration: InputDecoration(
-                    labelText: 'Année de Départ',
-                    labelStyle: TextStyle(
-                      color: isDark ? Colors.white60 : Colors.black54,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    filled: true,
-                    fillColor: isDark
-                        ? const Color(0xFF374151)
-                        : Colors.grey[50],
-                  ),
-                  dropdownColor: isDark
-                      ? const Color(0xFF374151)
-                      : Colors.white,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                  value: _oldAnneeId,
-                  items: _annees
-                      .map(
-                        (a) => DropdownMenuItem<int>(
-                          value: a['id'] as int,
-                          child: Text(a['libelle'].toString()),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    setState(() => _oldAnneeId = v);
-                    _loadClasses();
-                  },
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<int>(
-                  decoration: InputDecoration(
-                    labelText: 'Classe de Départ',
-                    labelStyle: TextStyle(
-                      color: isDark ? Colors.white60 : Colors.black54,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    filled: true,
-                    fillColor: isDark
-                        ? const Color(0xFF374151)
-                        : Colors.grey[50],
-                  ),
-                  dropdownColor: isDark
-                      ? const Color(0xFF374151)
-                      : Colors.white,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                  value: _oldClasseId,
-                  items: _classes
-                      .map(
-                        (c) => DropdownMenuItem<int>(
-                          value: c['id'] as int,
-                          child: Text(c['nom'].toString()),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) async {
-                    setState(() => _oldClasseId = v);
-                    if (v != null) await _resolveNextClass(v);
-                    await _loadStudentsWithAverages();
-                    setState(() {});
-                  },
-                ),
-              ],
-            ),
-          ),
+          if (isNarrow)
+            _buildSourceBlock(isDark)
+          else
+            Expanded(child: _buildSourceBlock(isDark)),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: EdgeInsets.symmetric(
+              horizontal: isNarrow ? 0 : 20,
+              vertical: isNarrow ? 12 : 16,
+            ),
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: AppTheme.primaryColor.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.arrow_forward_rounded,
+              child: Icon(
+                isNarrow
+                    ? Icons.arrow_downward_rounded
+                    : Icons.arrow_forward_rounded,
                 size: 24,
                 color: AppTheme.primaryColor,
               ),
@@ -562,124 +592,246 @@ class _PromotionPageState extends State<PromotionPage> {
           ),
 
           // TO block
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (isNarrow)
+            _buildDestinationBlock(isDark, isNarrow)
+          else
+            Expanded(child: _buildDestinationBlock(isDark, isNarrow)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourceBlock(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'ORIGINE',
+                style: TextStyle(
+                  color: Colors.blue[400],
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<int>(
+          decoration: InputDecoration(
+            labelText: 'Année de Départ',
+            labelStyle: TextStyle(
+              color: isDark ? Colors.white60 : Colors.black54,
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            filled: true,
+            fillColor: isDark ? const Color(0xFF374151) : Colors.grey[50],
+          ),
+          dropdownColor: isDark ? const Color(0xFF374151) : Colors.white,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          value: _oldAnneeId,
+          items: _annees
+              .map(
+                (a) => DropdownMenuItem<int>(
+                  value: a['id'] as int,
+                  child: Text(a['libelle'].toString()),
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            setState(() => _oldAnneeId = v);
+            _loadClasses();
+          },
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          decoration: InputDecoration(
+            labelText: 'Classe de Départ',
+            labelStyle: TextStyle(
+              color: isDark ? Colors.white60 : Colors.black54,
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            filled: true,
+            fillColor: isDark ? const Color(0xFF374151) : Colors.grey[50],
+          ),
+          dropdownColor: isDark ? const Color(0xFF374151) : Colors.white,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          value: _oldClasseId,
+          items: _classes
+              .map(
+                (c) => DropdownMenuItem<int>(
+                  value: c['id'] as int,
+                  child: Text(c['nom'].toString()),
+                ),
+              )
+              .toList(),
+          onChanged: (v) async {
+            setState(() => _oldClasseId = v);
+            if (v != null) await _resolveDestinationClasses(v);
+            await _loadStudentsWithAverages();
+            setState(() {});
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDestinationBlock(bool isDark, bool isNarrow) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'DESTINATION',
+                style: TextStyle(
+                  color: Colors.green[400],
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<int>(
+          decoration: InputDecoration(
+            labelText: 'Année de Destination',
+            labelStyle: TextStyle(
+              color: isDark ? Colors.white60 : Colors.black54,
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            filled: true,
+            fillColor: isDark ? const Color(0xFF374151) : Colors.grey[50],
+          ),
+          dropdownColor: isDark ? const Color(0xFF374151) : Colors.white,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          value: _newAnneeId,
+          items: _annees
+              .map(
+                (a) => DropdownMenuItem<int>(
+                  value: a['id'] as int,
+                  child: Text(a['libelle'].toString()),
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            setState(() => _newAnneeId = v);
+            if (v != null) {
+              final selectedYear = _annees.firstWhere(
+                (a) => a['id'] == v,
+                orElse: () => <String, dynamic>{},
+              );
+              final prevId = selectedYear['annee_precedente_id'];
+              if (prevId != null) {
+                setState(() => _oldAnneeId = prevId as int);
+                _loadClasses();
+              }
+            }
+          },
+        ),
+        const SizedBox(height: 8),
+        if (_isFinalClass)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+            ),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'DESTINATION',
-                        style: TextStyle(
-                          color: Colors.green[400],
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          letterSpacing: 1,
-                        ),
-                      ),
+                const Icon(Icons.info_outline, color: Colors.orange, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Classe Terminale : Les élèves admis seront archivés (Statut : Sorti).',
+                    style: TextStyle(
+                      color: isDark ? Colors.orange[200] : Colors.orange[800],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  decoration: InputDecoration(
-                    labelText: 'Année de Destination',
-                    labelStyle: TextStyle(
-                      color: isDark ? Colors.white60 : Colors.black54,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    filled: true,
-                    fillColor: isDark
-                        ? const Color(0xFF374151)
-                        : Colors.grey[50],
                   ),
-                  dropdownColor: isDark
-                      ? const Color(0xFF374151)
-                      : Colors.white,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                  value: _newAnneeId,
-                  items: _annees
-                      .map(
-                        (a) => DropdownMenuItem<int>(
-                          value: a['id'] as int,
-                          child: Text(a['libelle'].toString()),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    setState(() => _newAnneeId = v);
-                    // Auto-resolve source year via annee_precedente_id
-                    if (v != null) {
-                      final selectedYear = _annees.firstWhere(
-                        (a) => a['id'] == v,
-                        orElse: () => <String, dynamic>{},
-                      );
-                      final prevId = selectedYear['annee_precedente_id'];
-                      if (prevId != null) {
-                        setState(() => _oldAnneeId = prevId as int);
-                        _loadClasses();
-                      }
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<int>(
-                  decoration: InputDecoration(
-                    labelText: 'Classe de Destination',
-                    labelStyle: TextStyle(
-                      color: isDark ? Colors.white60 : Colors.black54,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    filled: true,
-                    fillColor: isDark
-                        ? const Color(0xFF374151)
-                        : Colors.grey[50],
-                  ),
-                  dropdownColor: isDark
-                      ? const Color(0xFF374151)
-                      : Colors.white,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                  value: _newClasseId,
-                  items: _classes
-                      .map(
-                        (c) => DropdownMenuItem<int>(
-                          value: c['id'] as int,
-                          child: Text(c['nom'].toString()),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() => _newClasseId = v),
                 ),
               ],
             ),
+          )
+        else ...[
+          DropdownButtonFormField<int>(
+            decoration: InputDecoration(
+              labelText: 'Classe de Destination',
+              labelStyle: TextStyle(
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF374151) : Colors.grey[50],
+            ),
+            dropdownColor: isDark ? const Color(0xFF374151) : Colors.white,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+            value: _newClasseId,
+            items: _destClasses
+                .map(
+                  (c) => DropdownMenuItem<int>(
+                    value: c['id'] as int,
+                    child: Text(c['nom'].toString()),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) => setState(() => _newClasseId = v),
           ),
+          if (_oldClasseId != null && _destClasses.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _nextNiveauId == null
+                    ? 'Progression non configurée pour ce niveau (Paramètres > Cycles & Niveaux).'
+                    : 'Aucune classe trouvée pour le niveau de destination.',
+                style: TextStyle(
+                  color: _nextNiveauId == null
+                      ? Colors.orange[400]
+                      : Colors.red[400],
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
         ],
-      ),
+      ],
     );
   }
 

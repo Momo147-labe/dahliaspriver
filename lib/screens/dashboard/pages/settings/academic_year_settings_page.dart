@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../core/database/database_helper.dart';
+import '../../../../providers/academic_year_provider.dart';
+import 'package:provider/provider.dart';
 
 class AcademicYearSettingsPage extends StatefulWidget {
   const AcademicYearSettingsPage({super.key});
@@ -117,10 +119,21 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
       if (_isActive) {
         await db.update(
           'annee_scolaire',
-          {'active': 0},
-          where: 'id != ?',
-          whereArgs: [savedId],
+          {'active': 0, 'statut': 'Inactive'},
+          where: 'id != ? AND statut = ?',
+          whereArgs: [savedId, 'Active'],
         );
+
+        // Si une année précédente est sélectionnée, on la marque comme Terminée
+        if (_selectedPreviousYearId != null) {
+          await db.update(
+            'annee_scolaire',
+            {'statut': 'Terminée', 'active': 0},
+            where: 'id = ?',
+            whereArgs: [_selectedPreviousYearId],
+          );
+        }
+
         await DatabaseHelper.instance.ensureActiveAnneeCached(
           forceRefresh: true,
         );
@@ -128,6 +141,11 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
 
       _resetForm();
       _loadAcademicYears();
+
+      // Mettre à jour le provider pour rafraîchir la navbar et le reste de l'app
+      if (mounted) {
+        context.read<AcademicYearProvider>().loadAnnees();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

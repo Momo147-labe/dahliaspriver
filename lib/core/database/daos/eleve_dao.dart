@@ -64,9 +64,11 @@ class EleveDao extends BaseDao {
 
     return await db.rawQuery(
       '''
-      SELECT e.*, c.nom as classe_nom 
+      SELECT e.*, c.nom as classe_nom, 
+             p.moyenne, p.decision, p.confirmation_statut, p.type_inscription
       FROM ${EleveSchema.tableName} e
       LEFT JOIN classe c ON e.classe_id = c.id
+      LEFT JOIN eleve_parcours p ON e.id = p.eleve_id AND e.annee_scolaire_id = p.annee_scolaire_id
       WHERE $whereString
       ORDER BY e.nom ASC, e.prenom ASC
       LIMIT ? OFFSET ?
@@ -121,9 +123,11 @@ class EleveDao extends BaseDao {
   Future<List<Map<String, dynamic>>> searchEleves(String query) async {
     return await db.rawQuery(
       '''
-      SELECT e.*, c.nom as classe_nom 
+      SELECT e.*, c.nom as classe_nom,
+             p.moyenne, p.decision, p.confirmation_statut, p.type_inscription
       FROM ${EleveSchema.tableName} e
       LEFT JOIN classe c ON e.classe_id = c.id
+      LEFT JOIN eleve_parcours p ON e.id = p.eleve_id AND e.annee_scolaire_id = p.annee_scolaire_id
       WHERE e.nom LIKE ? OR e.prenom LIKE ? OR e.matricule LIKE ?
       LIMIT 20
     ''',
@@ -133,9 +137,11 @@ class EleveDao extends BaseDao {
 
   Future<List<Map<String, dynamic>>> getInitialSearchData() async {
     return await db.rawQuery('''
-      SELECT e.*, c.nom as classe_nom 
+      SELECT e.*, c.nom as classe_nom,
+             p.moyenne, p.decision, p.confirmation_statut, p.type_inscription 
       FROM ${EleveSchema.tableName} e
       LEFT JOIN classe c ON e.classe_id = c.id
+      LEFT JOIN eleve_parcours p ON e.id = p.eleve_id AND e.annee_scolaire_id = p.annee_scolaire_id
       LIMIT 20
     ''');
   }
@@ -206,22 +212,53 @@ class EleveDao extends BaseDao {
     required int newClasseId,
     required int newAnneeId,
     required String decision, // 'Admis' ou 'Redoublant'
+    String confirmationStatut = 'En attente',
   }) async {
     await db.transaction((txn) async {
       final now = DateTime.now().toIso8601String();
 
       for (int eleveId in eleveIds) {
-        // 1. Sauvegarder dans le parcours
+        // 1. Mettre à jour la décision pour l'année qui se termine
+        // On essaie d'abord d'updater un record existant pour cet élève/année
+        final existingOld = await txn.query(
+          'eleve_parcours',
+          where: 'eleve_id = ? AND annee_scolaire_id = ?',
+          whereArgs: [eleveId, oldAnneeId],
+        );
+
+        if (existingOld.isNotEmpty) {
+          await txn.update(
+            'eleve_parcours',
+            {'decision': decision, 'updated_at': now},
+            where: 'id = ?',
+            whereArgs: [existingOld.first['id']],
+          );
+        } else {
+          // Si pas de record (cas rare), on le crée
+          await txn.insert('eleve_parcours', {
+            'eleve_id': eleveId,
+            'classe_id': oldClasseId,
+            'annee_scolaire_id': oldAnneeId,
+            'decision': decision,
+            'updated_at': now,
+            'created_at': now,
+          });
+        }
+
+        // 2. Créer l'entrée pour la nouvelle année (En attente de confirmation/paiement)
         await txn.insert('eleve_parcours', {
           'eleve_id': eleveId,
-          'classe_id': oldClasseId,
-          'annee_scolaire_id': oldAnneeId,
-          'decision': decision,
+          'classe_id': newClasseId,
+          'annee_scolaire_id': newAnneeId,
+          'confirmation_statut': confirmationStatut,
+          'type_inscription': decision == 'Admis'
+              ? 'Promotion'
+              : 'Redoublement',
           'created_at': now,
           'updated_at': now,
         });
 
-        // 2. Mettre à jour la table élève avec la nouvelle classe et année
+        // 3. Mettre à jour la table principale élève
         await txn.update(
           EleveSchema.tableName,
           {
@@ -360,16 +397,13 @@ class EleveDao extends BaseDao {
     for (var eleve in eleves) {
       double moyenne = await calculateMoyenne(eleve['id'] as int, anneeId);
       final classe = await getClasse(eleve['classe_id'] as int);
-      int? nextClassId = classe?['next_class_id'] as int?;
       bool isFinal = classe?['is_final_class'] == 1;
 
-      if (moyenne >= defaultPassingGrade && !isFinal && nextClassId != null) {
-        await db.update(
-          EleveSchema.tableName,
-          {'classe_id': nextClassId, 'annee_scolaire_id': nouvelleAnneeId},
-          where: 'id = ?',
-          whereArgs: [eleve['id']],
-        );
+      // Note: next_class_id has been removed.
+      // Manual promotion via executeBulkPromotion is now the preferred way.
+      if (moyenne >= defaultPassingGrade && !isFinal) {
+        // We can't automatically promote without next_class_id defined per class
+        // keeping logic for repeaters/graduates for now
       } else if (isFinal) {
         await db.update(
           EleveSchema.tableName,

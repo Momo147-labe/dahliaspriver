@@ -33,7 +33,6 @@ class _ClassesPageState extends State<ClassesPage> {
   int? _selectedNiveauId;
   int? _selectedCycleId;
   int? _selectedAnneeId;
-  int? _selectedNextClassId;
   bool _isFinalClass = false;
 
   List<Map<String, dynamic>> _allEnseignants = [];
@@ -864,17 +863,6 @@ class _ClassesPageState extends State<ClassesPage> {
               fontSize: 14,
             ),
           ),
-          if (c['next_class_id'] != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              '→ ${_classes.firstWhere((cls) => cls['id'] == c['next_class_id'], orElse: () => {'nom': 'N/A'})['nom']}',
-              style: TextStyle(
-                color: Colors.green[600],
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
           const Spacer(),
           _buildProgressBar(percent, count, max),
           const SizedBox(height: 16),
@@ -889,7 +877,7 @@ class _ClassesPageState extends State<ClassesPage> {
             Icons.person_pin_outlined,
             'Prof. Principal',
             (c['prof_principal_nom'] != null)
-                ? '${c['prof_principal_prenom']} ${c['prof_principal_nom']}'
+                ? '${c['prof_principal_prenom'] ?? ''} ${c['prof_principal_nom']}'
                 : 'N/A',
             isDark,
           ),
@@ -1038,17 +1026,8 @@ class _ClassesPageState extends State<ClassesPage> {
                 ),
                 if (c['prof_principal_nom'] != null)
                   Text(
-                    'Prof: ${c['prof_principal_prenom']} ${c['prof_principal_nom']}',
+                    'Prof: ${c['prof_principal_prenom'] ?? ''} ${c['prof_principal_nom']}',
                     style: const TextStyle(fontSize: 11, color: Colors.blue),
-                  ),
-                if (c['next_class_id'] != null)
-                  Text(
-                    '→ ${_classes.firstWhere((cls) => cls['id'] == c['next_class_id'], orElse: () => {'nom': 'N/A'})['nom']}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.green[600],
-                      fontWeight: FontWeight.w500,
-                    ),
                   ),
                 if (c['is_final_class'] == 1)
                   Container(
@@ -1116,8 +1095,6 @@ class _ClassesPageState extends State<ClassesPage> {
       _salleController.text = classe['salle'] ?? '';
       _selectedCycleId = classe['cycle_id'];
       _selectedNiveauId = classe['niveau_id'];
-      _selectedAnneeId = classe['annee_scolaire_id'];
-      _selectedNextClassId = classe['next_class_id'];
       _selectedProfPrincipalId = classe['prof_principal_id'];
       _isFinalClass = classe['is_final_class'] == 1;
 
@@ -1136,7 +1113,6 @@ class _ClassesPageState extends State<ClassesPage> {
       _selectedCycleId = null;
       _selectedNiveauId = null;
       _selectedAnneeId = DatabaseHelper.activeAnneeId;
-      _selectedNextClassId = null;
       _selectedProfPrincipalId = null;
       _isFinalClass = false;
       _filteredNiveauxForModal = [];
@@ -1283,35 +1259,8 @@ class _ClassesPageState extends State<ClassesPage> {
                             ),
                           ],
                         ),
-                        _buildModalDropdown(
-                          'Classe Suivante',
-                          _selectedNextClassId != null
-                              ? _classes.firstWhere(
-                                  (c) => c['id'] == _selectedNextClassId,
-                                  orElse: () => {'nom': 'Aucune'},
-                                )['nom']
-                              : 'Aucune',
-                          [
-                            'Aucune',
-                            ..._classes
-                                .where(
-                                  (c) =>
-                                      classe == null || c['id'] != classe['id'],
-                                )
-                                .map((c) => c['nom'] as String),
-                          ],
-                          (v) => setModalState(() {
-                            if (v == null || v == 'Aucune') {
-                              _selectedNextClassId = null;
-                            } else {
-                              final selected = _classes.firstWhere(
-                                (c) => c['nom'] == v,
-                              );
-                              _selectedNextClassId = selected['id'];
-                            }
-                          }),
-                          isDark,
-                        ),
+                        const SizedBox(height: 20),
+
                         const SizedBox(height: 20),
                         _buildModalIdDropdown(
                           'Professeur Principal (Optionnel)',
@@ -1470,49 +1419,6 @@ class _ClassesPageState extends State<ClassesPage> {
     );
   }
 
-  Widget _buildModalDropdown(
-    String label,
-    String? value,
-    List<String> items,
-    ValueChanged<String?> onChanged,
-    bool isDark,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: value,
-          isExpanded: true,
-          items: items
-              .map(
-                (e) => DropdownMenuItem(
-                  value: e,
-                  child: Text(e, overflow: TextOverflow.ellipsis),
-                ),
-              )
-              .toList(),
-          onChanged: onChanged,
-          validator: (v) => v == null ? 'Requis' : null,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: isDark
-                ? const Color(0xFF374151)
-                : const Color(0xFFF3F4F6),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildBtn(String label, Color bg, Color text, VoidCallback onTap) {
     return ElevatedButton(
       onPressed: onTap,
@@ -1536,7 +1442,6 @@ class _ClassesPageState extends State<ClassesPage> {
       'salle': _salleController.text,
       'niveau_id': _selectedNiveauId,
       'eff_max': int.tryParse(_effMaxController.text) ?? 100,
-      'next_class_id': _selectedNextClassId,
       'prof_principal_id': _selectedProfPrincipalId,
       'is_final_class': _isFinalClass ? 1 : 0,
     };
