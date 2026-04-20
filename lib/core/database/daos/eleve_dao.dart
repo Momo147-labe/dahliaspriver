@@ -198,6 +198,45 @@ class EleveDao extends BaseDao {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
+  /// Promeut une liste d'élèves vers une classe supérieure pour une nouvelle année.
+  Future<void> executeBulkPromotion({
+    required List<int> eleveIds,
+    required int oldClasseId,
+    required int oldAnneeId,
+    required int newClasseId,
+    required int newAnneeId,
+    required String decision, // 'Admis' ou 'Redoublant'
+  }) async {
+    await db.transaction((txn) async {
+      final now = DateTime.now().toIso8601String();
+
+      for (int eleveId in eleveIds) {
+        // 1. Sauvegarder dans le parcours
+        await txn.insert('eleve_parcours', {
+          'eleve_id': eleveId,
+          'classe_id': oldClasseId,
+          'annee_scolaire_id': oldAnneeId,
+          'decision': decision,
+          'created_at': now,
+          'updated_at': now,
+        });
+
+        // 2. Mettre à jour la table élève avec la nouvelle classe et année
+        await txn.update(
+          EleveSchema.tableName,
+          {
+            'classe_id': newClasseId,
+            'annee_scolaire_id': newAnneeId,
+            'statut': 'reinscrit',
+            'updated_at': now,
+          },
+          where: 'id = ?',
+          whereArgs: [eleveId],
+        );
+      }
+    });
+  }
+
   // Analytics
   Future<Map<String, dynamic>> getStudentAnalytics(
     int currentYearId, {

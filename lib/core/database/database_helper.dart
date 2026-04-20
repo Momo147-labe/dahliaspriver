@@ -147,7 +147,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 50,
+      version: 51,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -1555,6 +1555,20 @@ class DatabaseHelper {
         debugPrint('Migration vers la version 50 (indexation) terminée.');
       } catch (e) {
         debugPrint('Erreur lors de la migration v50 : $e');
+      }
+    }
+
+    if (oldVersion < 51) {
+      try {
+        // Ensure eleve_parcours has decision, moyenne, rang columns
+        await _addColumnSafely(db, 'eleve_parcours', 'decision', 'TEXT');
+        await _addColumnSafely(db, 'eleve_parcours', 'moyenne', 'REAL');
+        await _addColumnSafely(db, 'eleve_parcours', 'rang', 'INTEGER');
+        debugPrint(
+          'Migration v51: colonnes decision/moyenne/rang ajoutées à eleve_parcours.',
+        );
+      } catch (e) {
+        debugPrint('Erreur migration v51: $e');
       }
     }
   }

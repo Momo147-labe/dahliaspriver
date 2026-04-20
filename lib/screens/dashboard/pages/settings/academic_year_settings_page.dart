@@ -293,210 +293,214 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                   ),
                 ),
 
-                // Content
-                Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        _buildDialogTextField(
-                          controller: _yearNameController,
-                          label: 'LIBELLÉ DE L\'ANNÉE',
-                          hint: 'Ex: 2024-2025',
-                          icon: Icons.label_outline,
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildDatePickerField(
-                                label: 'DATE DÉBUT',
-                                date: _startDate,
-                                icon: Icons.event_available,
-                                onTap: () async {
-                                  final d = await _selectDateDialog(context);
-                                  if (d != null) {
-                                    setDialogState(() => _startDate = d);
-                                  }
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildDatePickerField(
-                                label: 'DATE FIN',
-                                date: _endDate,
-                                icon: Icons.event_busy,
-                                onTap: () async {
-                                  final d = await _selectDateDialog(context);
-                                  if (d != null) {
-                                    setDialogState(() => _endDate = d);
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        // Dropdown for Previous Year
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'ANNÉE PRÉCÉDENTE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.2,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? Colors.grey[900]
-                                    : Colors.grey[50],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isDark
-                                      ? Colors.grey[800]!
-                                      : Colors.grey[200]!,
-                                ),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<int>(
-                                  value: _selectedPreviousYearId,
-                                  isExpanded: true,
-                                  hint: const Text(
-                                    'Sélectionner l\'année précédente',
-                                  ),
-                                  items: _academicYears
-                                      .where((y) => y['id'] != _editingYearId)
-                                      .map(
-                                        (y) => DropdownMenuItem<int>(
-                                          value: y['id'] as int,
-                                          child: Text(y['libelle'] as String),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (val) {
-                                    setDialogState(
-                                      () => _selectedPreviousYearId = val,
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        // Dropdown for Statut
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'STATUT',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.2,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? Colors.grey[900]
-                                    : Colors.grey[50],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isDark
-                                      ? Colors.grey[800]!
-                                      : Colors.grey[200]!,
-                                ),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: _statut,
-                                  isExpanded: true,
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'Active',
-                                      child: Text('Active'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Inactive',
-                                      child: Text('Inactive'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Terminée',
-                                      child: Text('Terminée'),
-                                    ),
-                                  ],
-                                  onChanged: (val) {
-                                    if (val != null) {
-                                      setDialogState(() => _statut = val);
+                // Content — scrollable to prevent overflow
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(32),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          _buildDialogTextField(
+                            controller: _yearNameController,
+                            label: 'LIBELLÉ DE L\'ANNÉE',
+                            hint: 'Ex: 2024-2025',
+                            icon: Icons.label_outline,
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildDatePickerField(
+                                  label: 'DATE DÉBUT',
+                                  date: _startDate,
+                                  icon: Icons.event_available,
+                                  onTap: () async {
+                                    final d = await _selectDateDialog(context);
+                                    if (d != null) {
+                                      setDialogState(() => _startDate = d);
                                     }
                                   },
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isDark ? Colors.grey[900] : Colors.grey[50],
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isDark
-                                  ? Colors.grey[800]!
-                                  : Colors.grey[200]!,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'DÉFINIR COMME ACTIVE',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                  Text(
-                                    'L\'année scolaire par défaut',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey[500],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Spacer(),
-                              Switch(
-                                value: _isActive,
-                                onChanged: (v) =>
-                                    setDialogState(() => _isActive = v),
-                                activeColor: AppTheme.primaryColor,
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildDatePickerField(
+                                  label: 'DATE FIN',
+                                  date: _endDate,
+                                  icon: Icons.event_busy,
+                                  onTap: () async {
+                                    final d = await _selectDateDialog(context);
+                                    if (d != null) {
+                                      setDialogState(() => _endDate = d);
+                                    }
+                                  },
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 24),
+                          // Dropdown for Previous Year
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ANNÉE PRÉCÉDENTE',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.2,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.grey[900]
+                                      : Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? Colors.grey[800]!
+                                        : Colors.grey[200]!,
+                                  ),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<int>(
+                                    value: _selectedPreviousYearId,
+                                    isExpanded: true,
+                                    hint: const Text(
+                                      'Sélectionner l\'année précédente',
+                                    ),
+                                    items: _academicYears
+                                        .where((y) => y['id'] != _editingYearId)
+                                        .map(
+                                          (y) => DropdownMenuItem<int>(
+                                            value: y['id'] as int,
+                                            child: Text(y['libelle'] as String),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (val) {
+                                      setDialogState(
+                                        () => _selectedPreviousYearId = val,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          // Dropdown for Statut
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'STATUT',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.2,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.grey[900]
+                                      : Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? Colors.grey[800]!
+                                        : Colors.grey[200]!,
+                                  ),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: _statut,
+                                    isExpanded: true,
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: 'Active',
+                                        child: Text('Active'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'Inactive',
+                                        child: Text('Inactive'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'Terminée',
+                                        child: Text('Terminée'),
+                                      ),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        setDialogState(() => _statut = val);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.grey[900]
+                                  : Colors.grey[50],
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.grey[800]!
+                                    : Colors.grey[200]!,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'DÉFINIR COMME ACTIVE',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                    Text(
+                                      'L\'année scolaire par défaut',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey[500],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Spacer(),
+                                Switch(
+                                  value: _isActive,
+                                  onChanged: (v) =>
+                                      setDialogState(() => _isActive = v),
+                                  activeColor: AppTheme.primaryColor,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

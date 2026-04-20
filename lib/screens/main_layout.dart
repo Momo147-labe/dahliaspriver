@@ -9,6 +9,7 @@ import '../widgets/dashboard/school_profile_card.dart';
 // Pages dashboard
 import 'dashboard/pages/dashboard_overview.dart';
 import 'dashboard/pages/students_page.dart';
+import 'dashboard/pages/promotion_page.dart';
 import 'dashboard/pages/classes_page.dart';
 import 'dashboard/pages/teachers_page.dart';
 import 'dashboard/pages/subjects_page.dart';
@@ -48,6 +49,7 @@ class _MainLayoutState extends State<MainLayout> {
         },
       ),
       const StudentsPage(),
+      const PromotionPage(),
       const ClassesPage(),
       const TeachersPage(),
       const SubjectsPage(),
@@ -73,6 +75,7 @@ class _MainLayoutState extends State<MainLayout> {
   final List<String> titles = [
     'Dashboard',
     'Élèves',
+    'Promotions',
     'Classes',
     'Enseignants',
     'Matières',
@@ -90,6 +93,7 @@ class _MainLayoutState extends State<MainLayout> {
   final List<IconData> icons = [
     Icons.dashboard,
     Icons.group,
+    Icons.auto_awesome_motion,
     Icons.class_,
     Icons.person,
     Icons.menu_book,
