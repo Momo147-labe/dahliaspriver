@@ -149,4 +149,69 @@ class FeesDao extends BaseDao {
       [anneeScolaireId, anneeScolaireId],
     );
   }
+
+  Future<int> importFeesFromYear({
+    required int sourceYearId,
+    required int targetYearId,
+    double adjustmentPercentage = 0.0,
+    double adjustmentFlat = 0.0,
+  }) async {
+    final sourceFees = await db.query(
+      FraisScolariteSchema.tableName,
+      where: 'annee_scolaire_id = ?',
+      whereArgs: [sourceYearId],
+    );
+
+    int count = 0;
+    await db.transaction((txn) async {
+      for (var f in sourceFees) {
+        // Vérifier si des frais existent déjà pour cette classe dans l'année cible
+        final existing = await txn.query(
+          FraisScolariteSchema.tableName,
+          where: 'classe_id = ? AND annee_scolaire_id = ?',
+          whereArgs: [f['classe_id'], targetYearId],
+        );
+
+        if (existing.isEmpty) {
+          final data = Map<String, dynamic>.from(f);
+          data.remove('id');
+          data['annee_scolaire_id'] = targetYearId;
+
+          // Appliquer les ajustements aux champs monétaires
+          final fieldsToAdjust = [
+            'inscription',
+            'reinscription',
+            'tranche1',
+            'tranche2',
+            'tranche3',
+          ];
+          double total = 0.0;
+
+          for (var field in fieldsToAdjust) {
+            double val = (data[field] as num?)?.toDouble() ?? 0.0;
+            if (val > 0) {
+              // Appliquer le pourcentage et ajouter le montant fixe proportionnel
+              // (ou juste sur le total, mais ici on le fait par champ si > 0)
+              val = val * (1 + (adjustmentPercentage / 100));
+
+              // On ajoute le montant fixe à la tranche 1 par défaut si c'est un ajustement global
+              if (field == 'tranche1') {
+                val += adjustmentFlat;
+              }
+
+              data[field] = val;
+            }
+            total += val;
+          }
+          data['montant_total'] = total;
+          data['created_at'] = DateTime.now().toIso8601String();
+          data['updated_at'] = DateTime.now().toIso8601String();
+
+          await txn.insert(FraisScolariteSchema.tableName, data);
+          count++;
+        }
+      }
+    });
+    return count;
+  }
 }

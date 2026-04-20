@@ -6,6 +6,7 @@ import '../../../theme/app_theme.dart';
 import '../../../providers/academic_year_provider.dart';
 import '../../../widgets/frais/frais_modal.dart';
 import '../../../widgets/frais/frais_card.dart';
+import '../../../core/database/daos/fees_dao.dart';
 
 class FraisPage extends StatefulWidget {
   const FraisPage({super.key});
@@ -308,6 +309,214 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
     );
   }
 
+  void _showImportDialog() async {
+    final currentYearId = context.read<AcademicYearProvider>().selectedAnneeId;
+
+    if (currentYearId == null) return;
+
+    final db = await DatabaseHelper.instance.database;
+    final years = await db.query('annee_scolaire', orderBy: 'libelle DESC');
+    final otherYears = years.where((y) => y['id'] != currentYearId).toList();
+
+    if (otherYears.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Aucune autre année scolaire trouvée pour l\'import.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    int? selectedSourceYearId = otherYears.isNotEmpty
+        ? otherYears.first['id'] as int
+        : null;
+    double percentage = 0.0;
+    double flat = 0.0;
+    bool isProcessing = false;
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1F2937) : Colors.white,
+            title: Row(
+              children: [
+                Icon(Symbols.content_copy, color: AppTheme.primaryColor),
+                const SizedBox(width: 12),
+                const Text('Importer les frais'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Récupérer les frais d\'une année précédente et les appliquer aux classes sans frais cette année.',
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : Colors.black54,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                DropdownButtonFormField<int>(
+                  value: selectedSourceYearId,
+                  dropdownColor: isDark
+                      ? const Color(0xFF374151)
+                      : Colors.white,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Année Source',
+                    labelStyle: TextStyle(
+                      color: isDark ? Colors.white60 : Colors.black54,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: isDark
+                        ? const Color(0xFF374151)
+                        : Colors.grey[50],
+                  ),
+                  items: otherYears
+                      .map(
+                        (y) => DropdownMenuItem(
+                          value: y['id'] as int,
+                          child: Text(y['libelle'].toString()),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) =>
+                      setDialogState(() => selectedSourceYearId = v),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Ajustement (%)',
+                          labelStyle: TextStyle(
+                            color: isDark ? Colors.white60 : Colors.black54,
+                          ),
+                          suffixText: '%',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: isDark
+                              ? const Color(0xFF374151)
+                              : Colors.grey[50],
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (v) =>
+                            percentage = double.tryParse(v) ?? 0.0,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Montant Fixe',
+                          labelStyle: TextStyle(
+                            color: isDark ? Colors.white60 : Colors.black54,
+                          ),
+                          suffixText: 'FG',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: isDark
+                              ? const Color(0xFF374151)
+                              : Colors.grey[50],
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (v) => flat = double.tryParse(v) ?? 0.0,
+                      ),
+                    ),
+                  ],
+                ),
+                if (isProcessing) ...[
+                  const SizedBox(height: 20),
+                  const LinearProgressIndicator(),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isProcessing ? null : () => Navigator.pop(context),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: isProcessing
+                    ? null
+                    : () async {
+                        if (selectedSourceYearId == null) return;
+                        setDialogState(() => isProcessing = true);
+
+                        try {
+                          final feesDao = FeesDao(db);
+                          final count = await feesDao.importFeesFromYear(
+                            sourceYearId: selectedSourceYearId!,
+                            targetYearId: currentYearId,
+                            adjustmentPercentage: percentage,
+                            adjustmentFlat: flat,
+                          );
+
+                          if (mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '$count classes importées avec succès.',
+                                ),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            _loadData(currentYearId);
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            setDialogState(() => isProcessing = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Erreur: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Lancer l\'import'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _fadeController.dispose();
@@ -354,11 +563,14 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
   }
 
   Widget _buildHeader(bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      spacing: 32,
+      runSpacing: 24,
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.start,
       children: [
-        Expanded(
+        SizedBox(
+          width: 450,
           child: Row(
             children: [
               Container(
@@ -419,7 +631,9 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
             ],
           ),
         ),
-        Row(
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
           children: [
             _headerActionBtn(
               label: 'Multi-Classes',
@@ -428,7 +642,13 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
               color: AppTheme.primaryColor,
               isDark: isDark,
             ),
-            const SizedBox(width: 16),
+            _headerActionBtn(
+              label: 'Importer',
+              icon: Symbols.content_copy,
+              onTap: _showImportDialog,
+              color: Colors.blue.shade700,
+              isDark: isDark,
+            ),
             _headerActionBtn(
               label: 'Classe unique',
               icon: Symbols.add,
@@ -624,31 +844,39 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
           color: isDark ? Colors.white10 : Colors.grey.shade200,
         ),
       ),
-      child: Row(
+      child: Wrap(
+        spacing: 16,
+        runSpacing: 16,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              onChanged: (_) => _filterFrais(),
-              decoration: InputDecoration(
-                hintText: 'Rechercher par classe, niveau ou année...',
-                prefixIcon: const Icon(Symbols.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: isDark
-                    ? Colors.white.withOpacity(0.05)
-                    : Colors.grey.shade100,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 20,
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 300),
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width > 600
+                  ? 400
+                  : double.infinity,
+              child: TextField(
+                controller: _searchController,
+                onChanged: (_) => _filterFrais(),
+                decoration: InputDecoration(
+                  hintText: 'Rechercher par classe, niveau ou année...',
+                  prefixIcon: const Icon(Symbols.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDark
+                      ? Colors.white.withOpacity(0.05)
+                      : Colors.grey.shade100,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 16),
           _buildDropdownControl(
             value: _selectedClass,
             items: [
@@ -664,7 +892,6 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
             isDark: isDark,
             label: 'Classe',
           ),
-          const SizedBox(width: 16),
           _buildDropdownControl(
             value: _selectedAnnee,
             items: [

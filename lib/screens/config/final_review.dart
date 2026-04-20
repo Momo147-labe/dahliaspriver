@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:io';
 import '../../core/database/database_helper.dart';
 import '../../theme/app_theme.dart';
 import '../auth/login_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/license_service.dart';
+import '../../core/services/trial_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../widgets/dashboard/trial_countdown.dart';
 
 class FinalReviewPage extends StatefulWidget {
   const FinalReviewPage({super.key});
@@ -97,7 +101,9 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                     children: [
                       // Progress Section
                       _buildProgressSection(isTablet, isDark),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 16),
+                      Center(child: TrialCountdown()),
+                      const SizedBox(height: 16),
 
                       // Main Content
                       isTablet
@@ -539,6 +545,38 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
               ),
             ],
           ),
+          if (!_isLicenseValidated) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: TextButton.icon(
+                icon: const Icon(Icons.timer_outlined, size: 18),
+                label: const Text("Essayer gratuitement pendant 7 jours"),
+                onPressed: () async {
+                  final success = await TrialService.activateTrial();
+                  final status = await TrialService.checkTrialStatus();
+
+                  if (success ||
+                      (status['isTrial'] == true && !status['expired'])) {
+                    if (mounted) {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginPage(),
+                        ),
+                        (route) => false,
+                      );
+                    }
+                  } else {
+                    _showErrorSnackBar(
+                      status['expired'] == true
+                          ? status['message']
+                          : "La période d'essai a déjà été épuisée sur cette machine.",
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
           if (_isLicenseValidated) ...[
             const SizedBox(height: 16),
             Row(
@@ -560,7 +598,197 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
               ],
             ),
           ],
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.surfaceDark : const Color(0xFFF0F4F4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? AppTheme.borderDark : const Color(0xFFDBE5E6),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Besoin d'acheter une licence ?",
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Contactez-nous pour obtenir votre clé d'activation.",
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                if (!_isLicenseValidated) ...[
+                  FutureBuilder<bool>(
+                    future: TrialService.isTrialActive(),
+                    builder: (context, snapshot) {
+                      final isActive = snapshot.data ?? false;
+                      if (isActive) {
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.3),
+                            ),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.timer, color: Colors.blue, size: 20),
+                              SizedBox(width: 12),
+                              Text(
+                                "Période d'essai activée (7 jours)",
+                                style: TextStyle(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final success = await TrialService.activateTrial();
+                            if (success) {
+                              setState(() {});
+                              _showSuccessSnackBar("Période d'essai activée !");
+                            } else {
+                              _showErrorSnackBar(
+                                "L'essai a déjà été utilisé sur cet appareil.",
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.timer_outlined),
+                          label: const Text("ESSAYER GRATUITEMENT (7 JOURS)"),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: const BorderSide(
+                              color: AppTheme.primaryColor,
+                            ),
+                            foregroundColor: AppTheme.primaryColor,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                Row(
+                  children: [
+                    _buildSupportBadge(
+                      icon: Icons.chat,
+                      label: "WhatsApp",
+                      color: Colors.green,
+                      onTap: () => _launchURL("https://wa.me/224627172530"),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildSupportBadge(
+                      icon: Icons.phone,
+                      label: "Appel",
+                      color: Colors.orange,
+                      onTap: () => _launchURL("tel:224627172530"),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.deepOrange.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.account_balance_wallet,
+                        color: Colors.deepOrange,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          "Paiement Orange Money : 674698",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Colors.deepOrange,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 16),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () {
+                          Clipboard.setData(
+                            const ClipboardData(text: "674698"),
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Code Marchand copié !"),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSupportBadge({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -598,6 +826,19 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
     } catch (e) {
       setState(() => _isValidatingLicense = false);
       _showErrorSnackBar("Erreur de connexion au serveur de licence.");
+    }
+  }
+
+  Future<void> _launchURL(String url) async {
+    final Uri uri = Uri.parse(url);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _showErrorSnackBar("Impossible d'ouvrir : $url");
+      }
+    } catch (e) {
+      _showErrorSnackBar("Erreur : $e");
     }
   }
 
@@ -864,9 +1105,14 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
     });
 
     if (!_isLicenseValidated) {
-      _showErrorSnackBar("Veuillez d'abord valider votre licence.");
-      setState(() => _isLoading = false);
-      return;
+      final isTrial = await TrialService.isTrialActive();
+      if (!isTrial) {
+        _showErrorSnackBar(
+          "Veuillez valider votre licence ou activer l'essai de 7 jours.",
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
     }
 
     try {

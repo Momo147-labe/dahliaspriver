@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/database/database_helper.dart';
@@ -6,6 +7,8 @@ import '../../theme/app_theme.dart';
 import '../main_layout.dart';
 import '../../core/utils/security_utils.dart';
 import 'forgot_password_page.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../widgets/dashboard/trial_countdown.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -270,6 +273,8 @@ class _LoginPageState extends State<LoginPage> {
                 // Header
                 Column(
                   children: [
+                    TrialCountdown(),
+                    const SizedBox(height: 16),
                     Text(
                       "Se connecter",
                       style: TextStyle(
@@ -499,9 +504,7 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       WidgetSpan(
                         child: GestureDetector(
-                          onTap: () {
-                            // TODO: Implement contact admin
-                          },
+                          onTap: _showContactAdmin,
                           child: const Text(
                             "Contactez l'administration",
                             style: TextStyle(
@@ -717,6 +720,159 @@ class _LoginPageState extends State<LoginPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
+  }
+
+  void _showContactAdmin() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.cardDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Contactez l'administration",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? AppTheme.textDarkPrimary : Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Besoin d'aide ? Nos agents sont à votre écoute.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark ? AppTheme.textDarkSecondary : Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Option WhatsApp
+                _buildContactOption(
+                  icon: Icons.chat,
+                  label: "WhatsApp (Orange/MTN)",
+                  subLabel: "627 17 25 30 / 666 76 10 76",
+                  color: Colors.green,
+                  onTap: () => _launchURL("https://wa.me/224627172530"),
+                  isDark: isDark,
+                ),
+
+                // Option Email
+                _buildContactOption(
+                  icon: Icons.email,
+                  label: "Envoyer un email",
+                  subLabel: "fodemomos11@gmail.com",
+                  color: Colors.blue,
+                  onTap: () => _launchURL("mailto:fodemomos11@gmail.com"),
+                  isDark: isDark,
+                ),
+
+                // Option Appel
+                _buildContactOption(
+                  icon: Icons.phone,
+                  label: "Appeler directement",
+                  subLabel: "627 17 25 30",
+                  color: Colors.orange,
+                  onTap: () => _launchURL("tel:224627172530"),
+                  isDark: isDark,
+                ),
+
+                // Option Orange Money
+                _buildContactOption(
+                  icon: Icons.account_balance_wallet,
+                  label: "Orange Money (Licence)",
+                  subLabel: "Code Marchand : 674698",
+                  color: Colors.deepOrange,
+                  onTap: () => _launchURL("tel:*144*4*1*674698#"),
+                  isDark: isDark,
+                  trailing: IconButton(
+                    icon: Icon(
+                      Icons.copy_rounded,
+                      size: 20,
+                      color: isDark ? AppTheme.primaryColor : Colors.deepOrange,
+                    ),
+                    onPressed: () {
+                      Clipboard.setData(const ClipboardData(text: "674698"));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Code Marchand copié !"),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContactOption({
+    required IconData icon,
+    required String label,
+    required String subLabel,
+    required Color color,
+    required VoidCallback onTap,
+    required bool isDark,
+    Widget? trailing,
+  }) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: color),
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: isDark ? AppTheme.textDarkPrimary : Colors.black,
+        ),
+      ),
+      subtitle: Text(
+        subLabel,
+        style: TextStyle(
+          color: isDark ? AppTheme.textDarkSecondary : Colors.grey,
+        ),
+      ),
+      trailing: trailing ?? const Icon(Icons.chevron_right, size: 20),
+      onTap: onTap,
+    );
+  }
+
+  Future<void> _launchURL(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      _showErrorSnackBar("Impossible d'ouvrir le lien: $url");
+    }
   }
 }
 

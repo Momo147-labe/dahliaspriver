@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/license_service.dart';
 import '../../theme/app_theme.dart';
 import '../onboarding_page.dart';
@@ -65,6 +66,19 @@ class _LicenseActivationPageState extends State<LicenseActivationPage> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _launchURL(String url) async {
+    final Uri uri = Uri.parse(url);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        setState(() => _errorMessage = "Impossible d'ouvrir : $url");
+      }
+    } catch (e) {
+      setState(() => _errorMessage = "Erreur : $e");
     }
   }
 
@@ -139,9 +153,86 @@ class _LicenseActivationPageState extends State<LicenseActivationPage> {
                         : const Text("Activer maintenant"),
                   ),
                 ),
+                const SizedBox(height: 24),
+
+                // Section Support
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppTheme.surfaceDark
+                        : const Color(0xFFF0F4F4),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark
+                          ? AppTheme.borderDark
+                          : const Color(0xFFDBE5E6),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        "Besoin d'aide pour votre licence ?",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildSupportIcon(
+                            icon: Icons.chat,
+                            color: Colors.green,
+                            onTap: () =>
+                                _launchURL("https://wa.me/224627172530"),
+                            tooltip: "WhatsApp",
+                          ),
+                          _buildSupportIcon(
+                            icon: Icons.email,
+                            color: Colors.blue,
+                            onTap: () =>
+                                _launchURL("mailto:fodemomos11@gmail.com"),
+                            tooltip: "Email",
+                          ),
+                          _buildSupportIcon(
+                            icon: Icons.phone,
+                            color: Colors.orange,
+                            onTap: () => _launchURL("tel:224627172530"),
+                            tooltip: "Appel",
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSupportIcon({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required String tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 20),
         ),
       ),
     );

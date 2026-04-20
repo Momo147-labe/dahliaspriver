@@ -5,6 +5,8 @@ import '../../../../core/database/database_helper.dart';
 import '../../../../core/services/file_service.dart';
 import '../../../../models/ecole.dart';
 import '../../../../theme/app_theme.dart';
+import '../../../../core/services/license_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SchoolSettingsPage extends StatefulWidget {
   const SchoolSettingsPage({super.key});
@@ -21,6 +23,11 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
   final _emailController = TextEditingController();
   final _directorController = TextEditingController();
   final _founderController = TextEditingController();
+  final _licenseController = TextEditingController();
+
+  bool _isLicenseValidated = false;
+  String? _currentLicenseKey;
+  bool _isValidatingLicense = false;
 
   String? _logoPath;
   String? _timbrePath;
@@ -51,12 +58,26 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
           _timbrePath = ecole.timbre;
         });
       }
+
+      // Charger les infos de licence
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _isLicenseValidated = prefs.getBool('isLicenseValidated') ?? false;
+        _currentLicenseKey = prefs.getString('licenseKey');
+        if (_currentLicenseKey != null) {
+          _licenseController.text = _currentLicenseKey!;
+        }
+      });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erreur lors du chargement: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors du chargement: $e')),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -68,6 +89,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
     _emailController.dispose();
     _directorController.dispose();
     _founderController.dispose();
+    _licenseController.dispose();
     super.dispose();
   }
 
@@ -141,6 +163,74 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
     }
   }
 
+  Future<void> _activateLicense() async {
+    final key = _licenseController.text.trim();
+    if (key.length < 10) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Format de clé invalide')));
+      return;
+    }
+
+    setState(() => _isValidatingLicense = true);
+
+    try {
+      final result = await LicenseService().verifyAndActivateLicense(
+        licenseKey: key,
+        schoolData: _currentEcole != null
+            ? {
+                'nom': _currentEcole!.nom,
+                'adresse': _currentEcole!.adresse,
+                'telephone': _currentEcole!.telephone,
+                'email': _currentEcole!.email,
+              }
+            : {},
+      );
+
+      if (result['success']) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLicenseValidated', true);
+        await prefs.setString('licenseKey', key);
+
+        setState(() {
+          _isLicenseValidated = true;
+          _currentLicenseKey = key;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Licence activée avec succès !'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: ${result['message']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur technique: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isValidatingLicense = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -202,7 +292,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Colonne Gauche: Identité & Logo
+                // Colonne Gauche
                 Expanded(
                   flex: 3,
                   child: Column(
@@ -271,7 +361,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
                   ),
                 ),
                 const SizedBox(width: 24),
-                // Colonne Droite: Contact & Localisation
+                // Colonne Droite
                 Expanded(
                   flex: 2,
                   child: Column(
@@ -318,6 +408,90 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 24),
+          _buildPremiumCard(
+            title: 'Licence de l\'Établissement',
+            icon: Icons.vpn_key_outlined,
+            child: _isLicenseValidated
+                ? Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.green.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.verified,
+                              color: Colors.green,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Licence Activée : ${_currentLicenseKey?.replaceAll(RegExp(r'.(?=.{4})'), '*')}',
+                              style: const TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _licenseController,
+                          label: 'CLÉ DE LICENCE',
+                          hint: 'Entrez votre clé de licence (XXXX-XXXX-XXXX)',
+                          icon: Icons.key_outlined,
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 18),
+                        child: ElevatedButton(
+                          onPressed: _isValidatingLicense
+                              ? null
+                              : _activateLicense,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: _isValidatingLicense
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('ACTIVER'),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
           const SizedBox(height: 40),
         ],

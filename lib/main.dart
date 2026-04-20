@@ -15,6 +15,7 @@ import 'screens/auth/login_page.dart';
 import 'screens/auth/license_activation_page.dart';
 import 'screens/auth/admin_registration_page.dart';
 import 'screens/main_layout.dart';
+import 'core/services/trial_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -85,6 +86,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _hasEcoles = false;
   bool _isLoggedIn = false;
   bool _isLicenseValidated = false;
+  bool _isTrialActive = false;
   bool _hasUser = false;
 
   @override
@@ -100,6 +102,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       // 1. Check license
       final licenseValidated = prefs.getBool('isLicenseValidated') ?? false;
+      final isTrialActive = await TrialService.isTrialActive();
 
       // 2. Check school
       final hasEcoles = await db.hasEcoles();
@@ -118,6 +121,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       setState(() {
         _isLicenseValidated = licenseValidated;
+        _isTrialActive = isTrialActive;
         _hasEcoles = hasEcoles;
         _hasUser = hasUser;
         _isLoggedIn = rememberMe && userId != null;
@@ -149,19 +153,18 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    // Priorité 1 : Licence
-    if (!_isLicenseValidated) {
-      return const LicenseActivationPage();
-    }
-
-    // Priorité 2 : Onboarding (Ecole)
+    // Priorité 1 : Onboarding (Ecole)
     if (!_hasEcoles) {
       return const OnboardingPage();
     }
 
-    // Priorité 3 : Inscription Administrateur (Si école présente mais pas d'user)
+    // Priorité 2 : Inscription Administrateur (Si école présente mais pas d'user)
     if (!_hasUser) {
       return const AdminRegistrationPage();
+    }
+    // Priorité 3 : Licence (Check license AND trial)
+    if (!_isLicenseValidated && !_isTrialActive) {
+      return const LicenseActivationPage();
     }
 
     // Priorité 4 : Session

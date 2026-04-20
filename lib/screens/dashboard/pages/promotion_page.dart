@@ -934,106 +934,57 @@ class _PromotionPageState extends State<PromotionPage> {
             ),
           ),
           const Divider(height: 1),
-          Expanded(
-            child: ListView.separated(
-              itemCount: _students.length,
-              separatorBuilder: (_, __) => Divider(
-                height: 1,
-                color: isDark ? Colors.white10 : Colors.grey[200],
-              ),
-              itemBuilder: (context, index) {
-                final student = _students[index];
-                final isAdmis = student['isAdmis'] as bool;
-                final moyenne = student['moyenne'] as double;
-                final studentId = student['id'] as int;
-                final isSelected = isAdmis
-                    ? _selectedAdmisIds.contains(studentId)
-                    : _selectedRedoublantIds.contains(studentId);
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _students.length,
+            separatorBuilder: (_, __) => Divider(
+              height: 1,
+              color: isDark ? Colors.white10 : Colors.grey[200],
+            ),
+            itemBuilder: (context, index) {
+              final student = _students[index];
+              final isAdmis = student['isAdmis'] as bool;
+              final moyenne = student['moyenne'] as double;
+              final studentId = student['id'] as int;
+              final isSelected = isAdmis
+                  ? _selectedAdmisIds.contains(studentId)
+                  : _selectedRedoublantIds.contains(studentId);
 
-                return Container(
-                  color: isSelected
-                      ? (isAdmis
-                            ? Colors.green.withOpacity(0.05)
-                            : Colors.red.withOpacity(0.05))
-                      : Colors.transparent,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 40,
-                        child: Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            color: isDark ? Colors.white38 : Colors.grey,
-                            fontSize: 12,
-                          ),
+              return Container(
+                color: isSelected
+                    ? (isAdmis
+                          ? Colors.green.withOpacity(0.05)
+                          : Colors.red.withOpacity(0.05))
+                    : Colors.transparent,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 40,
+                      child: Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          color: isDark ? Colors.white38 : Colors.grey,
+                          fontSize: 12,
                         ),
                       ),
-                      Expanded(
-                        flex: 3,
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 16,
-                              backgroundColor: isAdmis
-                                  ? Colors.green.withOpacity(0.15)
-                                  : Colors.red.withOpacity(0.15),
-                              child: Text(
-                                (student['nom']?.toString() ?? '?')[0]
-                                    .toUpperCase(),
-                                style: TextStyle(
-                                  color: isAdmis
-                                      ? Colors.green[700]
-                                      : Colors.red[700],
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                '${student['nom']} ${student['prenom']}',
-                                style: TextStyle(
-                                  color: isDark ? Colors.white : Colors.black87,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 13,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          student['matricule']?.toString() ?? '-',
-                          style: TextStyle(
-                            color: isDark ? Colors.white54 : Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 100,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isAdmis
-                                  ? Colors.green.withOpacity(0.12)
-                                  : Colors.red.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: isAdmis
+                                ? Colors.green.withOpacity(0.15)
+                                : Colors.red.withOpacity(0.15),
                             child: Text(
-                              moyenne.toStringAsFixed(2),
+                              (student['nom']?.toString() ?? '?')[0]
+                                  .toUpperCase(),
                               style: TextStyle(
                                 color: isAdmis
                                     ? Colors.green[700]
@@ -1043,82 +994,131 @@ class _PromotionPageState extends State<PromotionPage> {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '${student['nom']} ${student['prenom']}',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: Text(
+                        student['matricule']?.toString() ?? '-',
+                        style: TextStyle(
+                          color: isDark ? Colors.white54 : Colors.grey[600],
+                          fontSize: 12,
                         ),
                       ),
-                      SizedBox(
-                        width: 120,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
+                    ),
+                    SizedBox(
+                      width: 100,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isAdmis
+                                ? Colors.green.withOpacity(0.12)
+                                : Colors.red.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            moyenne.toStringAsFixed(2),
+                            style: TextStyle(
                               color: isAdmis
-                                  ? Colors.green.withOpacity(0.1)
-                                  : Colors.red.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isAdmis
-                                    ? Colors.green.withOpacity(0.3)
-                                    : Colors.red.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isAdmis ? Icons.check_circle : Icons.cancel,
-                                  size: 14,
-                                  color: isAdmis
-                                      ? Colors.green[600]
-                                      : Colors.red[600],
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isAdmis ? 'Admis' : 'Redoublant',
-                                  style: TextStyle(
-                                    color: isAdmis
-                                        ? Colors.green[700]
-                                        : Colors.red[700],
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
+                                  ? Colors.green[700]
+                                  : Colors.red[700],
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
                             ),
                           ),
                         ),
                       ),
-                      SizedBox(
-                        width: 40,
-                        child: Checkbox(
-                          value: isSelected,
-                          activeColor: isAdmis ? Colors.green : Colors.red,
-                          onChanged: (val) {
-                            setState(() {
-                              if (isAdmis) {
-                                if (val == true) {
-                                  _selectedAdmisIds.add(studentId);
-                                } else {
-                                  _selectedAdmisIds.remove(studentId);
-                                }
-                              } else {
-                                if (val == true) {
-                                  _selectedRedoublantIds.add(studentId);
-                                } else {
-                                  _selectedRedoublantIds.remove(studentId);
-                                }
-                              }
-                            });
-                          },
+                    ),
+                    SizedBox(
+                      width: 120,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isAdmis
+                                ? Colors.green.withOpacity(0.1)
+                                : Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isAdmis
+                                  ? Colors.green.withOpacity(0.3)
+                                  : Colors.red.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isAdmis ? Icons.check_circle : Icons.cancel,
+                                size: 14,
+                                color: isAdmis
+                                    ? Colors.green[600]
+                                    : Colors.red[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isAdmis ? 'Admis' : 'Redoublant',
+                                style: TextStyle(
+                                  color: isAdmis
+                                      ? Colors.green[700]
+                                      : Colors.red[700],
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    ),
+                    SizedBox(
+                      width: 40,
+                      child: Checkbox(
+                        value: isSelected,
+                        activeColor: isAdmis ? Colors.green : Colors.red,
+                        onChanged: (val) {
+                          setState(() {
+                            if (isAdmis) {
+                              if (val == true) {
+                                _selectedAdmisIds.add(studentId);
+                              } else {
+                                _selectedAdmisIds.remove(studentId);
+                              }
+                            } else {
+                              if (val == true) {
+                                _selectedRedoublantIds.add(studentId);
+                              } else {
+                                _selectedRedoublantIds.remove(studentId);
+                              }
+                            }
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),

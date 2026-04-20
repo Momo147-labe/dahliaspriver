@@ -7,6 +7,7 @@ import '../../core/database/database_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../screens/auth/login_page.dart';
 import 'notification_modal.dart';
+import 'trial_countdown.dart';
 
 class Header extends StatefulWidget {
   final String pageTitle;
@@ -206,6 +207,10 @@ class _HeaderState extends State<Header> {
                   ],
                 ),
               ),
+
+              // Trial Countdown
+              TrialCountdown(),
+              const SizedBox(width: 16),
 
               // Bouton Déconnexion
               Container(
