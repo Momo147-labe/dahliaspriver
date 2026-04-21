@@ -48,6 +48,8 @@ class _StudentsPageState extends State<StudentsPage> {
   int _ageMoyen = 0;
   int? _lastLoadedAnneeId;
   Map<String, int> _classesStats = {};
+  List<Map<String, dynamic>> _allClasses =
+      []; // All classes with IDs and levels
 
   @override
   void didChangeDependencies() {
@@ -63,6 +65,137 @@ class _StudentsPageState extends State<StudentsPage> {
       _lastLoadedAnneeId = anneeId;
       // On utilise Future.microtask pour s'assurer que le build actuel est terminé
       Future.microtask(() => _loadData(anneeId));
+    }
+  }
+
+  Future<void> _showTransferDialog(Map<String, dynamic> student) async {
+    final db = await DatabaseHelper.instance.database;
+    final eleveDao = EleveDao(db);
+
+    // Get student's current class to find its level
+    final studentClassId = student['classe_id'] as int;
+    final classes = await db.query(
+      'classe',
+      where: 'id = ?',
+      whereArgs: [studentClassId],
+    );
+
+    if (classes.isEmpty) return;
+    final int levelId = classes.first['niveau_id'] as int;
+
+    if (!mounted) return;
+
+    final int? result = await showDialog<int>(
+      context: context,
+      builder: (ctx) {
+        int? selectedDestId;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            // Filter classes of the same level, excluding current
+            final otherClasses = _allClasses
+                .where(
+                  (c) => c['id'] != studentClassId && c['niveau_id'] == levelId,
+                )
+                .toList();
+
+            return AlertDialog(
+              title: const Text('Transférer l\'élève'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Transférer ${student['nom']} ${student['prenom']} vers une autre classe du même niveau.',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 20),
+                  DropdownButtonFormField<int>(
+                    decoration: InputDecoration(
+                      labelText: 'Classe de destination',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      filled: true,
+                      fillColor: isDark
+                          ? const Color(0xFF374151)
+                          : Colors.grey[50],
+                    ),
+                    dropdownColor: isDark
+                        ? const Color(0xFF374151)
+                        : Colors.white,
+                    value: selectedDestId,
+                    items: otherClasses
+                        .map(
+                          (c) => DropdownMenuItem<int>(
+                            value: c['id'] as int,
+                            child: Text(c['nom'].toString()),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setDialogState(() => selectedDestId = v),
+                  ),
+                  if (otherClasses.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Aucune autre classe disponible pour ce niveau.',
+                        style: TextStyle(color: Colors.red, fontSize: 11),
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Annuler'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedDestId == null
+                      ? null
+                      : () => Navigator.pop(ctx, selectedDestId),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                  ),
+                  child: const Text(
+                    'Transférer',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null && _lastLoadedAnneeId != null) {
+      setState(() => _isLoading = true);
+      try {
+        await eleveDao.transfererEleve(
+          eleveId: student['id'] as int,
+          newClasseId: result,
+          anneeId: _lastLoadedAnneeId!,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Élève transféré avec succès.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        await _loadData(_lastLoadedAnneeId!);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -101,9 +234,10 @@ class _StudentsPageState extends State<StudentsPage> {
         final db = await DatabaseHelper.instance.database;
         final classes = await db.query(
           'classe',
-          columns: ['nom'],
+          columns: ['id', 'nom', 'niveau_id'],
           orderBy: 'nom',
         );
+        _allClasses = classes;
         _uniqueClasses = [
           'Toutes les classes',
           ...classes.map((c) => c['nom'].toString()),
@@ -815,6 +949,12 @@ class _StudentsPageState extends State<StudentsPage> {
               ),
               DataColumn(
                 label: Text(
+                  'Sexe',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+              DataColumn(
+                label: Text(
                   'Né(e) le',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
@@ -884,6 +1024,7 @@ class _StudentsPageState extends State<StudentsPage> {
                       ),
                     ),
                   ),
+                  DataCell(Text(s.sexe, style: const TextStyle(fontSize: 14))),
                   DataCell(
                     Text(s.dateNaissance, style: const TextStyle(fontSize: 14)),
                   ),
@@ -937,6 +1078,17 @@ class _StudentsPageState extends State<StudentsPage> {
                                     CarteScolaireGuinee(studentId: s.id),
                               ),
                             ),
+                          ),
+                        ),
+                        Tooltip(
+                          message: 'Transfert',
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.swap_horiz,
+                              size: 20,
+                              color: Colors.orange,
+                            ),
+                            onPressed: () => _showTransferDialog(eleve),
                           ),
                         ),
                       ],
@@ -1077,7 +1229,11 @@ class _StudentsPageState extends State<StudentsPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Né(e) le: ${s.dateNaissance} à ${s.lieuNaissance}',
+                  'Sexe: ${s.sexeDisplay} | Né(e) le: ${s.dateNaissance}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                Text(
+                  'À ${s.lieuNaissance}',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
@@ -1096,6 +1252,13 @@ class _StudentsPageState extends State<StudentsPage> {
                       Icons.edit,
                       Colors.blue,
                       () => _openEditModal(s),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildMobileAction(
+                      'Transfert',
+                      Icons.swap_horiz,
+                      Colors.orange,
+                      () => _showTransferDialog(_filteredStudents[index]),
                     ),
                     const SizedBox(width: 8),
                     _buildMobileAction(

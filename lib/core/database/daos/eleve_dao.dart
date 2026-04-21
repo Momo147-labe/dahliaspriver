@@ -433,4 +433,49 @@ class EleveDao extends BaseDao {
       whereArgs: [id],
     );
   }
+
+  Future<void> transfererEleve({
+    required int eleveId,
+    required int newClasseId,
+    required int anneeId,
+  }) async {
+    await db.transaction((txn) async {
+      // 1. Mettre à jour la table principale eleve
+      await txn.update(
+        EleveSchema.tableName,
+        {
+          'classe_id': newClasseId,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [eleveId],
+      );
+
+      // 2. Mettre à jour la table eleve_parcours pour l'année scolaire en cours
+      await txn.update(
+        'eleve_parcours',
+        {
+          'classe_id': newClasseId,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'eleve_id = ? AND annee_scolaire_id = ?',
+        whereArgs: [eleveId, anneeId],
+      );
+
+      // 3. Mettre à jour les paiements pour l'année scolaire en cours
+      await txn.update(
+        'paiement',
+        {'classe_id': newClasseId},
+        where: 'eleve_id = ? AND annee_scolaire_id = ?',
+        whereArgs: [eleveId, anneeId],
+      );
+
+      await txn.update(
+        'paiement_detail',
+        {'classe_id': newClasseId},
+        where: 'eleve_id = ? AND annee_scolaire_id = ?',
+        whereArgs: [eleveId, anneeId],
+      );
+    });
+  }
 }

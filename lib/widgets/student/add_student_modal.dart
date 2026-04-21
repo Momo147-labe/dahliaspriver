@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
+import 'package:image/image.dart' as img;
 
 import 'package:intl/intl.dart';
 import '../../../core/database/database_helper.dart';
@@ -1135,6 +1136,13 @@ class _AddStudentModalState extends State<AddStudentModal> {
           FileService.studentPhotosDir,
         );
 
+        // Supprimer la photo temporaire de la machine
+        try {
+          await File(capturedFile.path).delete();
+        } catch (e) {
+          debugPrint('Erreur suppression temp: $e');
+        }
+
         setState(() => _selectedImage = File(savedPath));
 
         if (mounted) {
@@ -2026,6 +2034,17 @@ class _CameraPreviewModalState extends State<_CameraPreviewModal> {
       setState(() => _isTakingPicture = true);
       await _initializeControllerFuture;
       final image = await _controller.takePicture();
+
+      // Correction de l'orientation sur Windows
+      if (Platform.isWindows) {
+        final bytes = await File(image.path).readAsBytes();
+        final decoded = img.decodeImage(bytes);
+        if (decoded != null) {
+          final rotated = img.copyRotate(decoded, angle: 180);
+          await File(image.path).writeAsBytes(img.encodeJpg(rotated));
+        }
+      }
+
       if (mounted) {
         Navigator.pop(context, image);
       }

@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:camera/camera.dart';
+import 'package:image/image.dart' as img;
 import '../../../core/database/database_helper.dart';
 import '../../../core/services/file_service.dart';
 import '../../../theme/app_theme.dart';
@@ -196,10 +198,99 @@ class _EditStudentModalState extends State<EditStudentModal> {
         );
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleCameraCapture() async {
+    // Protection pour Linux (camera non supportée par le plugin Windows/Linux actuel sans config complexe)
+    if (Platform.isLinux) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'La capture caméra n\'est pas encore supportée sur Linux. Veuillez utiliser la galerie.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Aucune caméra trouvée'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (!mounted) return;
+
+      final XFile? capturedFile = await showDialog<XFile>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _CameraPreviewModal(cameras: cameras),
+      );
+
+      if (capturedFile != null) {
+        final String savedPath = await FileService.instance.saveImage(
+          File(capturedFile.path),
+          FileService.studentPhotosDir,
+        );
+
+        // Supprimer la photo temporaire de la machine
+        try {
+          await File(capturedFile.path).delete();
+        } catch (e) {
+          debugPrint('Erreur suppression temp: $e');
+        }
+
+        setState(() => _selectedImage = File(savedPath));
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Photo capturée avec succès'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } on CameraException catch (e) {
+      String message = 'Erreur caméra : ${e.description}';
+      if (e.code == 'cameraNotFound') message = 'Aucune caméra trouvée';
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      // Gestion spécifique du MissingPluginException sur Linux/Web
+      String errorMsg = e.toString();
+      if (errorMsg.contains('MissingPluginException') ||
+          errorMsg.contains('UnimplementedError')) {
+        errorMsg = 'Fonctionnalité caméra non disponible sur cette plateforme.';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : $errorMsg'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -601,6 +692,13 @@ class _EditStudentModalState extends State<EditStudentModal> {
               onTap: () => _pickImage(source: ImageSource.gallery),
               isDark: isDark,
             ),
+            _buildPickerBtn(
+              icon: Icons.camera_alt,
+              label: 'Caméra',
+              onTap: _handleCameraCapture,
+              isDark: isDark,
+              color: Colors.teal,
+            ),
           ],
         ),
       ],
@@ -612,6 +710,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
     required String label,
     required VoidCallback onTap,
     required bool isDark,
+    Color? color,
   }) {
     return InkWell(
       onTap: onTap,
@@ -627,7 +726,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
         ),
         child: Row(
           children: [
-            Icon(icon, size: 16, color: AppTheme.primaryColor),
+            Icon(icon, size: 16, color: color ?? AppTheme.primaryColor),
             const SizedBox(width: 8),
             Text(
               label,
@@ -644,7 +743,32 @@ class _EditStudentModalState extends State<EditStudentModal> {
   }
 
   void _showImageSourceDialog() {
-    _pickImage(source: ImageSource.gallery);
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Galerie'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(source: ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Prendre une photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _handleCameraCapture();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildActions() {
@@ -938,5 +1062,132 @@ class _EditStudentModalState extends State<EditStudentModal> {
         ),
       ],
     );
+  }
+}
+
+class _CameraPreviewModal extends StatefulWidget {
+  final List<CameraDescription> cameras;
+
+  const _CameraPreviewModal({required this.cameras});
+
+  @override
+  State<_CameraPreviewModal> createState() => _CameraPreviewModalState();
+}
+
+class _CameraPreviewModalState extends State<_CameraPreviewModal> {
+  late CameraController _controller;
+  late Future<void> _initializeControllerFuture;
+  bool _isTakingPicture = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = CameraController(
+      widget.cameras.first,
+      ResolutionPreset.medium,
+      enableAudio: false,
+    );
+    _initializeControllerFuture = _controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: const EdgeInsets.all(0),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          FutureBuilder<void>(
+            future: _initializeControllerFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.done) {
+                return CameraPreview(_controller);
+              } else {
+                return const Center(child: CircularProgressIndicator());
+              }
+            },
+          ),
+          Positioned(
+            bottom: 40,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                  padding: const EdgeInsets.all(12),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black45,
+                    shape: const CircleBorder(),
+                  ),
+                ),
+                const SizedBox(width: 40),
+                GestureDetector(
+                  onTap: _isTakingPicture ? null : _takePicture,
+                  child: Container(
+                    height: 80,
+                    width: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 4),
+                    ),
+                    child: Center(
+                      child: _isTakingPicture
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Container(
+                              height: 60,
+                              width: 60,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _takePicture() async {
+    try {
+      setState(() => _isTakingPicture = true);
+      await _initializeControllerFuture;
+      final image = await _controller.takePicture();
+
+      // Correction de l'orientation sur Windows
+      if (Platform.isWindows) {
+        final bytes = await File(image.path).readAsBytes();
+        final decoded = img.decodeImage(bytes);
+        if (decoded != null) {
+          final rotated = img.copyRotate(decoded, angle: 180);
+          await File(image.path).writeAsBytes(img.encodeJpg(rotated));
+        }
+      }
+
+      if (mounted) Navigator.of(context).pop(image);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur capture : $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTakingPicture = false);
+    }
   }
 }
