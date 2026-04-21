@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/database/daos/eleve_dao.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/services/file_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../models/student.dart';
 import '../../../providers/academic_year_provider.dart';
@@ -1342,6 +1343,10 @@ class _StudentsPageState extends State<StudentsPage> {
     if (confirmed == true) {
       try {
         final db = await DatabaseHelper.instance.database;
+        // Supprimer la photo avant de supprimer l'élève de la BD
+        if (student.photo.isNotEmpty) {
+          await FileService.instance.deleteFile(student.photo);
+        }
         await db.delete('eleve', where: 'id = ?', whereArgs: [student.id]);
         final anneeId = context.read<AcademicYearProvider>().selectedAnneeId;
         if (anneeId != null) {

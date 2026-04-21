@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:camera/camera.dart';
-import 'package:image/image.dart' as img;
+
 import '../../../core/database/database_helper.dart';
 import '../../../core/services/file_service.dart';
 import '../../../theme/app_theme.dart';
@@ -41,6 +41,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
 
   late String _selectedSexe;
   File? _selectedImage;
+  File? _tempCapturedImage;
   bool _isLoading = false;
 
   @override
@@ -92,6 +93,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
     _prenomPereController.dispose();
     _nomMereController.dispose();
     _prenomMereController.dispose();
+    _tempCapturedImage?.delete().catchError((_) => File(''));
     super.dispose();
   }
 
@@ -105,13 +107,11 @@ class _EditStudentModalState extends State<EditStudentModal> {
       );
 
       if (image != null) {
-        // Sauvegarder l'image localement via FileService
-        final String savedPath = await FileService.instance.saveImage(
-          File(image.path),
-          FileService.studentPhotosDir,
-        );
-
-        setState(() => _selectedImage = File(savedPath));
+        final tempFile = File(image.path);
+        setState(() {
+          _tempCapturedImage = tempFile;
+          _selectedImage = tempFile;
+        });
       }
     } catch (e) {
       print('Erreur picking image: $e');
@@ -164,6 +164,27 @@ class _EditStudentModalState extends State<EditStudentModal> {
     try {
       final db = await DatabaseHelper.instance.database;
 
+      String finalPhotoPath =
+          widget.student.photo; // Garder l'ancienne par défaut
+
+      if (_tempCapturedImage != null && await _tempCapturedImage!.exists()) {
+        // Supprimer définitivement l'ancienne photo
+        if (widget.student.photo.isNotEmpty) {
+          await FileService.instance.deleteFile(widget.student.photo);
+        }
+
+        final ext = '.jpg';
+        final fileName = '${_matriculeController.text}$ext';
+        finalPhotoPath = await FileService.instance.saveImageWithName(
+          _tempCapturedImage!,
+          FileService.studentPhotosDir,
+          fileName,
+        );
+        // Supprimer le fichier temporaire d'origine
+        await _tempCapturedImage!.delete().catchError((_) => File(''));
+        _tempCapturedImage = null;
+      }
+
       final updatedData = {
         'matricule': _matriculeController.text,
         'nom': _nomController.text,
@@ -171,7 +192,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
         'date_naissance': _dateNaissanceController.text,
         'lieu_naissance': _lieuNaissanceController.text,
         'sexe': _selectedSexe,
-        'photo': _selectedImage?.path ?? widget.student.photo,
+        'photo': finalPhotoPath,
         'personne_a_prevenir': _personneAPrevenirController.text.trim(),
         'contact_urgence': _contactUrgenceController.text.trim(),
         'nom_pere': _nomPereController.text.trim(),
@@ -245,19 +266,11 @@ class _EditStudentModalState extends State<EditStudentModal> {
       );
 
       if (capturedFile != null) {
-        final String savedPath = await FileService.instance.saveImage(
-          File(capturedFile.path),
-          FileService.studentPhotosDir,
-        );
-
-        // Supprimer la photo temporaire de la machine
-        try {
-          await File(capturedFile.path).delete();
-        } catch (e) {
-          debugPrint('Erreur suppression temp: $e');
-        }
-
-        setState(() => _selectedImage = File(savedPath));
+        final tempFile = File(capturedFile.path);
+        setState(() {
+          _tempCapturedImage = tempFile;
+          _selectedImage = tempFile;
+        });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1165,16 +1178,6 @@ class _CameraPreviewModalState extends State<_CameraPreviewModal> {
       setState(() => _isTakingPicture = true);
       await _initializeControllerFuture;
       final image = await _controller.takePicture();
-
-      // Correction de l'orientation sur Windows
-      if (Platform.isWindows) {
-        final bytes = await File(image.path).readAsBytes();
-        final decoded = img.decodeImage(bytes);
-        if (decoded != null) {
-          final rotated = img.copyRotate(decoded, angle: 180);
-          await File(image.path).writeAsBytes(img.encodeJpg(rotated));
-        }
-      }
 
       if (mounted) Navigator.of(context).pop(image);
     } catch (e) {

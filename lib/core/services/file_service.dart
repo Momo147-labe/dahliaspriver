@@ -52,6 +52,18 @@ class FileService {
     return savedFile.path;
   }
 
+  /// Saves an image file with a specific name.
+  Future<String> saveImageWithName(
+    File sourceFile,
+    String category,
+    String fileName,
+  ) async {
+    final dir = await _getCategoryDir(category);
+    final String targetPath = p.join(dir.path, fileName);
+    final File savedFile = await sourceFile.copy(targetPath);
+    return savedFile.path;
+  }
+
   /// Deletes a file if it exists.
   Future<void> deleteFile(String? path) async {
     if (path == null || path.isEmpty) return;

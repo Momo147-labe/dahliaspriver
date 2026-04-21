@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
-import 'package:image/image.dart' as img;
 
 import 'package:intl/intl.dart';
 import '../../../core/database/database_helper.dart';
@@ -58,7 +57,9 @@ class _AddStudentModalState extends State<AddStudentModal> {
   String _selectedTypeInscription = 'nouveau';
   String _selectedTypePaiement = 'inscription';
   String _selectedModePaiement = 'especes';
-  File? _selectedImage;
+  File? _selectedImage; // Image actuellement affiché (aperçu)
+  File?
+  _tempCapturedImage; // Fichier temporaire avant la soumission du formulaire
   bool _isLoading = false;
 
   // Données chargées depuis SQLite
@@ -233,6 +234,8 @@ class _AddStudentModalState extends State<AddStudentModal> {
     _prenomPereController.dispose();
     _nomMereController.dispose();
     _prenomMereController.dispose();
+    // Supprimer le fichier temporaire si le formulaire n'a pas été soumis
+    _tempCapturedImage?.delete().catchError((_) => File(''));
     super.dispose();
   }
 
@@ -247,13 +250,12 @@ class _AddStudentModalState extends State<AddStudentModal> {
       );
 
       if (image != null) {
-        // Sauvegarder l'image localement via FileService
-        final String savedPath = await FileService.instance.saveImage(
-          File(image.path),
-          FileService.studentPhotosDir,
-        );
-
-        setState(() => _selectedImage = File(savedPath));
+        // Stocker comme fichier temporaire — sera sauvegardé définitivement lors du submit
+        final tempFile = File(image.path);
+        setState(() {
+          _tempCapturedImage = tempFile;
+          _selectedImage = tempFile;
+        });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -376,26 +378,10 @@ class _AddStudentModalState extends State<AddStudentModal> {
       }
 
       int eleveId;
+      String finalPhotoPath = '';
 
-      if (widget.isValidationMode && widget.initialStudent != null) {
-        eleveId = int.parse(widget.initialStudent!.id);
-        // Mettre à jour le statut de l'élève
-        await db.update(
-          'eleve',
-          {
-            'statut': _selectedTypeInscription == 'reinscrit'
-                ? 'reinscrit'
-                : 'inscrit',
-            'classe_id': classeId,
-            'annee_scolaire_id': anneeScolaireId,
-            'frais_id': _fraisId,
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          where: 'id = ?',
-          whereArgs: [eleveId],
-        );
-      } else {
-        // Générer matricule automatiquement si non fourni
+      // Calculer le matricule définitivement (uniquement si nouveau)
+      if (!widget.isValidationMode || widget.initialStudent == null) {
         if (_matriculeController.text.isEmpty) {
           final year = DateTime.now().year;
           final count = await db.rawQuery(
@@ -405,7 +391,47 @@ class _AddStudentModalState extends State<AddStudentModal> {
           _matriculeController.text =
               '$year-STUD-${studentCount.toString().padLeft(4, '0')}';
         }
+      }
 
+      // Sauvegarder la photo définitivement avec le matricule comme nom de fichier
+      if (_tempCapturedImage != null && await _tempCapturedImage!.exists()) {
+        final ext = '.jpg';
+        final fileName = '${_matriculeController.text}$ext';
+        finalPhotoPath = await FileService.instance.saveImageWithName(
+          _tempCapturedImage!,
+          FileService.studentPhotosDir,
+          fileName,
+        );
+        // Supprimer le fichier temporaire d'origine
+        await _tempCapturedImage!.delete().catchError((_) => File(''));
+        _tempCapturedImage = null;
+      }
+
+      if (widget.isValidationMode && widget.initialStudent != null) {
+        eleveId = int.parse(widget.initialStudent!.id);
+
+        final updateData = {
+          'statut': _selectedTypeInscription == 'reinscrit'
+              ? 'reinscrit'
+              : 'inscrit',
+          'classe_id': classeId,
+          'annee_scolaire_id': anneeScolaireId,
+          'frais_id': _fraisId,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+
+        if (finalPhotoPath.isNotEmpty) {
+          updateData['photo'] = finalPhotoPath;
+        }
+
+        // Mettre à jour le statut de l'élève
+        await db.update(
+          'eleve',
+          updateData,
+          where: 'id = ?',
+          whereArgs: [eleveId],
+        );
+      } else {
         // Insérer l'élève avec les champs requis selon le schéma
         final eleveData = {
           'matricule': _matriculeController.text,
@@ -417,7 +443,10 @@ class _AddStudentModalState extends State<AddStudentModal> {
           'classe_id': classeId,
           'annee_scolaire_id': anneeScolaireId,
           'frais_id': _fraisId,
-          'photo': _selectedImage?.path ?? '',
+          // Utiliser finalPhotoPath si on vient d'enregistrer la caméra, sinon ce qui est dans _selectedImage
+          'photo': finalPhotoPath.isNotEmpty
+              ? finalPhotoPath
+              : (_selectedImage?.path ?? ''),
           'personne_a_prevenir': _personneAPrevenirController.text.trim(),
           'contact_urgence': _contactUrgenceController.text.trim(),
           'nom_pere': _nomPereController.text.trim(),
@@ -1131,19 +1160,12 @@ class _AddStudentModalState extends State<AddStudentModal> {
       );
 
       if (capturedFile != null) {
-        final String savedPath = await FileService.instance.saveImage(
-          File(capturedFile.path),
-          FileService.studentPhotosDir,
-        );
-
-        // Supprimer la photo temporaire de la machine
-        try {
-          await File(capturedFile.path).delete();
-        } catch (e) {
-          debugPrint('Erreur suppression temp: $e');
-        }
-
-        setState(() => _selectedImage = File(savedPath));
+        // Stocker comme fichier temporaire — sera sauvegardé définitivement lors du submit
+        final tempFile = File(capturedFile.path);
+        setState(() {
+          _tempCapturedImage = tempFile;
+          _selectedImage = tempFile;
+        });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -2034,16 +2056,6 @@ class _CameraPreviewModalState extends State<_CameraPreviewModal> {
       setState(() => _isTakingPicture = true);
       await _initializeControllerFuture;
       final image = await _controller.takePicture();
-
-      // Correction de l'orientation sur Windows
-      if (Platform.isWindows) {
-        final bytes = await File(image.path).readAsBytes();
-        final decoded = img.decodeImage(bytes);
-        if (decoded != null) {
-          final rotated = img.copyRotate(decoded, angle: 180);
-          await File(image.path).writeAsBytes(img.encodeJpg(rotated));
-        }
-      }
 
       if (mounted) {
         Navigator.pop(context, image);
