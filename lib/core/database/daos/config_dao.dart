@@ -209,6 +209,22 @@ class ConfigDao extends BaseDao {
     return await db.query(NiveauxSchema.tableName, where: 'actif = 1');
   }
 
+  Future<List<Map<String, dynamic>>> getSequencesForTrimester(
+    int anneeId,
+    int trimester,
+  ) async {
+    try {
+      return await db.query(
+        'sequence_planification',
+        where: 'annee_scolaire_id = ? AND trimestre = ?',
+        whereArgs: [anneeId, trimester],
+        orderBy: 'numero_sequence ASC',
+      );
+    } catch (e) {
+      return [];
+    }
+  }
+
   Future<void> saveSequencesPlanification(
     List<Map<String, dynamic>> sequences,
   ) async {

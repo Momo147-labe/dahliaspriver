@@ -25,6 +25,16 @@ class EnseignantDao extends BaseDao {
     return await db.insert(EnseignantSchema.tableName, enseignant);
   }
 
+  Future<Map<String, dynamic>> getEnseignantsStats() async {
+    final result = await db.rawQuery('''
+      SELECT 
+        (SELECT COUNT(*) FROM enseignant) as total_enseignants,
+        (SELECT COUNT(DISTINCT specialite) FROM enseignant WHERE specialite IS NOT NULL AND specialite != '') as total_specialites,
+        (SELECT COUNT(*) FROM emploi_du_temps) as assignments_count
+    ''');
+    return result.first;
+  }
+
   Future<int> updateEnseignant(int id, Map<String, dynamic> enseignant) async {
     enseignant['updated_at'] = DateTime.now().toIso8601String();
     return await db.update(
@@ -70,29 +80,25 @@ class EnseignantDao extends BaseDao {
     return results.isNotEmpty ? results.first : null;
   }
 
-  Future<Map<String, dynamic>> getEnseignantsStats() async {
-    final result = await db.rawQuery('''
-      SELECT 
-        (SELECT COUNT(*) FROM ${EnseignantSchema.tableName}) as total_enseignants,
-        (SELECT COUNT(DISTINCT specialite) FROM ${EnseignantSchema.tableName} WHERE specialite IS NOT NULL AND specialite != '') as total_specialites,
-        (SELECT COUNT(*) FROM attribution_enseignant) as assignments_count
-    ''');
-    return result.first;
-  }
-
   Future<void> saveAllAttributions(
     int classeId,
     int? anneeId,
     Map<int, int?> assignments,
   ) async {
     await db.transaction((txn) async {
+      // Clean up old attributions for this class
+      await txn.delete(
+        'attribution_enseignant',
+        where: 'classe_id = ?',
+        whereArgs: [classeId],
+      );
+
       for (var entry in assignments.entries) {
         if (entry.value != null) {
           await txn.insert('attribution_enseignant', {
             'classe_id': classeId,
             'matiere_id': entry.key,
             'enseignant_id': entry.value,
-            'annee_scolaire_id': anneeId,
           }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
       }
@@ -175,5 +181,13 @@ class EnseignantDao extends BaseDao {
           : null,
       'specialityDistribution': specialityDistribution,
     };
+  }
+
+  Future<int> deleteEnseignant(int id) async {
+    return await db.delete(
+      EnseignantSchema.tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

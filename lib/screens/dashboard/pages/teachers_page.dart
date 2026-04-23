@@ -5,6 +5,8 @@ import '../../../core/database/database_helper.dart';
 import '../../../models/enseignant.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/teacher/teacher_modal.dart';
+import '../../../providers/academic_year_provider.dart';
+import 'package:provider/provider.dart';
 
 class TeachersPage extends StatefulWidget {
   const TeachersPage({super.key});
@@ -35,6 +37,7 @@ class _TeachersPageState extends State<TeachersPage>
   bool _isLoading = true;
   String _searchTerm = '';
   String _viewMode = 'grid'; // 'grid' or 'list'
+  int? _lastAnneeId;
   late AnimationController _animationController;
 
   @override
@@ -45,6 +48,18 @@ class _TeachersPageState extends State<TeachersPage>
       duration: const Duration(milliseconds: 800),
     );
     _loadData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final academicProvider = Provider.of<AcademicYearProvider>(context);
+    final anneeId = academicProvider.selectedAnneeId;
+
+    if (anneeId != null && anneeId != _lastAnneeId) {
+      _lastAnneeId = anneeId;
+      Future.microtask(() => _loadData());
+    }
   }
 
   @override

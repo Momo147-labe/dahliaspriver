@@ -55,11 +55,7 @@ class _StudentsPageState extends State<StudentsPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Utiliser listen: false pour éviter que les changements du provider ne redéclenchent didChangeDependencies à l'infini
-    final academicProvider = Provider.of<AcademicYearProvider>(
-      context,
-      listen: false,
-    );
+    final academicProvider = Provider.of<AcademicYearProvider>(context);
     final anneeId = academicProvider.selectedAnneeId;
 
     if (anneeId != null && anneeId != _lastLoadedAnneeId) {

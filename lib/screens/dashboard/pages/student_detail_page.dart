@@ -149,32 +149,30 @@ class _StudentDetailPageState extends State<StudentDetailPage>
       backgroundColor: isDark
           ? AppTheme.backgroundDark
           : AppTheme.backgroundLight,
-      body: CustomScrollView(
-        slivers: [
-          _buildSliverHeader(isDark),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-              child: _buildSummaryStatsRow(isDark),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            _buildSliverHeader(isDark),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                child: _buildSummaryStatsRow(isDark),
+              ),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: _buildTabNavigation(isDark),
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _SliverAppBarDelegate(_buildTabNavigation(isDark)),
             ),
-          ),
-          SliverFillRemaining(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildParcoursTab(isDark),
-                _buildResultsTab(isDark),
-                _buildFinanceTab(isDark),
-              ],
-            ),
-          ),
-        ],
+          ];
+        },
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildParcoursTab(isDark),
+            _buildResultsTab(isDark),
+            _buildFinanceTab(isDark),
+          ],
+        ),
       ),
     );
   }
@@ -1465,5 +1463,30 @@ class _StudentDetailPageState extends State<StudentDetailPage>
       decimalDigits: 0,
     );
     return formatter.format(amount ?? 0);
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate(this._tabBar);
+
+  final Widget _tabBar;
+
+  @override
+  double get minExtent => 52; // Hauteur approximative du TabBar + bordure
+  @override
+  double get maxExtent => 52;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return _tabBar;
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }

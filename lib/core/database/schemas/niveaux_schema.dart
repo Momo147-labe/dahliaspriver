@@ -11,6 +11,7 @@ class NiveauxSchema {
       moyenne_passage REAL,
       is_examen INTEGER DEFAULT 0,
       actif INTEGER DEFAULT 1,
+      next_niveau_id INTEGER,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id)

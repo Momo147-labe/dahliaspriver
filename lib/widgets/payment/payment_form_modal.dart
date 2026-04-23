@@ -477,9 +477,14 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
 
   void _fetchInitialResults() async {
     setState(() => _isLoading = true);
-    setState(() => _isLoading = true);
-    final results = await DatabaseHelper.instance.eleveDao
-        .getInitialSearchData();
+    final anneeId = await DatabaseHelper.instance.ensureActiveAnneeCached();
+    if (anneeId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    final results = await DatabaseHelper.instance.eleveDao.getInitialSearchData(
+      anneeId,
+    );
     setState(() {
       _results = results;
       _isLoading = false;
@@ -493,8 +498,12 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
     }
     if (query.length < 2) return;
 
-    setState(() => _isLoading = true);
-    final results = await DatabaseHelper.instance.searchEleves(query);
+    final anneeId = await DatabaseHelper.instance.ensureActiveAnneeCached();
+    if (anneeId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    final results = await DatabaseHelper.instance.searchEleves(query, anneeId);
     setState(() {
       _results = results;
       _isLoading = false;

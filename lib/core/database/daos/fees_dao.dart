@@ -214,4 +214,225 @@ class FeesDao extends BaseDao {
     });
     return count;
   }
+
+  Future<List<Map<String, dynamic>>> getPaiementsByEleve(
+    int eleveId,
+    int anneeId,
+  ) async {
+    return await db.query(
+      'paiement_detail',
+      where: 'eleve_id = ? AND annee_scolaire_id = ?',
+      whereArgs: [eleveId, anneeId],
+      orderBy: 'date_paiement DESC',
+    );
+  }
+
+  Future<void> addPaiement(Map<String, dynamic> data) async {
+    await db.transaction((txn) async {
+      // 1. Insert into paiement_detail
+      int? classeId = data['classe_id'];
+      int? fraisId = data['frais_id'];
+
+      if (classeId == null || fraisId == null) {
+        final eleve = await txn.query(
+          'eleve',
+          columns: ['classe_id'],
+          where: 'id = ?',
+          whereArgs: [data['eleve_id']],
+        );
+        if (eleve.isNotEmpty) {
+          classeId = eleve.first['classe_id'] as int;
+          data['classe_id'] = classeId;
+
+          final fees = await txn.query(
+            FraisScolariteSchema.tableName,
+            columns: ['id'],
+            where: 'classe_id = ? AND annee_scolaire_id = ?',
+            whereArgs: [classeId, data['annee_scolaire_id']],
+          );
+          if (fees.isNotEmpty) {
+            fraisId = fees.first['id'] as int?;
+            data['frais_id'] = fraisId;
+          }
+        }
+      }
+
+      await txn.insert('paiement_detail', data);
+
+      // 2. Update or insert into aggregate 'paiement' table
+      final existing = await txn.query(
+        'paiement',
+        where: 'eleve_id = ? AND annee_scolaire_id = ?',
+        whereArgs: [data['eleve_id'], data['annee_scolaire_id']],
+      );
+
+      if (existing.isNotEmpty) {
+        final double currentPaid =
+            (existing.first['montant_paye'] as num?)?.toDouble() ?? 0.0;
+        final double total =
+            (existing.first['montant_total'] as num?)?.toDouble() ?? 0.0;
+        final double newPaid =
+            currentPaid + (data['montant'] as num).toDouble();
+        final double newRemaining = total - newPaid;
+
+        await txn.update(
+          'paiement',
+          {
+            'montant_paye': newPaid,
+            'montant_restant': newRemaining,
+            'mode_paiement': data['mode_paiement'],
+            'reference_paiement': data['observation'],
+            'date_paiement': data['date_paiement'],
+            'type_paiement': data['type_frais'],
+            'statut': newRemaining <= 0 ? 'Réglé' : 'Partiel',
+            'classe_id': classeId,
+            'frais_id': fraisId,
+          },
+          where: 'id = ?',
+          whereArgs: [existing.first['id']],
+        );
+      } else {
+        // Initial payment record creation
+        double totalFees = 0.0;
+        if (classeId != null) {
+          final fees = await txn.query(
+            FraisScolariteSchema.tableName,
+            columns: ['montant_total'],
+            where: 'classe_id = ? AND annee_scolaire_id = ?',
+            whereArgs: [classeId, data['annee_scolaire_id']],
+          );
+          if (fees.isNotEmpty) {
+            totalFees =
+                (fees.first['montant_total'] as num?)?.toDouble() ?? 0.0;
+          }
+        }
+
+        final double montantPaye = (data['montant'] as num).toDouble();
+        final double remaining = totalFees - montantPaye;
+
+        await txn.insert('paiement', {
+          'eleve_id': data['eleve_id'],
+          'classe_id': classeId,
+          'frais_id': fraisId,
+          'annee_scolaire_id': data['annee_scolaire_id'],
+          'montant_total': totalFees,
+          'montant_paye': montantPaye,
+          'montant_restant': remaining,
+          'mode_paiement': data['mode_paiement'],
+          'reference_paiement': data['observation'],
+          'date_paiement': data['date_paiement'],
+          'type_paiement': data['type_frais'],
+          'statut': remaining <= 0 ? 'Réglé' : 'Partiel',
+        });
+      }
+    });
+  }
+
+  Future<Map<String, dynamic>> getFinancialAnalytics(
+    int currentYearId,
+    int? previousYearId,
+  ) async {
+    final currentFinances = await db.rawQuery(
+      '''
+      SELECT 
+        COUNT(DISTINCT pd.eleve_id) as students_paid,
+        SUM(pd.montant) as total_collected,
+        COUNT(pd.id) as payment_count
+      FROM paiement_detail pd
+      JOIN eleve_parcours ep ON pd.eleve_id = ep.eleve_id
+      WHERE ep.annee_scolaire_id = ?
+    ''',
+      [currentYearId],
+    );
+
+    final currentExpected = await db.rawQuery(
+      '''
+      SELECT 
+        SUM(
+          (fs.inscription + fs.reinscription + fs.tranche1 + fs.tranche2 + fs.tranche3) * 
+          (SELECT COUNT(*) FROM eleve_parcours WHERE classe_id = fs.classe_id AND annee_scolaire_id = ?)
+        ) as total_expected
+      FROM ${FraisScolariteSchema.tableName} fs
+      WHERE fs.annee_scolaire_id = ?
+    ''',
+      [currentYearId, currentYearId],
+    );
+
+    final paymentMethods = await db.rawQuery(
+      '''
+      SELECT pd.mode_paiement, COUNT(*) as count, SUM(pd.montant) as total
+      FROM paiement_detail pd
+      JOIN eleve_parcours ep ON pd.eleve_id = ep.eleve_id
+      WHERE ep.annee_scolaire_id = ?
+      GROUP BY pd.mode_paiement
+    ''',
+      [currentYearId],
+    );
+
+    return {
+      'current': {
+        ...currentFinances.first,
+        'total_expected': currentExpected.first['total_expected'],
+      },
+      'paymentMethods': paymentMethods,
+    };
+  }
+
+  Future<Map<String, double>> getStudentFinancialStatus(
+    int eleveId,
+    int anneeId,
+  ) async {
+    final result = await db.rawQuery(
+      '''
+      SELECT 
+        COALESCE(p.montant_total, fs.montant_total, 0) as total_expected,
+        COALESCE(p.montant_paye, 0) as total_paid
+      FROM eleve e
+      JOIN eleve_parcours ep ON e.id = ep.eleve_id AND ep.annee_scolaire_id = ?
+      JOIN classe c ON ep.classe_id = c.id
+      LEFT JOIN paiement p ON e.id = p.eleve_id AND p.annee_scolaire_id = ?
+      LEFT JOIN frais_scolarite fs ON ep.classe_id = fs.classe_id AND ep.annee_scolaire_id = fs.annee_scolaire_id
+      WHERE e.id = ?
+    ''',
+      [anneeId, anneeId, eleveId],
+    );
+
+    if (result.isEmpty) {
+      return {'totalExpected': 0.0, 'totalPaid': 0.0, 'balance': 0.0};
+    }
+
+    final double expected =
+        (result.first['total_expected'] as num?)?.toDouble() ?? 0.0;
+    final double paid = (result.first['total_paid'] as num?)?.toDouble() ?? 0.0;
+
+    return {
+      'totalExpected': expected,
+      'totalPaid': paid,
+      'balance': expected - paid,
+    };
+  }
+
+  Future<List<Map<String, dynamic>>> getOverdueStudents(int anneeId) async {
+    return await db.rawQuery(
+      '''
+      SELECT 
+        e.id, e.nom, e.prenom, e.matricule,
+        c.nom as classe_nom,
+        p.montant_restant, p.statut,
+        fs.date_limite_t1, fs.date_limite_t2, fs.date_limite_t3
+      FROM eleve e
+      JOIN eleve_parcours ep ON e.id = ep.eleve_id AND ep.annee_scolaire_id = ?
+      JOIN classe c ON ep.classe_id = c.id
+      JOIN paiement p ON e.id = p.eleve_id AND p.annee_scolaire_id = ?
+      JOIN frais_scolarite fs ON ep.classe_id = fs.classe_id AND ep.annee_scolaire_id = fs.annee_scolaire_id
+      WHERE p.montant_restant > 0 
+      AND (
+        (fs.date_limite_t1 < date('now') AND p.montant_paye < fs.tranche1) OR
+        (fs.date_limite_t2 < date('now') AND p.montant_paye < (fs.tranche1 + fs.tranche2)) OR
+        (fs.date_limite_t3 < date('now') AND p.montant_paye < fs.montant_total)
+      )
+    ''',
+      [anneeId, anneeId],
+    );
+  }
 }

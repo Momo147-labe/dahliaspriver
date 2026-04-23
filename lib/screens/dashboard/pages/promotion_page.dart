@@ -174,6 +174,7 @@ class _PromotionPageState extends State<PromotionPage> {
       // 2. Get students
       final rawStudents = await _dbHelper.eleveDao.getElevesByClasse(
         _oldClasseId!,
+        _oldAnneeId!,
       );
 
       // 3. Calculate average for each student
@@ -272,36 +273,48 @@ class _PromotionPageState extends State<PromotionPage> {
 
     setState(() => _isLoading = true);
     try {
-      final db = await _dbHelper.database;
-      await db.transaction((txn) async {
-        for (var id in _selectedAdmisIds) {
-          if (_isFinalClass) {
-            // Archive terminal class students
-            await txn.update(
-              'eleve',
-              {
-                'statut': 'sorti',
-                'updated_at': DateTime.now().toIso8601String(),
-              },
-              where: 'id = ?',
-              whereArgs: [id],
+      if (_isFinalClass) {
+        final db = await _dbHelper.database;
+        await db.transaction((txn) async {
+          final now = DateTime.now().toIso8601String();
+          for (var id in _selectedAdmisIds) {
+            // 1. Mettre à jour la décision dans le parcours de l'année sortante pour l'archive
+            final existingOld = await txn.query(
+              'eleve_parcours',
+              where: 'eleve_id = ? AND annee_scolaire_id = ?',
+              whereArgs: [id, _oldAnneeId],
             );
-          } else {
-            // Standard promotion
+
+            if (existingOld.isNotEmpty) {
+              await txn.update(
+                'eleve_parcours',
+                {'decision': 'Diplômé', 'updated_at': now},
+                where: 'id = ?',
+                whereArgs: [existingOld.first['id']],
+              );
+            }
+
+            // 2. Marquer l'élève comme sorti dans la table principale
             await txn.update(
               'eleve',
-              {
-                'classe_id': _newClasseId,
-                'annee_scolaire_id': _newAnneeId,
-                'statut': 'reinscrit',
-                'updated_at': DateTime.now().toIso8601String(),
-              },
+              {'statut': 'sorti', 'updated_at': now},
               where: 'id = ?',
               whereArgs: [id],
             );
           }
-        }
-      });
+        });
+      } else {
+        // Promotion standard utilisant le DAO pour gérer l'archivage et la nouvelle inscription
+        await _dbHelper.eleveDao.executeBulkPromotion(
+          eleveIds: _selectedAdmisIds.toList(),
+          oldClasseId: _oldClasseId!,
+          oldAnneeId: _oldAnneeId!,
+          newClasseId: _newClasseId!,
+          newAnneeId: _newAnneeId!,
+          decision: 'Admis',
+          confirmationStatut: 'En attente',
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -362,21 +375,17 @@ class _PromotionPageState extends State<PromotionPage> {
 
     setState(() => _isLoading = true);
     try {
-      final db = await _dbHelper.database;
-      await db.transaction((txn) async {
-        for (var id in _selectedRedoublantIds) {
-          await txn.update(
-            'eleve',
-            {
-              'annee_scolaire_id': _newAnneeId,
-              'statut': 'reinscrit', // Re-enrolled for redoublement
-              'updated_at': DateTime.now().toIso8601String(),
-            },
-            where: 'id = ?',
-            whereArgs: [id],
-          );
-        }
-      });
+      // Utiliser le DAO pour gérer proprement l'archivage de l'année passée (Redoublant)
+      // et la réinscription pour la nouvelle année dans la même classe
+      await _dbHelper.eleveDao.executeBulkPromotion(
+        eleveIds: _selectedRedoublantIds.toList(),
+        oldClasseId: _oldClasseId!,
+        oldAnneeId: _oldAnneeId!,
+        newClasseId: _oldClasseId!, // Garder la même classe
+        newAnneeId: _newAnneeId!,
+        decision: 'Redoublant',
+        confirmationStatut: 'En attente',
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

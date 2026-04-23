@@ -272,4 +272,37 @@ class DashboardDao extends BaseDao {
       'paymentMonthlyStats': paymentMonthlyStats,
     };
   }
+
+  Future<Map<String, dynamic>> getStudentAnalytics(int anneeId) async {
+    final genderStats = await db.rawQuery(
+      'SELECT sexe, COUNT(*) as count FROM eleve WHERE annee_scolaire_id = ? GROUP BY sexe',
+      [anneeId],
+    );
+
+    final levelStats = await db.rawQuery(
+      '''
+      SELECT n.nom, COUNT(e.id) as count 
+      FROM eleve e 
+      JOIN classe c ON e.classe_id = c.id 
+      JOIN niveaux n ON c.niveau_id = n.id
+      WHERE e.annee_scolaire_id = ? 
+      GROUP BY n.nom
+      ''',
+      [anneeId],
+    );
+
+    final classStats = await db.rawQuery(
+      '''
+      SELECT c.nom, COUNT(e.id) as count 
+      FROM eleve e 
+      JOIN classe c ON e.classe_id = c.id 
+      WHERE e.annee_scolaire_id = ? 
+      GROUP BY c.nom
+      ORDER BY count DESC
+      ''',
+      [anneeId],
+    );
+
+    return {'gender': genderStats, 'levels': levelStats, 'classes': classStats};
+  }
 }

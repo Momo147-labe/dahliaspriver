@@ -5,15 +5,19 @@ import 'base_dao.dart';
 class EleveDao extends BaseDao {
   EleveDao(Database db) : super(db);
 
-  Future<List<Map<String, dynamic>>> getElevesByClasse(int classeId) async {
+  Future<List<Map<String, dynamic>>> getElevesByClasse(
+    int classeId,
+    int anneeId,
+  ) async {
     return await db.rawQuery(
       '''
       SELECT e.*, c.nom as classe_nom 
       FROM ${EleveSchema.tableName} e
-      LEFT JOIN classe c ON e.classe_id = c.id
-      WHERE e.classe_id = ?
+      JOIN eleve_parcours p ON e.id = p.eleve_id AND p.annee_scolaire_id = ?
+      LEFT JOIN classe c ON p.classe_id = c.id
+      WHERE p.classe_id = ?
     ''',
-      [classeId],
+      [anneeId, classeId],
     );
   }
 
@@ -35,7 +39,7 @@ class EleveDao extends BaseDao {
     String? selectedStatus,
     String? selectedGender,
   }) async {
-    List<String> whereClauses = ['e.annee_scolaire_id = ?'];
+    List<String> whereClauses = ['p.annee_scolaire_id = ?'];
     List<dynamic> whereArgs = [anneeId];
 
     if (search != null && search.isNotEmpty) {
@@ -64,16 +68,18 @@ class EleveDao extends BaseDao {
 
     return await db.rawQuery(
       '''
-      SELECT e.*, c.nom as classe_nom, 
-             p.moyenne, p.decision, p.confirmation_statut, p.type_inscription
+      SELECT e.*, 
+             c.nom as classe_nom, 
+             p.moyenne, p.decision, p.confirmation_statut, p.type_inscription,
+             p.classe_id as current_classe_id
       FROM ${EleveSchema.tableName} e
-      LEFT JOIN classe c ON e.classe_id = c.id
-      LEFT JOIN eleve_parcours p ON e.id = p.eleve_id AND e.annee_scolaire_id = p.annee_scolaire_id
+      JOIN eleve_parcours p ON e.id = p.eleve_id AND p.annee_scolaire_id = ?
+      LEFT JOIN classe c ON p.classe_id = c.id
       WHERE $whereString
       ORDER BY e.nom ASC, e.prenom ASC
       LIMIT ? OFFSET ?
     ''',
-      [...whereArgs, limit, offset],
+      [anneeId, ...whereArgs, limit, offset],
     );
   }
 
@@ -84,7 +90,7 @@ class EleveDao extends BaseDao {
     String? selectedStatus,
     String? selectedGender,
   }) async {
-    List<String> whereClauses = ['e.annee_scolaire_id = ?'];
+    List<String> whereClauses = ['p.annee_scolaire_id = ?'];
     List<dynamic> whereArgs = [anneeId];
 
     if (search != null && search.isNotEmpty) {
@@ -114,36 +120,45 @@ class EleveDao extends BaseDao {
     final result = await db.rawQuery('''
       SELECT COUNT(*) as count 
       FROM ${EleveSchema.tableName} e
-      LEFT JOIN classe c ON e.classe_id = c.id
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      LEFT JOIN classe c ON p.classe_id = c.id
       WHERE $whereString
     ''', whereArgs);
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  Future<List<Map<String, dynamic>>> searchEleves(String query) async {
+  Future<List<Map<String, dynamic>>> searchEleves(
+    String query,
+    int anneeId,
+  ) async {
     return await db.rawQuery(
       '''
       SELECT e.*, c.nom as classe_nom,
              p.moyenne, p.decision, p.confirmation_statut, p.type_inscription
       FROM ${EleveSchema.tableName} e
-      LEFT JOIN classe c ON e.classe_id = c.id
-      LEFT JOIN eleve_parcours p ON e.id = p.eleve_id AND e.annee_scolaire_id = p.annee_scolaire_id
-      WHERE e.nom LIKE ? OR e.prenom LIKE ? OR e.matricule LIKE ?
+      LEFT JOIN eleve_parcours p ON e.id = p.eleve_id AND p.annee_scolaire_id = ?
+      LEFT JOIN classe c ON p.classe_id = c.id
+      WHERE (e.nom LIKE ? OR e.prenom LIKE ? OR e.matricule LIKE ?)
+      AND p.annee_scolaire_id IS NOT NULL
       LIMIT 20
     ''',
-      ['%$query%', '%$query%', '%$query%'],
+      [anneeId, '%$query%', '%$query%', '%$query%'],
     );
   }
 
-  Future<List<Map<String, dynamic>>> getInitialSearchData() async {
-    return await db.rawQuery('''
+  Future<List<Map<String, dynamic>>> getInitialSearchData(int anneeId) async {
+    return await db.rawQuery(
+      '''
       SELECT e.*, c.nom as classe_nom,
              p.moyenne, p.decision, p.confirmation_statut, p.type_inscription 
       FROM ${EleveSchema.tableName} e
-      LEFT JOIN classe c ON e.classe_id = c.id
-      LEFT JOIN eleve_parcours p ON e.id = p.eleve_id AND e.annee_scolaire_id = p.annee_scolaire_id
+      LEFT JOIN eleve_parcours p ON e.id = p.eleve_id AND p.annee_scolaire_id = ?
+      LEFT JOIN classe c ON p.classe_id = c.id
+      WHERE p.annee_scolaire_id IS NOT NULL
       LIMIT 20
-    ''');
+    ''',
+      [anneeId],
+    );
   }
 
   Future<Map<String, dynamic>?> getEleveById(int id) async {
@@ -151,7 +166,8 @@ class EleveDao extends BaseDao {
       '''
       SELECT e.*, c.nom as classe_nom, a.libelle as annee_nom
       FROM ${EleveSchema.tableName} e
-      LEFT JOIN classe c ON e.classe_id = c.id
+      LEFT JOIN eleve_parcours p ON e.id = p.eleve_id AND e.annee_scolaire_id = p.annee_scolaire_id
+      LEFT JOIN classe c ON p.classe_id = c.id
       LEFT JOIN annee_scolaire a ON e.annee_scolaire_id = a.id
       WHERE e.id = ?
     ''',
@@ -218,8 +234,23 @@ class EleveDao extends BaseDao {
       final now = DateTime.now().toIso8601String();
 
       for (int eleveId in eleveIds) {
-        // 1. Mettre à jour la décision pour l'année qui se termine
-        // On essaie d'abord d'updater un record existant pour cet élève/année
+        // 1. Archiver la performance (moyenne et rang) pour l'année qui se termine
+        // On récupère la moyenne calculée
+        final averageResult = await txn.query(
+          'averages',
+          where: 'eleve_id = ? AND annee_scolaire_id = ?',
+          whereArgs: [eleveId, oldAnneeId],
+        );
+
+        double? moyenne;
+        int? rang;
+
+        if (averageResult.isNotEmpty) {
+          moyenne = (averageResult.first['moyenne'] as num?)?.toDouble();
+          rang = averageResult.first['rang'] as int?;
+        }
+
+        // On met à jour ou crée le record pour l'année qui se termine avec moyenne, rang et décision
         final existingOld = await txn.query(
           'eleve_parcours',
           where: 'eleve_id = ? AND annee_scolaire_id = ?',
@@ -229,23 +260,29 @@ class EleveDao extends BaseDao {
         if (existingOld.isNotEmpty) {
           await txn.update(
             'eleve_parcours',
-            {'decision': decision, 'updated_at': now},
+            {
+              'decision': decision,
+              'moyenne': moyenne,
+              'rang': rang,
+              'updated_at': now,
+            },
             where: 'id = ?',
             whereArgs: [existingOld.first['id']],
           );
         } else {
-          // Si pas de record (cas rare), on le crée
           await txn.insert('eleve_parcours', {
             'eleve_id': eleveId,
             'classe_id': oldClasseId,
             'annee_scolaire_id': oldAnneeId,
             'decision': decision,
+            'moyenne': moyenne,
+            'rang': rang,
             'updated_at': now,
             'created_at': now,
           });
         }
 
-        // 2. Créer l'entrée pour la nouvelle année (En attente de confirmation/paiement)
+        // 2. Créer l'entrée pour la nouvelle année
         await txn.insert('eleve_parcours', {
           'eleve_id': eleveId,
           'classe_id': newClasseId,
@@ -254,19 +291,23 @@ class EleveDao extends BaseDao {
           'type_inscription': decision == 'Admis'
               ? 'Promotion'
               : 'Redoublement',
+          'moyenne': null,
+          'rang': null,
           'created_at': now,
           'updated_at': now,
         });
 
-        // 3. Mettre à jour la table principale élève
+        // 3. Supprimer d'éventuelles moyennes résiduelles pour la nouvelle année
+        await txn.delete(
+          'averages',
+          where: 'eleve_id = ? AND annee_scolaire_id = ?',
+          whereArgs: [eleveId, newAnneeId],
+        );
+
+        // 4. Mettre à jour le statut global de l'élève (optionnel, mais ne plus toucher à classe_id)
         await txn.update(
           EleveSchema.tableName,
-          {
-            'classe_id': newClasseId,
-            'annee_scolaire_id': newAnneeId,
-            'statut': 'reinscrit',
-            'updated_at': now,
-          },
+          {'statut': 'reinscrit', 'updated_at': now},
           where: 'id = ?',
           whereArgs: [eleveId],
         );
@@ -283,17 +324,19 @@ class EleveDao extends BaseDao {
       '''
       SELECT 
         COUNT(*) as total,
-        SUM(CASE WHEN sexe = 'M' THEN 1 ELSE 0 END) as males,
-        SUM(CASE WHEN sexe = 'F' THEN 1 ELSE 0 END) as females,
-        SUM(CASE WHEN statut = 'inscrit' THEN 1 ELSE 0 END) as new_students,
-        SUM(CASE WHEN statut = 'reinscrit' THEN 1 ELSE 0 END) as returning_students,
+        SUM(CASE WHEN e.sexe = 'M' THEN 1 ELSE 0 END) as males,
+        SUM(CASE WHEN e.sexe = 'F' THEN 1 ELSE 0 END) as females,
+        SUM(CASE WHEN p.type_inscription = 'Promotion' THEN 1 ELSE 0 END) as returning_students,
+        SUM(CASE WHEN p.type_inscription = 'Redoublement' THEN 1 ELSE 0 END) as repeaters,
+        SUM(CASE WHEN p.type_inscription IS NULL OR p.type_inscription = 'Inscrit' THEN 1 ELSE 0 END) as new_students,
         AVG(CASE 
-          WHEN date_naissance IS NOT NULL AND date_naissance != '' 
-          THEN (strftime('%Y', 'now') - strftime('%Y', date_naissance)) 
+          WHEN e.date_naissance IS NOT NULL AND e.date_naissance != '' 
+          THEN (strftime('%Y', 'now') - strftime('%Y', e.date_naissance)) 
           ELSE NULL 
         END) as average_age
-      FROM ${EleveSchema.tableName}
-      WHERE annee_scolaire_id = ?
+      FROM ${EleveSchema.tableName} e
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      WHERE p.annee_scolaire_id = ?
     ''',
       [currentYearId],
     );
@@ -302,9 +345,10 @@ class EleveDao extends BaseDao {
       '''
       SELECT cy.nom as cycle, COUNT(e.id) as count
       FROM ${EleveSchema.tableName} e
-      JOIN classe c ON e.classe_id = c.id
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      JOIN classe c ON p.classe_id = c.id
       JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      WHERE e.annee_scolaire_id = ?
+      WHERE p.annee_scolaire_id = ?
       GROUP BY cy.nom
     ''',
       [currentYearId],
@@ -314,8 +358,9 @@ class EleveDao extends BaseDao {
       '''
       SELECT c.nom as classe, COUNT(e.id) as count
       FROM ${EleveSchema.tableName} e
-      JOIN classe c ON e.classe_id = c.id
-      WHERE e.annee_scolaire_id = ?
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      JOIN classe c ON p.classe_id = c.id
+      WHERE p.annee_scolaire_id = ?
       GROUP BY c.nom
     ''',
       [currentYearId],
@@ -337,12 +382,13 @@ class EleveDao extends BaseDao {
         e.id, e.nom, e.prenom, e.matricule, e.statut as eleve_statut, e.photo,
         c.nom as classe_nom,
         fs.inscription, fs.reinscription, fs.tranche1, fs.tranche2, fs.tranche3, fs.montant_total,
-        COALESCE(p.montant_paye, 0) as total_paye
+        COALESCE(p_main.montant_paye, 0) as total_paye
       FROM ${EleveSchema.tableName} e
-      JOIN classe c ON e.classe_id = c.id
-      LEFT JOIN frais_scolarite fs ON e.classe_id = fs.classe_id AND e.annee_scolaire_id = fs.annee_scolaire_id
-      LEFT JOIN paiement p ON p.eleve_id = e.id AND p.annee_scolaire_id = e.annee_scolaire_id
-      WHERE e.annee_scolaire_id = ?
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      JOIN classe c ON p.classe_id = c.id
+      LEFT JOIN frais_scolarite fs ON p.classe_id = fs.classe_id AND p.annee_scolaire_id = fs.annee_scolaire_id
+      LEFT JOIN paiement p_main ON p_main.eleve_id = e.id AND p_main.annee_scolaire_id = p.annee_scolaire_id
+      WHERE p.annee_scolaire_id = ?
       ORDER BY c.nom ASC, e.nom ASC
     ''',
       [anneeId],
@@ -351,7 +397,13 @@ class EleveDao extends BaseDao {
 
   Future<List<Map<String, dynamic>>> getGenderStats(int anneeId) async {
     return await db.rawQuery(
-      'SELECT sexe, COUNT(*) as count FROM ${EleveSchema.tableName} WHERE annee_scolaire_id = ? GROUP BY sexe',
+      '''
+      SELECT e.sexe, COUNT(*) as count 
+      FROM ${EleveSchema.tableName} e 
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      WHERE p.annee_scolaire_id = ? 
+      GROUP BY e.sexe
+      ''',
       [anneeId],
     );
   }
@@ -361,9 +413,10 @@ class EleveDao extends BaseDao {
       '''
       SELECT cy.nom as cycle, COUNT(e.id) as count 
       FROM ${EleveSchema.tableName} e 
-      JOIN classe c ON e.classe_id = c.id 
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      JOIN classe c ON p.classe_id = c.id 
       JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      WHERE e.annee_scolaire_id = ? 
+      WHERE p.annee_scolaire_id = ? 
       GROUP BY cy.nom
       ''',
       [anneeId],
@@ -375,8 +428,9 @@ class EleveDao extends BaseDao {
       '''
       SELECT c.nom, COUNT(e.id) as count 
       FROM ${EleveSchema.tableName} e 
-      JOIN classe c ON e.classe_id = c.id 
-      WHERE e.annee_scolaire_id = ? 
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      JOIN classe c ON p.classe_id = c.id 
+      WHERE p.annee_scolaire_id = ? 
       GROUP BY c.nom
       ORDER BY count DESC
       LIMIT 10
@@ -456,6 +510,8 @@ class EleveDao extends BaseDao {
         'eleve_parcours',
         {
           'classe_id': newClasseId,
+          'moyenne': null, // Réinitialiser pour forcer le recalcul
+          'rang': null,
           'updated_at': DateTime.now().toIso8601String(),
         },
         where: 'eleve_id = ? AND annee_scolaire_id = ?',
@@ -473,6 +529,13 @@ class EleveDao extends BaseDao {
       await txn.update(
         'paiement_detail',
         {'classe_id': newClasseId},
+        where: 'eleve_id = ? AND annee_scolaire_id = ?',
+        whereArgs: [eleveId, anneeId],
+      );
+
+      // 4. Supprimer les moyennes précalculées dans la table averages
+      await txn.delete(
+        'averages',
         where: 'eleve_id = ? AND annee_scolaire_id = ?',
         whereArgs: [eleveId, anneeId],
       );

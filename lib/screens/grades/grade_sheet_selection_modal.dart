@@ -104,6 +104,7 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
       // 1. Get students
       final students = await widget.dbHelper.getElevesByClasse(
         _selectedClass!['id'] as int,
+        anneeId,
       );
 
       // 2. Get assigned teacher

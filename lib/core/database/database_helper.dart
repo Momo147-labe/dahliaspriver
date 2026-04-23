@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:intl/intl.dart';
 import '../../models/ecole.dart';
 import '../../models/matiere.dart';
 import 'database_path.dart';
@@ -18,7 +16,11 @@ import 'daos/notes_dao.dart';
 import 'daos/paiement_dao.dart';
 import 'daos/timetable_dao.dart';
 import 'daos/user_dao.dart';
-import 'schemas/document_template_schema.dart';
+import 'daos/common_dao.dart';
+import 'daos/result_dao.dart';
+import 'daos/reports_dao.dart';
+import 'schema/database_schema.dart';
+import 'migrations/database_migrations.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -27,8 +29,6 @@ class DatabaseHelper {
   static Database? _db;
   static Completer<Database>? _dbCompleter;
   static int? activeAnneeId;
-
-  // DAOs Cache (removed to use sync getters)
 
   // DAOs Getters
   AnneeScolaireDao get anneeScolaireDao => AnneeScolaireDao(_db!);
@@ -44,6 +44,9 @@ class DatabaseHelper {
   PaiementDao get paiementDao => PaiementDao(_db!);
   TimetableDao get timetableDao => TimetableDao(_db!);
   UserDao get userDao => UserDao(_db!);
+  CommonDao get commonDao => CommonDao(_db!);
+  ResultDao get resultDao => ResultDao(_db!);
+  ReportsDao get reportsDao => ReportsDao(_db!);
 
   // ==============================================================================
   // PROXY METHODS TO DAOs (for UI compatibility)
@@ -135,8 +138,7 @@ class DatabaseHelper {
     try {
       _db = await _initDatabase();
 
-      // Force addition of missing columns if any
-      await _manualSchemaFix(_db!);
+      // Schema creation and upgrades are handled in _onCreate and _onUpgrade
 
       _dbCompleter!.complete(_db!);
       return _db!;
@@ -144,23 +146,6 @@ class DatabaseHelper {
       _dbCompleter!.completeError(e);
       _dbCompleter = null; // Allow retry on failure
       rethrow;
-    }
-  }
-
-  /// Manually ensure critical columns are present, bypasses migration lifecycle issues
-  Future<void> _manualSchemaFix(Database db) async {
-    try {
-      await _addColumnSafely(db, 'eleve_parcours', 'updated_at', 'TEXT');
-      await _addColumnSafely(
-        db,
-        'eleve_parcours',
-        'confirmation_statut',
-        "TEXT",
-      );
-      await _addColumnSafely(db, 'niveaux', 'next_niveau_id', 'INTEGER');
-      debugPrint('Manual schema fix applied successfully.');
-    } catch (e) {
-      debugPrint('Error during manual schema fix: $e');
     }
   }
 
@@ -175,1559 +160,37 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // -------------------------
-    // Tables principales
-    // -------------------------
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS annee_scolaire (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        libelle TEXT NOT NULL,
-        date_debut TEXT NOT NULL,
-        date_fin TEXT NOT NULL,
-        active INTEGER DEFAULT 0,
-        statut TEXT CHECK (statut IN ('Active', 'Inactive', 'Terminée')) DEFAULT 'Active',
-        annee_precedente_id INTEGER,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (annee_precedente_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS ecole (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nom TEXT NOT NULL,
-        fondateur TEXT NOT NULL,
-        directeur TEXT NOT NULL,
-        logo TEXT,             -- chemin ou URL du logo
-        timbre TEXT,           -- chemin ou URL du timbre
-        adresse TEXT,
-        telephone TEXT,
-        email TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS classe (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nom TEXT NOT NULL,
-        cycle_id INTEGER,
-        salle TEXT,
-        niveau_id INTEGER,
-        eff_max INTEGER DEFAULT 100,
-        is_final_class INTEGER DEFAULT 0,
-        prof_principal_id INTEGER,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (prof_principal_id) REFERENCES enseignant(id),
-        FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id),
-        FOREIGN KEY (niveau_id) REFERENCES niveaux(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS eleve (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        matricule TEXT UNIQUE NOT NULL,
-        nom TEXT NOT NULL,
-        prenom TEXT NOT NULL,
-        date_naissance TEXT,
-        lieu_naissance TEXT,
-        sexe TEXT CHECK (sexe IN ('M','F')),
-        classe_id INTEGER NOT NULL,
-        statut TEXT CHECK (statut IN ('inscrit','reinscrit','sorti')) DEFAULT 'inscrit',
-        annee_scolaire_id INTEGER,
-        frais_id INTEGER,
-        photo TEXT,
-        nom_pere TEXT,
-        prenom_pere TEXT,
-        nom_mere TEXT,
-        prenom_mere TEXT,
-        personne_a_prevenir TEXT,
-        contact_urgence TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (classe_id) REFERENCES classe(id),
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    // Table des matières
-    await db.execute('''
-    CREATE TABLE IF NOT EXISTS matiere (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nom TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-  ''');
-
-    // Table des coefficients par cycle ou option lycée
-    await db.execute('''
-    CREATE TABLE IF NOT EXISTS matiere_coeff (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      matiere_id INTEGER NOT NULL,
-      cycle TEXT,            
-      option_lycee TEXT,     
-      coefficient REAL DEFAULT 1,
-      FOREIGN KEY (matiere_id) REFERENCES matiere(id)
-    )
-  ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS notes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        eleve_id INTEGER NOT NULL,
-        matiere_id INTEGER NOT NULL,
-        note REAL NOT NULL,
-        coefficient REAL DEFAULT 1,
-        trimestre INTEGER,
-        sequence INTEGER DEFAULT 1,
-        annee_scolaire_id INTEGER,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (eleve_id) REFERENCES eleve(id),
-        FOREIGN KEY (matiere_id) REFERENCES matiere(id),
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    // Table de configuration (Standardisée)
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS configuration_annee (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        annee_scolaire_id INTEGER UNIQUE,
-        moyenne_passage_cycle1 REAL DEFAULT 10.0,
-        moyenne_passage_cycle2 REAL DEFAULT 10.0,
-        moyenne_passage_cycle3 REAL DEFAULT 10.0,
-        moyenne_generale_min REAL DEFAULT 10.0,
-        appreciation_excellent TEXT DEFAULT 'Excellent',
-        appreciation_tres_bien TEXT DEFAULT 'Très bien',
-        appreciation_bien TEXT DEFAULT 'Bien',
-        appreciation_abien TEXT DEFAULT 'Assez bien',
-        appreciation_passable TEXT DEFAULT 'Passable',
-        appreciation_insuffisant TEXT DEFAULT 'Insuffisant',
-        mode_calcul_moyenne TEXT DEFAULT 'trimestrielle',
-        use_custom_mentions INTEGER DEFAULT 1,
-        base_notation REAL DEFAULT 20.0,
-        include_conduite INTEGER DEFAULT 1,
-        nombre_sequences_trimestre INTEGER DEFAULT 3,
-        nombre_trimestres_annee INTEGER DEFAULT 3,
-        coefficient_max_matiere REAL DEFAULT 10.0,
-        note_maximale REAL DEFAULT 20.0,
-        note_minimale REAL DEFAULT 0.0,
-        appreciation_automatique INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS cycles_scolaires (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nom TEXT NOT NULL,
-        ordre INTEGER NOT NULL,
-        note_min REAL NOT NULL DEFAULT 0,
-        note_max REAL NOT NULL DEFAULT 20,
-        moyenne_passage REAL NOT NULL,
-        is_terminal INTEGER DEFAULT 0,
-        actif INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS niveaux (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nom TEXT NOT NULL,
-        ordre INTEGER NOT NULL,
-        cycle_id INTEGER NOT NULL,
-        moyenne_passage REAL,
-        next_niveau_id INTEGER,
-        is_examen INTEGER DEFAULT 0,
-        actif INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id),
-        FOREIGN KEY (next_niveau_id) REFERENCES niveaux(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS paiement (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        eleve_id INTEGER NOT NULL,
-        classe_id INTEGER,
-        frais_id INTEGER,
-        montant_total REAL NOT NULL,
-        montant_paye REAL DEFAULT 0,
-        montant_restant REAL DEFAULT 0,
-        mode_paiement TEXT,
-        reference_paiement TEXT,
-        date_paiement TEXT,
-        type_paiement TEXT,
-        statut TEXT,
-        annee_scolaire_id INTEGER,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (eleve_id) REFERENCES eleve(id),
-        FOREIGN KEY (classe_id) REFERENCES classe(id),
-        FOREIGN KEY (frais_id) REFERENCES frais_scolarite(id),
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS averages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        eleve_id INTEGER NOT NULL,
-        annee_scolaire_id INTEGER NOT NULL,
-        moyenne REAL,
-        rang INTEGER
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS enseignant (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nom TEXT NOT NULL,
-        prenom TEXT NOT NULL,
-        telephone TEXT,
-        email TEXT,
-        specialite TEXT,
-        sexe TEXT CHECK (sexe IN ('M','F')),
-        photo TEXT,
-        date_naissance TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS emploi_du_temps (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        classe_id INTEGER NOT NULL,
-        matiere_id INTEGER NOT NULL,
-        enseignant_id INTEGER,
-        jour_semaine INTEGER NOT NULL, -- 1: Lundi, 2: Mardi, etc.
-        heure_debut TEXT NOT NULL,     -- Format "HH:mm"
-        heure_fin TEXT NOT NULL,       -- Format "HH:mm"
-        salle TEXT,
-        annee_scolaire_id INTEGER,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (classe_id) REFERENCES classe(id),
-        FOREIGN KEY (matiere_id) REFERENCES matiere(id),
-        FOREIGN KEY (enseignant_id) REFERENCES enseignant(id),
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS frais_scolarite (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        classe_id INTEGER NOT NULL,
-        annee_scolaire_id INTEGER NOT NULL,
-        inscription REAL DEFAULT 0,
-        reinscription REAL DEFAULT 0,
-        tranche1 REAL DEFAULT 0,
-        date_limite_t1 TEXT,
-        tranche2 REAL DEFAULT 0,
-        date_limite_t2 TEXT,
-        tranche3 REAL DEFAULT 0,
-        date_limite_t3 TEXT,
-        montant_total REAL DEFAULT 0,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (classe_id) REFERENCES classe(id),
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS paiement_detail (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        eleve_id INTEGER NOT NULL,
-        montant REAL NOT NULL,
-        date_paiement TEXT NOT NULL,
-        mode_paiement TEXT, -- Espèces, Virement, etc.
-        type_frais TEXT,    -- Inscription, Tranche 1, etc.
-        mois TEXT,          -- Pour les frais mensuels si applicable
-        observation TEXT,   -- Notes ou référence détaillée
-        classe_id INTEGER,
-        frais_id INTEGER,
-        annee_scolaire_id INTEGER,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        created_by_id INTEGER, -- ID de l'utilisateur qui a créé le paiement
-        numero_recu TEXT,      -- Numéro de reçu officiel (ex: REC-2024-001)
-        FOREIGN KEY (eleve_id) REFERENCES eleve(id),
-        FOREIGN KEY (classe_id) REFERENCES classe(id),
-        FOREIGN KEY (frais_id) REFERENCES frais_scolarite(id),
-        FOREIGN KEY (created_by_id) REFERENCES user(id),
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS eleve_parcours (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        eleve_id INTEGER NOT NULL,
-        classe_id INTEGER NOT NULL,
-        annee_scolaire_id INTEGER NOT NULL,
-        type_inscription TEXT,
-        date_inscription TEXT,
-        decision TEXT,
-        moyenne REAL,
-        rang INTEGER,
-        confirmation_statut TEXT DEFAULT 'Confirmé',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (eleve_id) REFERENCES eleve(id),
-        FOREIGN KEY (classe_id) REFERENCES classe(id),
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS user (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        pseudo TEXT NOT NULL,
-        nom_complet TEXT, -- Nom complet pour l'affichage (ex: sur les reçus)
-        email TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL,
-        codesecret TEXT NOT NULL,
-        role TEXT CHECK (role IN ('admin','enseignant','comptable')) DEFAULT 'enseignant',
-        photo TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS attribution_enseignant (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        classe_id INTEGER NOT NULL,
-        matiere_id INTEGER NOT NULL,
-        enseignant_id INTEGER NOT NULL,
-        annee_scolaire_id INTEGER,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (classe_id) REFERENCES classe(id),
-        FOREIGN KEY (matiere_id) REFERENCES matiere(id),
-        FOREIGN KEY (enseignant_id) REFERENCES enseignant(id),
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
-        UNIQUE(classe_id, matiere_id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS classe_matiere (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        classe_id INTEGER NOT NULL,
-        matiere_id INTEGER NOT NULL,
-        annee_scolaire_id INTEGER,
-        coefficient REAL DEFAULT 1,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (classe_id) REFERENCES classe(id),
-        FOREIGN KEY (matiere_id) REFERENCES matiere(id),
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
-        UNIQUE(classe_id, matiere_id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS mention_config (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        label TEXT NOT NULL,
-        note_min REAL NOT NULL,
-        note_max REAL NOT NULL,
-        couleur TEXT,
-        cycle_id INTEGER,
-        appreciation TEXT,
-        icone TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS appreciation_config (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        note_min REAL NOT NULL,
-        note_max REAL NOT NULL,
-        commentaire_type TEXT NOT NULL,
-        categorie TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS sequence_planification (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        annee_scolaire_id INTEGER,
-        trimestre INTEGER,
-        numero_sequence INTEGER,
-        nom TEXT,
-        date_debut TEXT,
-        date_fin TEXT,
-        poids REAL,
-        statut TEXT,
-        FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-      )
-    ''');
-
-    await db.execute(DocumentTemplateSchema.createTable);
+    await DatabaseSchema.create(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Migration vers version 10/11: Ajout de la table matiere_coeff
-    if (oldVersion < 11) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS matiere_coeff (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          matiere_id INTEGER NOT NULL,
-          cycle TEXT,            
-          option_lycee TEXT,     
-          coefficient REAL DEFAULT 1,
-          FOREIGN KEY (matiere_id) REFERENCES matiere(id)
-        )
-      ''');
-    }
-
-    if (oldVersion < 12) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS enseignant (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          nom TEXT NOT NULL,
-          prenom TEXT NOT NULL,
-          telephone TEXT,
-          email TEXT,
-          specialite TEXT,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS emploi_du_temps (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          classe_id INTEGER NOT NULL,
-          matiere_id INTEGER NOT NULL,
-          enseignant_id INTEGER,
-          jour_semaine INTEGER NOT NULL,
-          heure_debut TEXT NOT NULL,
-          heure_fin TEXT NOT NULL,
-          salle TEXT,
-          annee_scolaire_id INTEGER,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (classe_id) REFERENCES classe(id),
-          FOREIGN KEY (matiere_id) REFERENCES matiere(id),
-          FOREIGN KEY (enseignant_id) REFERENCES enseignant(id),
-          FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-        )
-      ''');
-    }
-
-    if (oldVersion < 13) {
-      // Ajout initial des champs v13 (déjà fait ou tenté)
-    }
-
-    if (oldVersion < 14) {
-      // On s'assure que TOUTES les colonnes nécessaires existent
-      final columns = {
-        'specialite': 'TEXT',
-        'sexe': 'TEXT CHECK (sexe IN ("M","F"))',
-        'photo': 'TEXT',
-        'date_naissance': 'TEXT',
-      };
-
-      for (var entry in columns.entries) {
-        try {
-          await db.execute(
-            'ALTER TABLE enseignant ADD COLUMN ${entry.key} ${entry.value}',
-          );
-          print('Colonne ${entry.key} ajoutée avec succès.');
-        } catch (e) {
-          print('La colonne ${entry.key} existe probablement déjà : $e');
-        }
-      }
-    }
-
-    if (oldVersion < 15) {
-      try {
-        await db.execute(
-          'ALTER TABLE notes ADD COLUMN sequence INTEGER DEFAULT 1',
-        );
-      } catch (e) {
-        print('La colonne sequence existe probablement déjà : $e');
-      }
-    }
-
-    if (oldVersion < 16) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS frais_scolarite (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          classe_id INTEGER NOT NULL,
-          annee_scolaire_id INTEGER NOT NULL,
-          inscription REAL DEFAULT 0,
-          reinscription REAL DEFAULT 0,
-          tranche1 REAL DEFAULT 0,
-          date_limite_t1 TEXT,
-          tranche2 REAL DEFAULT 0,
-          date_limite_t2 TEXT,
-          tranche3 REAL DEFAULT 0,
-          date_limite_t3 TEXT,
-          montant_total REAL DEFAULT 0,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (classe_id) REFERENCES classe(id),
-          FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS paiement_detail (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          eleve_id INTEGER NOT NULL,
-          montant REAL NOT NULL,
-          date_paiement TEXT NOT NULL,
-          mode_paiement TEXT,
-          type_frais TEXT,
-          mois TEXT,
-          annee_scolaire_id INTEGER,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (eleve_id) REFERENCES eleve(id),
-          FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-        )
-      ''');
-    }
-
-    if (oldVersion < 17) {
-      // Fix paiement_detail table structure - drop old table and recreate with correct schema
-      await db.execute('DROP TABLE IF EXISTS paiement_detail');
-      await db.execute('''
-        CREATE TABLE paiement_detail (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          eleve_id INTEGER NOT NULL,
-          montant REAL NOT NULL,
-          date_paiement TEXT NOT NULL,
-          mode_paiement TEXT,
-          type_frais TEXT,
-          mois TEXT,
-          annee_scolaire_id INTEGER,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (eleve_id) REFERENCES eleve(id),
-          FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-        )
-      ''');
-    }
-
-    if (oldVersion < 18) {
-      // Update paiement table with comprehensive payment tracking fields
-      await db.execute('DROP TABLE IF EXISTS paiement');
-      await db.execute('''
-        CREATE TABLE paiement (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          eleve_id INTEGER NOT NULL,
-          classe_id INTEGER,
-          frais_id INTEGER,
-          montant_total REAL NOT NULL,
-          montant_paye REAL DEFAULT 0,
-          montant_restant REAL DEFAULT 0,
-          mode_paiement TEXT,
-          reference_paiement TEXT,
-          date_paiement TEXT,
-          type_paiement TEXT,
-          statut TEXT,
-          annee_scolaire_id INTEGER,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (eleve_id) REFERENCES eleve(id),
-          FOREIGN KEY (classe_id) REFERENCES classe(id),
-          FOREIGN KEY (frais_id) REFERENCES frais_scolarite(id),
-          FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-        )
-      ''');
-    }
-
-    if (oldVersion < 19) {
-      // Create eleve_parcours table for tracking student enrollment history
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS eleve_parcours (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          eleve_id INTEGER NOT NULL,
-          classe_id INTEGER NOT NULL,
-          annee_scolaire_id INTEGER NOT NULL,
-          type_inscription TEXT,
-          date_inscription TEXT,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (eleve_id) REFERENCES eleve(id),
-          FOREIGN KEY (classe_id) REFERENCES classe(id),
-          FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-        )
-      ''');
-    }
-
-    if (oldVersion < 21) {
-      try {
-        await db.execute(
-          'ALTER TABLE paiement_detail ADD COLUMN observation TEXT',
-        );
-      } catch (e) {
-        debugPrint('Column observation may already exist: $e');
-      }
-    }
-
-    if (oldVersion < 22) {
-      // Ensuring observation column exists because version 21 upgrade might have been skipped for some users
-      try {
-        final List<Map<String, dynamic>> columns = await db.rawQuery(
-          'PRAGMA table_info(paiement_detail)',
-        );
-        final bool hasObservation = columns.any(
-          (column) => column['name'] == 'observation',
-        );
-        if (!hasObservation) {
-          await db.execute(
-            'ALTER TABLE paiement_detail ADD COLUMN observation TEXT',
-          );
-        }
-      } catch (e) {
-        debugPrint('Error checking column observation: $e');
-      }
-    }
-
-    if (oldVersion < 24) {
-      try {
-        final List<Map<String, dynamic>> columns = await db.rawQuery(
-          'PRAGMA table_info(paiement_detail)',
-        );
-
-        final bool hasClasseId = columns.any(
-          (column) => column['name'] == 'classe_id',
-        );
-        if (!hasClasseId) {
-          await db.execute(
-            'ALTER TABLE paiement_detail ADD COLUMN classe_id INTEGER',
-          );
-        }
-
-        final bool hasFraisId = columns.any(
-          (column) => column['name'] == 'frais_id',
-        );
-        if (!hasFraisId) {
-          await db.execute(
-            'ALTER TABLE paiement_detail ADD COLUMN frais_id INTEGER',
-          );
-        }
-      } catch (e) {
-        debugPrint('Error during v24 migration: $e');
-      }
-    }
-
-    if (oldVersion < 25) {
-      // Ensure 'eleve' table has all necessary columns
-      try {
-        final List<Map<String, dynamic>> columns = await db.rawQuery(
-          'PRAGMA table_info(eleve)',
-        );
-
-        final List<String> requiredColumns = [
-          'annee_scolaire_id',
-          'frais_id',
-          'photo',
-          'statut',
-        ];
-
-        for (var col in requiredColumns) {
-          final bool exists = columns.any((column) => column['name'] == col);
-          if (!exists) {
-            String type = col == 'photo' || col == 'statut'
-                ? 'TEXT'
-                : 'INTEGER';
-            await db.execute('ALTER TABLE eleve ADD COLUMN $col $type');
-            debugPrint('Column $col added to table eleve');
-          }
-        }
-      } catch (e) {
-        debugPrint('Error during v25 migration for table eleve: $e');
-      }
-
-      // Ensure 'paiement_detail' has 'annee_scolaire_id'
-      try {
-        final List<Map<String, dynamic>> columns = await db.rawQuery(
-          'PRAGMA table_info(paiement_detail)',
-        );
-        final bool hasAnnee = columns.any(
-          (column) => column['name'] == 'annee_scolaire_id',
-        );
-        if (!hasAnnee) {
-          await db.execute(
-            'ALTER TABLE paiement_detail ADD COLUMN annee_scolaire_id INTEGER',
-          );
-          debugPrint('Column annee_scolaire_id added to table paiement_detail');
-        }
-      } catch (e) {
-        debugPrint('Error during v25 migration for table paiement_detail: $e');
-      }
-    }
-
-    if (oldVersion < 26) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS attribution_enseignant (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          classe_id INTEGER NOT NULL,
-          matiere_id INTEGER NOT NULL,
-          enseignant_id INTEGER NOT NULL,
-          annee_scolaire_id INTEGER NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (classe_id) REFERENCES classe(id),
-          FOREIGN KEY (matiere_id) REFERENCES matiere(id),
-          FOREIGN KEY (enseignant_id) REFERENCES enseignant(id),
-          FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
-          UNIQUE(classe_id, matiere_id, annee_scolaire_id)
-        )
-      ''');
-    }
-
-    if (oldVersion < 27) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS classe_matiere (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          classe_id INTEGER NOT NULL,
-          matiere_id INTEGER NOT NULL,
-          annee_scolaire_id INTEGER NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (classe_id) REFERENCES classe(id),
-          FOREIGN KEY (matiere_id) REFERENCES matiere(id),
-          FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
-          UNIQUE(classe_id, matiere_id, annee_scolaire_id)
-        )
-      ''');
-    }
-
-    if (oldVersion < 28) {
-      try {
-        await db.execute(
-          'ALTER TABLE classe_matiere ADD COLUMN coefficient REAL DEFAULT 1',
-        );
-      } catch (e) {
-        debugPrint('Error adding coefficient to classe_matiere: $e');
-      }
-    }
-
-    if (oldVersion < 29) {
-      try {
-        await db.execute(
-          'ALTER TABLE notes ADD COLUMN coefficient REAL DEFAULT 1',
-        );
-      } catch (e) {
-        debugPrint('Error adding coefficient to notes: $e');
-      }
-    }
-
-    if (oldVersion < 30) {
-      // 1. Create new configuration tables
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS mention_config (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          label TEXT NOT NULL,
-          note_min REAL NOT NULL,
-          note_max REAL NOT NULL,
-          couleur TEXT,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS appreciation_config (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          note_min REAL NOT NULL,
-          note_max REAL NOT NULL,
-          commentaire_type TEXT NOT NULL,
-          categorie TEXT,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      ''');
-
-      // 2. Helper to add columns safely to existing tables
-      // 3. Update existing tables
-      await _addColumnSafely(
-        db,
-        'annee_scolaire',
-        'annee_precedente_id',
-        'INTEGER',
-      );
-
-      await _addColumnSafely(
-        db,
-        'classe',
-        'moyenne_min_promotion',
-        'REAL DEFAULT 10.0',
-      );
-      await _addColumnSafely(
-        db,
-        'classe',
-        'moyenne_max_promotion',
-        'REAL DEFAULT 20.0',
-      );
-      await _addColumnSafely(
-        db,
-        'classe',
-        'created_at',
-        'TEXT DEFAULT CURRENT_TIMESTAMP',
-      );
-      await _addColumnSafely(
-        db,
-        'classe',
-        'updated_at',
-        'TEXT DEFAULT CURRENT_TIMESTAMP',
-      );
-      await _addColumnSafely(
-        db,
-        'eleve',
-        'updated_at',
-        'TEXT DEFAULT CURRENT_TIMESTAMP',
-      );
-      await _addColumnSafely(
-        db,
-        'matiere',
-        'created_at',
-        'TEXT DEFAULT CURRENT_TIMESTAMP',
-      );
-      await _addColumnSafely(
-        db,
-        'matiere',
-        'updated_at',
-        'TEXT DEFAULT CURRENT_TIMESTAMP',
-      );
-      await _addColumnSafely(
-        db,
-        'notes',
-        'created_at',
-        'TEXT DEFAULT CURRENT_TIMESTAMP',
-      );
-      await _addColumnSafely(
-        db,
-        'notes',
-        'updated_at',
-        'TEXT DEFAULT CURRENT_TIMESTAMP',
-      );
-
-      await _addColumnSafely(
-        db,
-        'configuration_annee',
-        'mode_calcul_moyenne',
-        'TEXT DEFAULT "trimestrielle"',
-      );
-      await _addColumnSafely(
-        db,
-        'configuration_annee',
-        'use_custom_mentions',
-        'INTEGER DEFAULT 1',
-      );
-      await _addColumnSafely(
-        db,
-        'cycles_scolaires',
-        'moyenne_passage_cycle',
-        'REAL DEFAULT 10.0',
-      );
-      await _addColumnSafely(
-        db,
-        'cycles_scolaires',
-        'moyenne_excellence_cycle',
-        'REAL DEFAULT 15.0',
-      );
-    }
-
-    if (oldVersion < 31) {
-      await _addColumnSafely(
-        db,
-        'cycles_scolaires',
-        'sous_titre_cycle',
-        'TEXT',
-      );
-      await _addColumnSafely(
-        db,
-        'cycles_scolaires',
-        'droit_redoublement',
-        'INTEGER DEFAULT 1',
-      );
-      await _addColumnSafely(
-        db,
-        'cycles_scolaires',
-        'seuil_redoublement',
-        'REAL DEFAULT 8.0',
-      );
-    }
-
-    if (oldVersion < 32) {
-      await _addColumnSafely(
-        db,
-        'configuration_annee',
-        'base_notation',
-        'REAL DEFAULT 20.0',
-      );
-      await _addColumnSafely(
-        db,
-        'configuration_annee',
-        'include_conduite',
-        'INTEGER DEFAULT 1',
-      );
-      await _addColumnSafely(db, 'mention_config', 'cycle_id', 'INTEGER');
-    }
-
-    if (oldVersion < 34) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS sequence_planification (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          annee_scolaire_id INTEGER,
-          trimestre INTEGER,
-          numero_sequence INTEGER,
-          nom TEXT,
-          date_debut TEXT,
-          date_fin TEXT,
-          poids REAL,
-          statut TEXT,
-          FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-        )
-      ''');
-    }
-
-    if (oldVersion < 35) {
-      // Migration de cycles_scolaires vers le nouveau schéma
-      // 1. Renommer l'ancienne table
-      await db.execute(
-        'ALTER TABLE cycles_scolaires RENAME TO cycles_scolaires_old',
-      );
-
-      // 2. Créer la nouvelle table
-      await db.execute('''
-        CREATE TABLE cycles_scolaires (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          nom TEXT NOT NULL,
-          ordre INTEGER NOT NULL,
-          niveau_min INTEGER NOT NULL,
-          niveau_max INTEGER NOT NULL,
-          moyenne_passage REAL NOT NULL,
-          is_terminal INTEGER DEFAULT 0,
-          actif INTEGER DEFAULT 1,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      ''');
-
-      // 3. Copier les données
-      await db.execute('''
-        INSERT INTO cycles_scolaires (id, nom, ordre, niveau_min, niveau_max, moyenne_passage, actif, created_at, updated_at)
-        SELECT id, nom_cycle, ordre_cycle, niveau_min, niveau_max, moyenne_passage_cycle, actif, created_at, updated_at
-        FROM cycles_scolaires_old
-      ''');
-
-      // 4. Supprimer l'ancienne table
-      await db.execute('DROP TABLE cycles_scolaires_old');
-
-      // 5. Créer la table niveaux
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS niveaux (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          nom TEXT NOT NULL,
-          ordre INTEGER NOT NULL,
-          cycle_id INTEGER NOT NULL,
-          moyenne_passage REAL,
-          is_examen INTEGER DEFAULT 0,
-          actif INTEGER DEFAULT 1,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id)
-        )
-      ''');
-    }
-
-    if (oldVersion < 36) {
-      await _addColumnSafely(db, 'mention_config', 'appreciation', 'TEXT');
-      await _addColumnSafely(db, 'mention_config', 'icone', 'TEXT');
-    }
-
-    if (oldVersion < 37) {
-      await _addColumnSafely(
-        db,
-        'annee_scolaire',
-        'statut',
-        "TEXT CHECK (statut IN ('Active', 'Inactive')) DEFAULT 'Active'",
-      );
-      await _addColumnSafely(
-        db,
-        'annee_scolaire',
-        'annee_precedente_id',
-        "INTEGER REFERENCES annee_scolaire(id)",
-      );
-    }
-
-    if (oldVersion < 38) {
-      await _addColumnSafely(db, 'eleve', 'personne_a_prevenir', 'TEXT');
-      await _addColumnSafely(db, 'eleve', 'contact_urgence', 'TEXT');
-    }
-
-    if (oldVersion < 39) {
-      // Rename niveau_min/niveau_max to note_min/note_max in cycles_scolaires
-      try {
-        // SQLite doesn't support renaming columns directly, so we need to recreate the table
-        await db.execute('''
-          CREATE TABLE cycles_scolaires_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nom TEXT NOT NULL,
-            ordre INTEGER NOT NULL,
-            note_min REAL NOT NULL DEFAULT 0,
-            note_max REAL NOT NULL DEFAULT 20,
-            moyenne_passage REAL NOT NULL,
-            is_terminal INTEGER DEFAULT 0,
-            actif INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-          )
-        ''');
-
-        // Copy data from old table to new table
-        await db.execute('''
-          INSERT INTO cycles_scolaires_new (id, nom, ordre, note_min, note_max, moyenne_passage, is_terminal, actif, created_at, updated_at)
-          SELECT id, nom, ordre, niveau_min, niveau_max, moyenne_passage, is_terminal, actif, created_at, updated_at
-          FROM cycles_scolaires
-        ''');
-
-        // Drop old table
-        await db.execute('DROP TABLE cycles_scolaires');
-
-        // Rename new table to original name
-        await db.execute(
-          'ALTER TABLE cycles_scolaires_new RENAME TO cycles_scolaires',
-        );
-
-        debugPrint(
-          'Successfully migrated cycles_scolaires to use note_min/note_max',
-        );
-      } catch (e) {
-        debugPrint('Error during v39 migration: $e');
-      }
-    }
-
-    if (oldVersion < 41) {
-      debugPrint(
-        'Mise à jour vers la version 41 : Refonte de la table classe (Tentative 2)',
-      );
-      try {
-        // Vérifier si la migration a déjà été faite (précaution)
-        var tableInfo = await db.rawQuery("PRAGMA table_info(classe)");
-        bool alreadyMigrated = tableInfo.any(
-          (col) => col['name'] == 'cycle_id',
-        );
-
-        if (!alreadyMigrated) {
-          // 1. Création de la nouvelle table classe avec le schéma mis à jour
-          await db.execute('''
-            CREATE TABLE classe_new (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              nom TEXT NOT NULL,
-              cycle_id INTEGER,
-              salle TEXT,
-              niveau_id INTEGER,
-              eff_max INTEGER DEFAULT 100,
-              next_class_id INTEGER,
-              is_final_class INTEGER DEFAULT 0,
-              annee_scolaire_id INTEGER,
-              created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-              updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-              FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
-              FOREIGN KEY (next_class_id) REFERENCES classe(id),
-              FOREIGN KEY (cycle_id) REFERENCES cycles_scolaires(id),
-              FOREIGN KEY (niveau_id) REFERENCES niveaux(id)
-            )
-          ''');
-
-          // 2. Migration des données
-          final List<Map<String, dynamic>> oldClasses = await db.query(
-            'classe',
-          );
-
-          for (var oldClasse in oldClasses) {
-            // Dans l'ancienne table, c'était 'cycle' et 'niveau'
-            final String? cycleName = oldClasse['cycle'] as String?;
-            final String? niveauName = oldClasse['niveau'] as String?;
-
-            int? cycleId;
-            int? niveauId;
-
-            if (cycleName != null && cycleName.isNotEmpty) {
-              final List<Map<String, dynamic>> cycles = await db.query(
-                'cycles_scolaires',
-                where: 'nom = ?',
-                whereArgs: [cycleName],
-              );
-
-              if (cycles.isNotEmpty) {
-                cycleId = cycles.first['id'] as int;
-              } else {
-                cycleId = await db.insert('cycles_scolaires', {
-                  'nom': cycleName,
-                  'ordre': 0,
-                  'note_min': 0.0,
-                  'note_max': 20.0,
-                  'moyenne_passage': 10.0,
-                });
-              }
-            }
-
-            if (niveauName != null &&
-                niveauName.isNotEmpty &&
-                cycleId != null) {
-              final List<Map<String, dynamic>> levels = await db.query(
-                'niveaux',
-                where: 'nom = ? AND cycle_id = ?',
-                whereArgs: [niveauName, cycleId],
-              );
-
-              if (levels.isNotEmpty) {
-                niveauId = levels.first['id'] as int;
-              } else {
-                niveauId = await db.insert('niveaux', {
-                  'nom': niveauName,
-                  'ordre': 0,
-                  'cycle_id': cycleId,
-                  'moyenne_passage': 10.0,
-                });
-              }
-            }
-
-            await db.insert('classe_new', {
-              'id': oldClasse['id'],
-              'nom': oldClasse['nom'],
-              'cycle_id': cycleId,
-              'salle': oldClasse['salle'],
-              'niveau_id': niveauId,
-              'eff_max': oldClasse['eff_max'],
-              'next_class_id': oldClasse['next_class_id'],
-              'is_final_class': oldClasse['is_final_class'],
-              'annee_scolaire_id': oldClasse['annee_scolaire_id'],
-              'created_at': oldClasse['created_at'],
-              'updated_at': oldClasse['updated_at'],
-            });
-          }
-
-          // 3. Remplacement
-          await db.execute('DROP TABLE classe');
-          await db.execute('ALTER TABLE classe_new RENAME TO classe');
-          debugPrint('Migration vers la version 41 terminée avec succès.');
-        } else {
-          debugPrint(
-            'La table classe semble déjà être à jour (cycle_id présent).',
-          );
-        }
-      } catch (e) {
-        debugPrint('Erreur lors de la migration vers la version 41 : $e');
-      }
-    }
-
-    if (oldVersion < 42) {
-      try {
-        // 1. Ensure 'statut' column exists
-        final List<Map<String, dynamic>> columns = await db.rawQuery(
-          'PRAGMA table_info(annee_scolaire)',
-        );
-
-        final bool hasStatut = columns.any(
-          (column) => column['name'] == 'statut',
-        );
-        if (!hasStatut) {
-          await db.execute(
-            "ALTER TABLE annee_scolaire ADD COLUMN statut TEXT CHECK (statut IN ('Active', 'Inactive')) DEFAULT 'Active'",
-          );
-          debugPrint('Column statut added to table annee_scolaire');
-        }
-
-        // 2. Migrate from 'etat' if it exists
-        final bool hasEtat = columns.any((column) => column['name'] == 'etat');
-        if (hasEtat) {
-          await db.execute(
-            "UPDATE annee_scolaire SET statut = 'Active' WHERE etat = 'EN_COURS'",
-          );
-          await db.execute(
-            "UPDATE annee_scolaire SET statut = 'Inactive' WHERE etat = 'TERMINEE'",
-          );
-          debugPrint('Migrated data from etat to statut in annee_scolaire');
-        }
-      } catch (e) {
-        debugPrint('Error during v42 migration: $e');
-      }
-    }
-
-    if (oldVersion < 43) {
-      try {
-        await _addColumnSafely(db, 'eleve', 'nom_pere', 'TEXT');
-        await _addColumnSafely(db, 'eleve', 'prenom_pere', 'TEXT');
-        await _addColumnSafely(db, 'eleve', 'nom_mere', 'TEXT');
-        await _addColumnSafely(db, 'eleve', 'prenom_mere', 'TEXT');
-        debugPrint('Migration vers la version 43 terminée avec succès.');
-      } catch (e) {
-        debugPrint('Erreur lors de la migration v43 : $e');
-      }
-    }
-
-    if (oldVersion < 44) {
-      debugPrint('Mise à jour vers la version 44 : Réparation du schéma');
-      try {
-        // 1. Créer la table configuration_annee si elle manque
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS configuration_annee (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            annee_scolaire_id INTEGER UNIQUE,
-            moyenne_passage_cycle1 REAL DEFAULT 10.0,
-            moyenne_passage_cycle2 REAL DEFAULT 10.0,
-            moyenne_passage_cycle3 REAL DEFAULT 10.0,
-            moyenne_generale_min REAL DEFAULT 10.0,
-            mode_calcul_moyenne TEXT DEFAULT 'trimestrielle',
-            use_custom_mentions INTEGER DEFAULT 1,
-            base_notation REAL DEFAULT 20.0,
-            include_conduite INTEGER DEFAULT 1,
-            appreciation_automatique INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-          )
-        ''');
-
-        // 2. Créer la table sequence_planification si elle manque
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS sequence_planification (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            annee_scolaire_id INTEGER,
-            trimestre INTEGER,
-            numero_sequence INTEGER,
-            nom TEXT,
-            date_debut TEXT,
-            date_fin TEXT,
-            poids REAL,
-            statut TEXT,
-            FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
-          )
-        ''');
-
-        // 3. Réparer la table classe (annee_scolaire_id)
-        await _addColumnSafely(
-          db,
-          'classe',
-          'annee_scolaire_id',
-          'INTEGER REFERENCES annee_scolaire(id)',
-        );
-
-        debugPrint('Migration vers la version 44 terminée avec succès.');
-      } catch (e) {
-        debugPrint('Erreur lors de la migration v44 : $e');
-      }
-    }
-    if (oldVersion < 45) {
-      try {
-        await _addColumnSafely(
-          db,
-          'classe',
-          'prof_principal_id',
-          'INTEGER REFERENCES enseignant(id)',
-        );
-        debugPrint('Migration vers la version 45 terminée avec succès.');
-      } catch (e) {
-        debugPrint('Erreur lors de la migration v45 : $e');
-      }
-    }
-    if (oldVersion < 46) {
-      try {
-        // Migration classe_matiere pour globalisation
-        await db.execute(
-          'ALTER TABLE classe_matiere RENAME TO classe_matiere_old',
-        );
-        await db.execute('''
-          CREATE TABLE classe_matiere (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            classe_id INTEGER NOT NULL,
-            matiere_id INTEGER NOT NULL,
-            annee_scolaire_id INTEGER,
-            coefficient REAL DEFAULT 1,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (classe_id) REFERENCES classe(id),
-            FOREIGN KEY (matiere_id) REFERENCES matiere(id),
-            FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
-            UNIQUE(classe_id, matiere_id)
-          )
-        ''');
-        await db.execute('''
-          INSERT OR IGNORE INTO classe_matiere (id, classe_id, matiere_id, annee_scolaire_id, coefficient, created_at)
-          SELECT id, classe_id, matiere_id, annee_scolaire_id, coefficient, created_at FROM classe_matiere_old
-        ''');
-        await db.execute('DROP TABLE classe_matiere_old');
-
-        // Migration attribution_enseignant pour globalisation
-        await db.execute(
-          'ALTER TABLE attribution_enseignant RENAME TO attribution_enseignant_old',
-        );
-        await db.execute('''
-          CREATE TABLE attribution_enseignant (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            classe_id INTEGER NOT NULL,
-            matiere_id INTEGER NOT NULL,
-            enseignant_id INTEGER NOT NULL,
-            annee_scolaire_id INTEGER,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (classe_id) REFERENCES classe(id),
-            FOREIGN KEY (matiere_id) REFERENCES matiere(id),
-            FOREIGN KEY (enseignant_id) REFERENCES enseignant(id),
-            FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
-            UNIQUE(classe_id, matiere_id)
-          )
-        ''');
-        await db.execute('''
-          INSERT OR IGNORE INTO attribution_enseignant (id, classe_id, matiere_id, enseignant_id, annee_scolaire_id, created_at)
-          SELECT id, classe_id, matiere_id, enseignant_id, annee_scolaire_id, created_at FROM attribution_enseignant_old
-        ''');
-        await db.execute('DROP TABLE attribution_enseignant_old');
-
-        debugPrint('Migration vers la version 46 terminée avec succès.');
-      } catch (e) {
-        debugPrint('Erreur lors de la migration v46 : $e');
-      }
-    }
-
-    if (oldVersion < 47) {
-      debugPrint(
-        'Mise à jour vers la version 47 : Ajout de document_templates',
-      );
-      try {
-        await db.execute(DocumentTemplateSchema.createTable);
-        debugPrint('Migration vers la version 47 terminée avec succès.');
-      } catch (e) {
-        debugPrint('Erreur lors de la migration v47 : $e');
-      }
-    }
-
-    if (oldVersion < 48) {
-      debugPrint('Mise à jour vers la version 48 : Traçabilité des paiements');
-      try {
-        // 1. Ajouter nom_complet à la table user
-        await _addColumnSafely(db, 'user', 'nom_complet', 'TEXT');
-
-        // 2. Initialiser nom_complet avec pseudo pour les utilisateurs existants
-        await db.execute(
-          'UPDATE user SET nom_complet = pseudo WHERE nom_complet IS NULL',
-        );
-
-        // 3. Ajouter created_by_id à la table paiement_detail
-        await _addColumnSafely(
-          db,
-          'paiement_detail',
-          'created_by_id',
-          'INTEGER REFERENCES user(id)',
-        );
-
-        debugPrint('Migration vers la version 48 terminée avec succès.');
-      } catch (e) {
-        debugPrint('Erreur lors de la migration v48 : $e');
-      }
-    }
-
-    if (oldVersion < 49) {
-      try {
-        await _addColumnSafely(db, 'paiement_detail', 'numero_recu', 'TEXT');
-        await db.execute(
-          "UPDATE paiement_detail SET numero_recu = 'OLD-' || id WHERE numero_recu IS NULL",
-        );
-        debugPrint('Migration vers la version 49 terminée avec succès.');
-      } catch (e) {
-        debugPrint('Erreur lors de la migration v49 : $e');
-      }
-    }
-
-    if (oldVersion < 50) {
-      try {
-        // Index sur les élèves
-        await db.execute(
-          'CREATE INDEX IF NOT EXISTS idx_eleve_annee ON eleve(annee_scolaire_id)',
-        );
-        await db.execute(
-          'CREATE INDEX IF NOT EXISTS idx_eleve_classe ON eleve(classe_id)',
-        );
-        await db.execute(
-          'CREATE INDEX IF NOT EXISTS idx_eleve_matricule ON eleve(matricule)',
-        );
-        await db.execute(
-          'CREATE INDEX IF NOT EXISTS idx_eleve_nom_prenom ON eleve(nom, prenom)',
-        );
-
-        // Index sur les notes (très important pour les bulletins)
-        await db.execute(
-          'CREATE INDEX IF NOT EXISTS idx_note_eleve_annee ON note(eleve_id, annee_scolaire_id)',
-        );
-        await db.execute(
-          'CREATE INDEX IF NOT EXISTS idx_note_matiere_trim ON note(matiere_id, trimestre, sequence)',
-        );
-
-        // Index sur les paiements
-        await db.execute(
-          'CREATE INDEX IF NOT EXISTS idx_paiement_eleve_annee ON paiement_detail(eleve_id, annee_scolaire_id)',
-        );
-
-        debugPrint('Migration vers la version 50 (indexation) terminée.');
-      } catch (e) {
-        debugPrint('Erreur lors de la migration v50 : $e');
-      }
-    }
-
-    if (oldVersion < 51) {
-      try {
-        // Ensure eleve_parcours has decision, moyenne, rang columns
-        await _addColumnSafely(db, 'eleve_parcours', 'decision', 'TEXT');
-        await _addColumnSafely(db, 'eleve_parcours', 'moyenne', 'REAL');
-        await _addColumnSafely(db, 'eleve_parcours', 'rang', 'INTEGER');
-        debugPrint(
-          'Migration v51: colonnes decision/moyenne/rang ajoutées à eleve_parcours.',
-        );
-      } catch (e) {
-        debugPrint('Erreur migration v51: $e');
-      }
-    }
-
-    if (oldVersion < 52) {
-      debugPrint(
-        'Migration v52: Refonte de la promotion et statuts des années',
-      );
-      try {
-        // 1. Recreer annee_scolaire pour la nouvelle contrainte CHECK
-        await db.execute(
-          'ALTER TABLE annee_scolaire RENAME TO annee_scolaire_old',
-        );
-        await db.execute('''
-          CREATE TABLE annee_scolaire (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            libelle TEXT NOT NULL,
-            date_debut TEXT NOT NULL,
-            date_fin TEXT NOT NULL,
-            active INTEGER DEFAULT 0,
-            statut TEXT CHECK (statut IN ('Active', 'Inactive', 'Terminée')) DEFAULT 'Active',
-            annee_precedente_id INTEGER,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (annee_precedente_id) REFERENCES annee_scolaire(id)
-          )
-        ''');
-        await db.execute('''
-          INSERT INTO annee_scolaire (id, libelle, date_debut, date_fin, active, statut, annee_precedente_id, created_at, updated_at)
-          SELECT id, libelle, date_debut, date_fin, active, statut, annee_precedente_id, created_at, updated_at FROM annee_scolaire_old
-        ''');
-        await db.execute('DROP TABLE annee_scolaire_old');
-
-        // 2. Ajouter next_niveau_id à niveaux
-        await _addColumnSafely(
-          db,
-          'niveaux',
-          'next_niveau_id',
-          'INTEGER REFERENCES niveaux(id)',
-        );
-
-        // 3. Ajouter confirmation_statut à eleve_parcours
-        await _addColumnSafely(
-          db,
-          'eleve_parcours',
-          'confirmation_statut',
-          "TEXT DEFAULT 'Confirmé'",
-        );
-
-        // 4. Note: next_class_id reste dans la table classe pour compatibilité mais ne sera plus utilisé
-        // Sa suppression complète nécessiterait une recréation de table complexe.
-
-        debugPrint('Migration v52 terminée avec succès.');
-      } catch (e) {
-        debugPrint('Erreur migration v52: $e');
-      }
-    }
-
-    if (oldVersion < 54) {
-      try {
-        // Double check all needed columns in eleve_parcours
-        // Note: SQLite ALTER TABLE doesn't allow CURRENT_TIMESTAMP as default for new columns
-        await _addColumnSafely(db, 'eleve_parcours', 'updated_at', 'TEXT');
-        await _addColumnSafely(
-          db,
-          'eleve_parcours',
-          'confirmation_statut',
-          "TEXT",
-        );
-        debugPrint(
-          'Migration v54: Verification des colonnes eleve_parcours terminée.',
-        );
-      } catch (e) {
-        debugPrint('Erreur migration v54: $e');
-      }
-    }
-  }
-
-  Future<void> _addColumnSafely(
-    Database db,
-    String table,
-    String column,
-    String definition,
-  ) async {
-    try {
-      final List<Map<String, dynamic>> info = await db.rawQuery(
-        'PRAGMA table_info($table)',
-      );
-      final bool exists = info.any((c) => c['name'] == column);
-      if (!exists) {
-        await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
-      }
-    } catch (e) {
-      debugPrint('Error adding $column to $table: $e');
-    }
+    await DatabaseMigrations.upgrade(db, oldVersion, newVersion);
   }
 
   // -------------------------
   // CRUD générique
   // -------------------------
-  Future<int> insert(String table, Map<String, dynamic> values) async {
-    final db = await database;
-    return await db.insert(table, values);
-  }
+  // -------------------------
+  // CRUD générique
+  // -------------------------
+  Future<int> insert(String table, Map<String, dynamic> values) =>
+      commonDao.insert(table, values);
 
   Future<int> update(
     String table,
     Map<String, dynamic> values,
     String where,
     List<dynamic> whereArgs,
-  ) async {
-    final db = await database;
-    return await db.update(table, values, where: where, whereArgs: whereArgs);
-  }
+  ) => commonDao.update(table, values, where, whereArgs);
 
-  Future<int> delete(
-    String table,
-    String where,
-    List<dynamic> whereArgs,
-  ) async {
-    final db = await database;
-    return await db.delete(table, where: where, whereArgs: whereArgs);
-  }
+  Future<int> delete(String table, String where, List<dynamic> whereArgs) =>
+      commonDao.delete(table, where, whereArgs);
 
-  Future<List<Map<String, dynamic>>> queryAll(String table) async {
-    final db = await database;
-    return await db.query(table);
-  }
+  Future<List<Map<String, dynamic>>> queryAll(String table) =>
+      commonDao.queryAll(table);
 
-  Future<Map<String, dynamic>?> queryById(String table, int id) async {
-    final db = await database;
-    final result = await db.query(table, where: 'id = ?', whereArgs: [id]);
-    return result.isNotEmpty ? result.first : null;
-  }
+  Future<Map<String, dynamic>?> queryById(String table, int id) =>
+      commonDao.queryById(table, id);
 
   // -------------------------
   // Méthodes Configuration École
@@ -1753,100 +216,33 @@ class DatabaseHelper {
     int anneeScolaireId,
   ) => configDao.getConfigurationAnnee(anneeScolaireId);
 
-  Future<int> saveCycleScolaire(Map<String, dynamic> cycle) async {
-    final db = await database;
-    return await db.insert('cycles_scolaires', cycle);
-  }
+  Future<int> saveCycleScolaire(Map<String, dynamic> cycle) =>
+      configDao.saveCycle(cycle);
 
-  Future<List<Map<String, dynamic>>> getCyclesScolaires() async {
-    final db = await database;
-    return await db.query(
-      'cycles_scolaires',
-      where: 'actif = 1',
-      orderBy: 'ordre',
-    );
-  }
+  Future<List<Map<String, dynamic>>> getCyclesScolaires() =>
+      configDao.getCyclesScolaires();
 
-  Future<Map<String, dynamic>?> getCycleById(int id) async {
-    final db = await database;
-    final result = await db.query(
-      'cycles_scolaires',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    return result.isNotEmpty ? result.first : null;
-  }
+  Future<Map<String, dynamic>?> getCycleById(int id) =>
+      configDao.getCycleById(id);
 
-  Future<int> updateCycleScolaire(int id, Map<String, dynamic> cycle) async {
-    final db = await database;
-    cycle['updated_at'] = DateTime.now().toIso8601String();
-    return await db.update(
-      'cycles_scolaires',
-      cycle,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
+  Future<int> updateCycleScolaire(int id, Map<String, dynamic> cycle) =>
+      configDao.updateCycle(id, cycle);
 
-  Future<int> deleteCycleScolaire(int id) async {
-    final db = await database;
-    return await db.update(
-      'cycles_scolaires',
-      {'actif': 0},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
+  Future<int> deleteCycleScolaire(int id) => configDao.deleteCycle(id);
 
   // -------------------------
   // Niveaux configuration
   // -------------------------
-  Future<List<Map<String, dynamic>>> getNiveauxByCycle(int cycleId) async {
-    final db = await database;
-    return await db.query(
-      'niveaux',
-      where: 'cycle_id = ? AND actif = 1',
-      whereArgs: [cycleId],
-      orderBy: 'ordre',
-    );
-  }
+  Future<List<Map<String, dynamic>>> getNiveauxByCycle(int cycleId) =>
+      configDao.getNiveauxByCycle(cycleId);
 
-  Future<int> saveNiveau(Map<String, dynamic> niveau) async {
-    final db = await database;
-    if (niveau['id'] != null) {
-      int id = niveau['id'];
-      Map<String, dynamic> data = Map.from(niveau);
-      data.remove('id');
-      data['updated_at'] = DateTime.now().toIso8601String();
-      return await db.update('niveaux', data, where: 'id = ?', whereArgs: [id]);
-    } else {
-      return await db.insert('niveaux', niveau);
-    }
-  }
+  Future<int> saveNiveau(Map<String, dynamic> niveau) =>
+      configDao.saveNiveau(niveau);
 
-  Future<int> deleteNiveau(int id) async {
-    final db = await database;
-    return await db.update(
-      'niveaux',
-      {'actif': 0},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
+  Future<int> deleteNiveau(int id) => configDao.deleteNiveau(id);
 
-  Future<Map<String, dynamic>?> getClasseWithCycle(int classId) async {
-    final db = await database;
-    final results = await db.rawQuery(
-      '''
-      SELECT c.*, cy.nom as cycle_nom, cy.note_min, cy.note_max, cy.moyenne_passage, cy.id as cycle_id
-      FROM classe c
-      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      WHERE c.id = ?
-    ''',
-      [classId],
-    );
-    return results.isNotEmpty ? results.first : null;
-  }
+  Future<Map<String, dynamic>?> getClasseWithCycle(int classId) =>
+      classeDao.getClasseWithCycle(classId);
 
   // -------------------------
   // Mentions configuration
@@ -1857,202 +253,38 @@ class DatabaseHelper {
   Future<void> saveMention(Map<String, dynamic> mention) =>
       configDao.saveMention(mention);
 
-  Future<void> deleteMention(int id) async {
-    final db = await database;
-    await db.delete('mention_config', where: 'id = ?', whereArgs: [id]);
-  }
+  Future<void> deleteMention(int id) => configDao.deleteMention(id);
 
   // -------------------------
   // Evaluation Planification
   // -------------------------
-  Future<List<Map<String, dynamic>>> getSequencesPlanification(
-    int anneeId,
-  ) async {
-    final db = await database;
-    return await db.query(
-      'sequence_planification',
-      where: 'annee_scolaire_id = ?',
-      whereArgs: [anneeId],
-      orderBy: 'numero_sequence ASC',
-    );
-  }
+  Future<List<Map<String, dynamic>>> getSequencesPlanification(int anneeId) =>
+      configDao.getSequencesPlanification(anneeId);
 
   Future<void> saveSequencesPlanification(
     List<Map<String, dynamic>> sequences,
-  ) async {
-    final db = await database;
-    final batch = db.batch();
-    for (var seq in sequences) {
-      if (seq['id'] != null) {
-        batch.update(
-          'sequence_planification',
-          seq,
-          where: 'id = ?',
-          whereArgs: [seq['id']],
-        );
-      } else {
-        batch.insert('sequence_planification', seq);
-      }
-    }
-    await batch.commit(noResult: true);
-  }
+  ) => configDao.saveSequencesPlanification(sequences);
 
   // -------------------------
   // Moyennes, rangs et passage
   // -------------------------
-  Future<double> calculerMoyenneGenerale(int eleveId, int anneeId) async {
-    final db = await database;
-    final result = await db.rawQuery(
-      '''
-      SELECT n.note, cm.coefficient 
-      FROM notes n
-      JOIN eleve e ON n.eleve_id = e.id
-      JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id 
-        AND cm.classe_id = e.classe_id 
-      WHERE n.eleve_id = ? AND n.annee_scolaire_id = ?
-    ''',
-      [eleveId, anneeId],
-    );
+  Future<double> calculerMoyenneGenerale(int eleveId, int anneeId) =>
+      resultDao.calculerMoyenneGenerale(eleveId, anneeId);
 
-    double sommeNotes = 0.0;
-    double sommeCoeff = 0.0;
+  Future<void> calculerRangsClasse(int classeId, int anneeId) =>
+      resultDao.calculerRangsClasse(classeId, anneeId);
 
-    for (var row in result) {
-      double note = (row['note'] as num?)?.toDouble() ?? 0.0;
-      double coeff = (row['coefficient'] as num?)?.toDouble() ?? 1.0;
-      sommeNotes += note * coeff;
-      sommeCoeff += coeff;
-    }
+  Future<void> passerEleves(
+    List<int> ids,
+    int nouvelleClasseId,
+    int nouvelleAnneeId,
+  ) => resultDao.passerEleves(ids, nouvelleClasseId, nouvelleAnneeId);
 
-    return sommeCoeff == 0 ? 0.0 : (sommeNotes / sommeCoeff);
-  }
+  String appreciationAutomatique(double moyenne) =>
+      resultDao.appreciationAutomatique(moyenne);
 
-  Future<void> calculerRangsClasse(int classeId, int anneeId) async {
-    final db = await database;
-    final eleves = await db.query(
-      'eleve',
-      where: 'classe_id = ?',
-      whereArgs: [classeId],
-    );
-
-    List<Map<String, dynamic>> resultats = [];
-
-    for (var eleve in eleves) {
-      double moyenne = await calculerMoyenneGenerale(
-        eleve['id'] as int,
-        anneeId,
-      );
-      resultats.add({'eleve_id': eleve['id'], 'moyenne': moyenne});
-    }
-
-    resultats.sort(
-      (a, b) => (b['moyenne'] as double).compareTo(a['moyenne'] as double),
-    );
-
-    for (int i = 0; i < resultats.length; i++) {
-      await db.insert('averages', {
-        'eleve_id': resultats[i]['eleve_id'],
-        'annee_scolaire_id': anneeId,
-        'moyenne': resultats[i]['moyenne'],
-        'rang': i + 1,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-  }
-
-  Future<void> passerEleves(int anneeId, int nouvelleAnneeId) async {
-    final db = await database;
-    final eleves = await db.query(
-      'eleve',
-      where: 'annee_scolaire_id = ?',
-      whereArgs: [anneeId],
-    );
-
-    for (var eleve in eleves) {
-      double moyenne = await calculerMoyenneGenerale(
-        eleve['id'] as int,
-        anneeId,
-      );
-      final classe = await queryById('classe', eleve['classe_id'] as int);
-      int? nextClassId = classe?['next_class_id'] as int?;
-      bool isFinal = classe?['is_final_class'] == 1;
-      final config = await queryAll('configuration_annee');
-      double moyennePassage = config.isNotEmpty
-          ? (config.first['moyenne_generale_min'] as num?)?.toDouble() ?? 10.0
-          : 10.0;
-
-      if (moyenne >= moyennePassage && !isFinal && nextClassId != null) {
-        await db.update(
-          'eleve',
-          {'classe_id': nextClassId, 'annee_scolaire_id': nouvelleAnneeId},
-          where: 'id = ?',
-          whereArgs: [eleve['id']],
-        );
-      } else if (isFinal) {
-        await db.update(
-          'eleve',
-          {'statut': 'sorti'},
-          where: 'id = ?',
-          whereArgs: [eleve['id']],
-        );
-      } else {
-        await db.update(
-          'eleve',
-          {
-            'classe_id': eleve['classe_id'],
-            'annee_scolaire_id': nouvelleAnneeId,
-          },
-          where: 'id = ?',
-          whereArgs: [eleve['id']],
-        );
-      }
-    }
-  }
-
-  String appreciationAutomatique(double moyenne) {
-    if (moyenne >= 16) return "Excellent";
-    if (moyenne >= 14) return "Très bien";
-    if (moyenne >= 12) return "Bien";
-    if (moyenne >= 10) return "Assez bien";
-    if (moyenne >= 8) return "Passable";
-    return "Insuffisant";
-  }
-
-  Future<String> getAppreciation(double moyenne, {int? cycleId}) async {
-    final mentions = await getMentionsByCycle(cycleId);
-    if (mentions.isEmpty && cycleId != null) {
-      // Fallback to global mentions if no cycle mentions
-      final globalMentions = await getMentionsByCycle(null);
-      if (globalMentions.isNotEmpty) {
-        for (var m in globalMentions) {
-          if (moyenne >= (m['note_min'] as num).toDouble() &&
-              moyenne <= (m['note_max'] as num).toDouble()) {
-            return m['label'];
-          }
-        }
-      }
-    } else {
-      for (var m in mentions) {
-        if (moyenne >= (m['note_min'] as num).toDouble() &&
-            moyenne <= (m['note_max'] as num).toDouble()) {
-          return m['label'];
-        }
-      }
-    }
-    return appreciationAutomatique(moyenne);
-  }
-
-  Future<bool> estBloque(int eleveId, int anneeId) async {
-    final db = await database;
-    final result = await db.query(
-      'paiement',
-      where: 'eleve_id = ? AND annee_scolaire_id = ?',
-      whereArgs: [eleveId, anneeId],
-    );
-
-    if (result.isEmpty) return false;
-    double reste = (result.first['montant_restant'] as num?)?.toDouble() ?? 0;
-    return reste > 0;
-  }
+  Future<String> getAppreciation(double moyenne) =>
+      resultDao.getAppreciation(moyenne);
 
   Future<int?> ensureActiveAnneeCached({bool forceRefresh = false}) async {
     if (activeAnneeId != null && !forceRefresh) return activeAnneeId;
@@ -2080,134 +312,52 @@ class DatabaseHelper {
     await ensureActiveAnneeCached(forceRefresh: true);
   }
 
-  Future<Map<String, dynamic>?> getActiveAnnee() async {
-    final db = await database;
-    final List<Map<String, dynamic>> result = await db.query(
-      'annee_scolaire',
-      where: 'statut = ?',
-      whereArgs: ['Active'],
-      limit: 1,
-    );
-    if (result.isNotEmpty) return result.first;
-
-    // Fallback to the latest one if no active year is set
-    final latest = await db.query(
-      'annee_scolaire',
-      orderBy: 'date_debut DESC',
-      limit: 1,
-    );
-    return latest.isNotEmpty ? latest.first : null;
-  }
+  Future<Map<String, dynamic>?> getActiveAnnee() =>
+      anneeScolaireDao.getActiveAnnee();
 
   // -------------------------
   // Méthodes Écoles
   // -------------------------
-  Future<List<Map<String, dynamic>>> getEcoles() async {
-    final db = await database;
-    return await db.query('ecole');
-  }
+  Future<List<Map<String, dynamic>>> getEcoles() => ecoleDao.getEcoles();
 
-  Future<int> countEcoles() async {
-    final db = await database;
-    final result = await db.rawQuery('SELECT COUNT(*) as count FROM ecole');
-    return result.first['count'] as int;
-  }
+  Future<int> countEcoles() => ecoleDao.countEcoles();
 
-  Future<bool> hasEcoles() async {
-    final count = await countEcoles();
-    return count > 0;
-  }
+  Future<bool> hasEcoles() => ecoleDao.hasEcoles();
 
   Future<Ecole?> getEcole() async {
-    final db = await database;
-    final result = await db.query('ecole', limit: 1);
-    if (result.isNotEmpty) {
-      return Ecole.fromMap(result.first);
-    }
-    return null;
+    final map = await ecoleDao.getSchoolProfile();
+    return map != null ? Ecole.fromMap(map) : null;
   }
 
-  Future<int> upsertEcole(Ecole ecole) async {
-    final db = await database;
-    final count = await countEcoles();
-    if (count == 0) {
-      return await db.insert('ecole', ecole.toMap());
-    } else {
-      Map<String, dynamic> data = ecole.toMap();
-      data['updated_at'] = DateTime.now().toIso8601String();
-      return await db.update(
-        'ecole',
-        data,
-        where: 'id = ?',
-        whereArgs: [ecole.id ?? 1],
-      );
-    }
-  }
+  Future<int> upsertEcole(Ecole ecole) => ecoleDao.upsertEcole(ecole);
 
   // -------------------------
   // Méthodes Matières
   // -------------------------
-  Future<List<Matiere>> getMatieresByAnnee(int anneeId) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('matiere');
-    return maps.map((map) => Matiere.fromMap(map)).toList();
-  }
+  Future<List<Matiere>> getMatieresByAnnee(int anneeId) =>
+      matiereDao.getMatieresByAnnee(anneeId);
 
-  Future<int> saveMatiere(Matiere matiere) async {
-    final db = await database;
-    return await db.insert('matiere', matiere.toMap());
-  }
+  Future<int> saveMatiere(Matiere matiere) =>
+      matiereDao.saveSubject(matiere.toMap());
 
-  Future<void> updateMatiere(Matiere matiere) async {
-    final db = await database;
-    await db.update(
-      'matiere',
-      matiere.toMap(),
-      where: 'id = ?',
-      whereArgs: [matiere.id],
-    );
-  }
+  Future<void> updateMatiere(Matiere matiere) =>
+      matiereDao.updateSubject(matiere.id!, matiere.toMap());
 
-  Future<void> deleteMatiere(int id) async {
-    final db = await database;
-    await db.delete('matiere', where: 'id = ?', whereArgs: [id]);
-  }
+  Future<void> deleteMatiere(int id) => matiereDao.deleteSubject(id);
 
-  Future<List<Map<String, dynamic>>> getMatieresStats() async {
-    final db = await database;
-    // This is a complex query to get stats like class count per subject
-    // For now, let's return subjects with their usage count in notes or just the basic count
-    return await db.rawQuery('''
-      SELECT m.*, 
-             (SELECT COUNT(DISTINCT eleve_id) FROM notes WHERE matiere_id = m.id) as students_count,
-             (SELECT COUNT(DISTINCT classe_id) FROM classe_matiere WHERE matiere_id = m.id) as classes_count
-      FROM matiere m
-    ''');
-  }
+  Future<List<Map<String, dynamic>>> getMatieresStats() =>
+      matiereDao.getMatieresStats();
 
   // -------------------------
   // Méthodes Enseignants
   // -------------------------
-  Future<List<Map<String, dynamic>>> getEnseignants() async {
-    final db = await database;
-    return await db.query('enseignant', orderBy: 'nom, prenom');
-  }
+  Future<List<Map<String, dynamic>>> getEnseignants() =>
+      enseignantDao.getEnseignants();
 
-  Future<Map<String, dynamic>> getEnseignantsStats() async {
-    final db = await database;
-    final result = await db.rawQuery('''
-      SELECT 
-        (SELECT COUNT(*) FROM enseignant) as total_enseignants,
-        (SELECT COUNT(DISTINCT specialite) FROM enseignant WHERE specialite IS NOT NULL AND specialite != '') as total_specialites,
-        (SELECT COUNT(*) FROM emploi_du_temps) as assignments_count
-    ''');
-    return result.first;
-  }
+  Future<Map<String, dynamic>> getEnseignantsStats() =>
+      enseignantDao.getEnseignantsStats();
 
-  Future<int> deleteEnseignant(int id) async {
-    final db = await database;
-    return await db.delete('enseignant', where: 'id = ?', whereArgs: [id]);
-  }
+  Future<int> deleteEnseignant(int id) => enseignantDao.deleteEnseignant(id);
 
   // -------------------------
   // Méthodes Emploi du Temps
@@ -2215,20 +365,7 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getEmploiDuTempsByClasse(
     int classeId,
     int anneeScolaireId,
-  ) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT edt.*, m.nom as matiere_nom, e.nom as enseignant_nom, e.prenom as enseignant_prenom
-      FROM emploi_du_temps edt
-      JOIN matiere m ON edt.matiere_id = m.id
-      LEFT JOIN enseignant e ON edt.enseignant_id = e.id
-      WHERE edt.classe_id = ? AND edt.annee_scolaire_id = ?
-      ORDER BY edt.jour_semaine, edt.heure_debut
-    ''',
-      [classeId, anneeScolaireId],
-    );
-  }
+  ) => timetableDao.getTimetableByClass(classeId, anneeScolaireId);
 
   Future<int> checkConflicts(
     int jour,
@@ -2237,409 +374,71 @@ class DatabaseHelper {
     int? enseignantId,
     int? classeId,
     int? excludeId,
-  }) async {
-    final db = await database;
-    // Simple conflict check: same teacher or same class at overlapping time
-    String query = '''
-      SELECT COUNT(*) as count FROM emploi_du_temps
-      WHERE jour_semaine = ? 
-      AND (
-        (heure_debut < ? AND heure_fin > ?) OR
-        (heure_debut < ? AND heure_fin > ?) OR
-        (heure_debut >= ? AND heure_fin <= ?)
-      )
-    ''';
-    List<dynamic> args = [jour, fin, debut, fin, debut, debut, fin];
-
-    if (enseignantId != null && classeId != null) {
-      query += ' AND (enseignant_id = ? OR classe_id = ?)';
-      args.addAll([enseignantId, classeId]);
-    } else if (enseignantId != null) {
-      query += ' AND enseignant_id = ?';
-      args.add(enseignantId);
-    } else if (classeId != null) {
-      query += ' AND classe_id = ?';
-      args.add(classeId);
-    }
-
-    if (excludeId != null) {
-      query += ' AND id != ?';
-      args.add(excludeId);
-    }
-
-    final result = await db.rawQuery(query, args);
-    return result.first['count'] as int;
-  }
+  }) => timetableDao.checkConflicts(
+    jour,
+    debut,
+    fin,
+    enseignantId: enseignantId,
+    classeId: classeId,
+    excludeId: excludeId,
+  );
 
   // -------------------------
   // Méthodes Bulletins / Rapports
   // -------------------------
 
-  Future<Map<String, dynamic>?> getActiveAnneeScolaire() async {
-    return await getActiveAnnee();
-  }
+  Future<Map<String, dynamic>?> getActiveAnneeScolaire() =>
+      anneeScolaireDao.getActiveAnnee();
 
-  Future<List<Map<String, dynamic>>> getClassesForReports() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT c.*, 
-             (SELECT COUNT(*) FROM eleve WHERE classe_id = c.id) as student_count
-      FROM classe c
-      ORDER BY c.nom
-    ''');
-  }
+  Future<List<Map<String, dynamic>>> getClassesForReports(int anneeId) =>
+      reportsDao.getClassesForReports(anneeId);
 
-  Future<List<Map<String, dynamic>>> getStudentsByClasse(int classeId) async {
-    final db = await database;
-    return await db.query(
-      'eleve',
-      where: 'classe_id = ?',
-      whereArgs: [classeId],
-      orderBy: 'nom, prenom',
-    );
-  }
+  Future<List<Map<String, dynamic>>> getStudentsByClasse(
+    int classeId,
+    int anneeId,
+  ) => reportsDao.getStudentsByClasse(classeId, anneeId);
 
   Future<List<Map<String, dynamic>>> getStudentNotesForBulletin(
     int studentId,
     int trimestre,
     int anneeId,
-  ) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT n.*, m.nom as matiere_nom, COALESCE(cm.coefficient, 1) as coefficient
-      FROM notes n
-      JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
-      LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
-      WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
-    ''',
-      [studentId, trimestre, anneeId],
-    );
-  }
+  ) => reportsDao.getStudentNotesForBulletin(
+    studentId,
+    anneeId,
+  ); // Trimestre usage might need DAO update
 
   Future<Map<String, dynamic>> getBulletinStats(
     int studentId,
     int classId,
     int trimestre,
     int anneeId,
-  ) async {
-    final db = await database;
-
-    // 1. Get average and cycle info for the specific student
-    final studentDataResult = await db.rawQuery(
-      '''
-      SELECT 
-        SUM(note * COALESCE(cm.coefficient, 1)) / SUM(COALESCE(cm.coefficient, 1)) as average,
-        cy.moyenne_passage,
-        cy.note_min,
-        cy.note_max
-      FROM notes n
-      JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
-      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
-      WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
-      GROUP BY cy.moyenne_passage, cy.note_min, cy.note_max
-    ''',
-      [studentId, trimestre, anneeId],
-    );
-
-    final studentData = studentDataResult.isNotEmpty
-        ? studentDataResult.first
-        : {};
-    double studentAvg = (studentData['average'] as num?)?.toDouble() ?? 0.0;
-    double passMark =
-        (studentData['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
-    double noteMin = (studentData['note_min'] as num?)?.toDouble() ?? 0.0;
-    double noteMax = (studentData['note_max'] as num?)?.toDouble() ?? 20.0;
-
-    // 2. Get averages for all students in the class to calculate rank and class average
-    final allAvgsResult = await db.rawQuery(
-      '''
-      SELECT e.id, SUM(note * COALESCE(cm.coefficient, 1)) / SUM(COALESCE(cm.coefficient, 1)) as average
-      FROM eleve e
-      JOIN notes n ON n.eleve_id = e.id
-      JOIN matiere m ON n.matiere_id = m.id
-      LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
-      WHERE e.classe_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
-      GROUP BY e.id
-      ORDER BY average DESC
-    ''',
-      [classId, trimestre, anneeId],
-    );
-
-    int rank = 0;
-    double totalClassAvg = 0;
-    for (int i = 0; i < allAvgsResult.length; i++) {
-      totalClassAvg += (allAvgsResult[i]['average'] as num?)?.toDouble() ?? 0.0;
-      if (allAvgsResult[i]['id'] == studentId) {
-        rank = i + 1;
-      }
-    }
-
-    double classAvg = allAvgsResult.isNotEmpty
-        ? totalClassAvg / allAvgsResult.length
-        : 0.0;
-
-    // 4. Get student total points
-    final studentSumResult = await db.rawQuery(
-      '''
-      SELECT SUM(note * COALESCE(cm.coefficient, 1)) as total_points
-      FROM notes n
-      JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
-      LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
-      WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
-    ''',
-      [studentId, trimestre, anneeId],
-    );
-    double totalPoints =
-        (studentSumResult.first['total_points'] as num?)?.toDouble() ?? 0.0;
-
-    return {
-      'average': studentAvg,
-      'rank': rank,
-      'classAverage': classAvg,
-      'totalStudents': allAvgsResult.length,
-      'moyenne_passage': passMark,
-      'note_min': noteMin,
-      'note_max': noteMax,
-      'totalPoints': totalPoints,
-    };
-  }
+  ) => resultDao.getBulletinStats(studentId, classId, trimestre, anneeId);
 
   // --- ANNUAL REPORT METHODS ---
 
   Future<List<Map<String, dynamic>>> getAnnualGradesForStudent(
     int studentId,
     int anneeId, {
-    int? classId, // Optional, but recommended for rank calculation
-  }) async {
-    final db = await database;
-
-    // Fetch classId if not provided (needed for rank)
-    int? effectiveClassId = classId;
-    if (effectiveClassId == null) {
-      final studentInfo = await db.query(
-        'eleve',
-        columns: ['classe_id'],
-        where: 'id = ?',
-        whereArgs: [studentId],
-      );
-      if (studentInfo.isNotEmpty) {
-        effectiveClassId = studentInfo.first['classe_id'] as int;
-      }
-    }
-
-    // 1. Get all grades for the year
-    final allGrades = await db.rawQuery(
-      '''
-      SELECT n.note, n.trimestre, 
-             m.id as matiere_id, m.nom as matiere_nom, 
-             COALESCE(cm.coefficient, 1) as coefficient
-      FROM notes n
-      JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
-      LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
-      WHERE n.eleve_id = ? AND n.annee_scolaire_id = ?
-      ORDER BY m.nom
-    ''',
-      [studentId, anneeId],
-    );
-
-    // 2. Pivot and calculate averages per subject
-    Map<int, Map<String, dynamic>> subjectStats = {};
-
-    for (var row in allGrades) {
-      int matId = row['matiere_id'] as int;
-      String matNom = row['matiere_nom'] as String;
-      double coeff = (row['coefficient'] as num).toDouble();
-      double note = (row['note'] as num).toDouble();
-      int tri = row['trimestre'] as int;
-
-      if (!subjectStats.containsKey(matId)) {
-        subjectStats[matId] = {
-          'matiere_id': matId,
-          'matiere_nom': matNom,
-          'coefficient': coeff,
-          'notes': <int, double?>{},
-        };
-      }
-      (subjectStats[matId]!['notes'] as Map<int, double?>)[tri] = note;
-    }
-
-    // 3. Calculate annual averages and subject ranks
-    List<Map<String, dynamic>> results = [];
-    for (var stat in subjectStats.values) {
-      final notesMap = stat['notes'] as Map<int, double?>;
-
-      int count = 0;
-      double sum = 0;
-      notesMap.forEach((triId, val) {
-        if (val != null) {
-          sum += val;
-          count++;
-        }
-      });
-
-      double moyAnnuelle = count > 0 ? sum / count : 0.0;
-
-      int rank = 0;
-      if (effectiveClassId != null) {
-        rank = await _getAnnualSubjectRank(
-          stat['matiere_id'],
-          moyAnnuelle,
-          effectiveClassId,
-          anneeId,
-        );
-      }
-
-      results.add({
-        'matiere_id': stat['matiere_id'],
-        'matiere': stat['matiere_nom'],
-        'coefficient': stat['coefficient'],
-        'coeff': stat['coefficient'],
-        'notes_par_trimestre': notesMap,
-        'moy_annuelle': moyAnnuelle,
-        'note': moyAnnuelle,
-        'total': moyAnnuelle * (stat['coefficient'] ?? 1.0),
-        'rang': rank,
-        'appreciation': appreciationAutomatique(moyAnnuelle),
-      });
-    }
-
-    return results;
-  }
-
-  Future<int> _getAnnualSubjectRank(
-    int matiereId,
-    double targetAvg,
-    int classeId,
-    int anneeId,
-  ) async {
-    final db = await database;
-
-    // Get annual averages for this subject for all students in the class
-    final allGrades = await db.rawQuery(
-      '''
-      SELECT n.eleve_id, n.note, n.trimestre
-      FROM notes n
-      JOIN eleve e ON n.eleve_id = e.id
-      WHERE n.matiere_id = ? 
-        AND n.annee_scolaire_id = ?
-        AND e.classe_id = ?
-    ''',
-      [matiereId, anneeId, classeId],
-    );
-
-    // Pivot in memory to get annual avg per student
-    Map<int, List<double>> studentGrades = {};
-    for (var row in allGrades) {
-      int sId = row['eleve_id'] as int;
-      double note = (row['note'] as num).toDouble();
-      if (!studentGrades.containsKey(sId)) {
-        studentGrades[sId] = [];
-      }
-      studentGrades[sId]!.add(note);
-    }
-
-    List<double> annualAvgs = [];
-    for (var grades in studentGrades.values) {
-      if (grades.isNotEmpty) {
-        double avg = grades.reduce((a, b) => a + b) / grades.length;
-        annualAvgs.add(avg);
-      }
-    }
-
-    annualAvgs.sort((a, b) => b.compareTo(a)); // Descending
-    int rank = annualAvgs.indexOf(targetAvg) + 1;
-    return rank > 0 ? rank : annualAvgs.length + 1; // Fallback
-  }
+    int? classId,
+  }) =>
+      resultDao.getAnnualGradesForStudent(studentId, anneeId, classId: classId);
 
   Future<Map<String, dynamic>> getAnnualStats(
     int studentId,
     int classId,
     int anneeId,
     Future<List<Map<String, dynamic>>> Function(int) getStudentsByClasse,
-  ) async {
-    final db = await database;
-    final grades = await getAnnualGradesForStudent(studentId, anneeId);
-
-    double totalPoints = 0;
-    double totalCoeff = 0;
-
-    for (var g in grades) {
-      double moy = (g['moy_annuelle'] as num?)?.toDouble() ?? 0.0;
-      double coeff = (g['coefficient'] as num?)?.toDouble() ?? 1.0;
-      totalPoints += moy * coeff;
-      totalCoeff += coeff;
-    }
-
-    double annualAvg = totalCoeff > 0 ? totalPoints / totalCoeff : 0.0;
-
-    // Calculate Rank
-    // We need annual averages of ALL students in the class
-    final allStudents = await getStudentsByClasse(classId);
-    List<double> allAverages = [];
-
-    for (var s in allStudents) {
-      final sGrades = await getAnnualGradesForStudent(s['id'] as int, anneeId);
-      double sTotalPoints = 0;
-      double sTotalCoeff = 0;
-      for (var g in sGrades) {
-        double sMoy = (g['moy_annuelle'] as num?)?.toDouble() ?? 0.0;
-        double sCoeff = (g['coefficient'] as num?)?.toDouble() ?? 1.0;
-        sTotalPoints += sMoy * sCoeff;
-        sTotalCoeff += sCoeff;
-      }
-      allAverages.add(sTotalCoeff > 0 ? sTotalPoints / sTotalCoeff : 0.0);
-    }
-
-    allAverages.sort((a, b) => b.compareTo(a)); // Descending
-    int rank = allAverages.indexOf(annualAvg) + 1;
-
-    // Class Annual Average
-    double classTotalAvg = allAverages.isNotEmpty
-        ? allAverages.reduce((a, b) => a + b) / allAverages.length
-        : 0.0;
-
-    // Get pass mark and notation for class cycle
-    final cycleResult = await db.rawQuery(
-      'SELECT cy.moyenne_passage, cy.note_min, cy.note_max FROM classe c JOIN cycles_scolaires cy ON c.cycle_id = cy.id WHERE c.id = ?',
-      [classId],
-    );
-    final cycleData = cycleResult.isNotEmpty ? cycleResult.first : {};
-    double passMark =
-        (cycleData['moyenne_passage'] as num?)?.toDouble() ?? 10.0;
-    double noteMin = (cycleData['note_min'] as num?)?.toDouble() ?? 0.0;
-    double noteMax = (cycleData['note_max'] as num?)?.toDouble() ?? 20.0;
-
-    return {
-      'average': annualAvg,
-      'rank': rank,
-      'classAverage': classTotalAvg,
-      'totalStudents': allStudents.length,
-      'moyenne_passage': passMark,
-      'note_min': noteMin,
-      'note_max': noteMax,
-      'totalPoints': totalPoints,
-      'totalCoeff': totalCoeff,
-    };
-  }
+  ) => resultDao.getAnnualStats(
+    studentId,
+    classId,
+    anneeId,
+    getStudentsByClasse,
+  );
 
   // --- GRADES MANAGEMENT ---
 
-  Future<List<Map<String, dynamic>>> getAllSubjects() async {
-    final db = await database;
-    return await db.query('matiere', orderBy: 'nom ASC');
-  }
+  Future<List<Map<String, dynamic>>> getAllSubjects() =>
+      matiereDao.getAllSubjects();
 
   Future<List<Map<String, dynamic>>> getGradesByClassSubject(
     int classId,
@@ -2647,69 +446,16 @@ class DatabaseHelper {
     int trimestre,
     int sequence,
     int anneeId,
-  ) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT e.id as eleve_id, e.nom, e.prenom, e.matricule, e.photo, n.note, n.id as note_id,
-             COALESCE(cm.coefficient, 1) as coefficient
-      FROM eleve e
-      LEFT JOIN notes n ON n.eleve_id = e.id 
-          AND n.matiere_id = ? 
-          AND n.trimestre = ? 
-          AND n.sequence = ?
-          AND n.annee_scolaire_id = ?
-      LEFT JOIN classe_matiere cm ON cm.matiere_id = ? 
-          AND cm.classe_id = e.classe_id
-      WHERE e.classe_id = ?
-      ORDER BY e.nom ASC, e.prenom ASC
-    ''',
-      [subjectId, trimestre, sequence, anneeId, subjectId, classId],
-    );
-  }
+  ) => notesDao.getGradesByClassSubject(
+    classId,
+    subjectId,
+    trimestre,
+    sequence,
+    anneeId,
+  );
 
-  Future<void> saveGrade(Map<String, dynamic> noteData) async {
-    final db = await database;
-
-    // 1. Validation : Vérifier si un enseignant est affecté
-    // On récupère d'abord la classe de l'élève
-    final eleveResult = await db.query(
-      'eleve',
-      columns: ['classe_id'],
-      where: 'id = ?',
-      whereArgs: [noteData['eleve_id']],
-    );
-
-    if (eleveResult.isEmpty) {
-      throw Exception("Élève non trouvé");
-    }
-
-    // 2. Enregistrement
-    // Check if it already exists
-    final existing = await db.query(
-      'notes',
-      where:
-          'eleve_id = ? AND matiere_id = ? AND trimestre = ? AND sequence = ? AND annee_scolaire_id = ?',
-      whereArgs: [
-        noteData['eleve_id'],
-        noteData['matiere_id'],
-        noteData['trimestre'],
-        noteData['sequence'],
-        noteData['annee_scolaire_id'],
-      ],
-    );
-
-    if (existing.isNotEmpty) {
-      await db.update(
-        'notes',
-        noteData,
-        where: 'id = ?',
-        whereArgs: [existing.first['id']],
-      );
-    } else {
-      await db.insert('notes', noteData);
-    }
-  }
+  Future<void> saveGrade(Map<String, dynamic> noteData) =>
+      notesDao.saveGrade(noteData);
 
   Future<Map<String, dynamic>> getGradesStats(
     int classId,
@@ -2718,217 +464,43 @@ class DatabaseHelper {
     int sequence,
     int anneeId, {
     double passingGrade = 10.0,
-  }) async {
-    final db = await database;
-    final result = await db.rawQuery(
-      '''
-      SELECT 
-        AVG(note) as average,
-        MAX(note) as maxNote,
-        MIN(note) as minNote,
-        COUNT(id) as total,
-        SUM(CASE WHEN note >= ? THEN 1 ELSE 0 END) as passed
-      FROM notes
-      WHERE matiere_id = ? AND trimestre = ? AND sequence = ? AND annee_scolaire_id = ?
-      AND eleve_id IN (SELECT id FROM eleve WHERE classe_id = ?)
-    ''',
-      [passingGrade, subjectId, trimestre, sequence, anneeId, classId],
-    );
-
-    if (result.isEmpty || result.first['total'] == 0) {
-      return {
-        'average': 0.0,
-        'maxNote': 0.0,
-        'minNote': 0.0,
-        'successRate': 0.0,
-        'total': 0,
-      };
-    }
-
-    final data = result.first;
-    final total = data['total'] as int;
-    final passed = data['passed'] as int;
-
-    return {
-      'average': (data['average'] as num?)?.toDouble() ?? 0.0,
-      'maxNote': (data['maxNote'] as num?)?.toDouble() ?? 0.0,
-      'minNote': (data['minNote'] as num?)?.toDouble() ?? 0.0,
-      'successRate': total > 0 ? (passed / total) * 100 : 0.0,
-      'total': total,
-    };
-  }
+  }) => notesDao.getGradesStats(
+    classId,
+    subjectId,
+    trimestre,
+    sequence,
+    anneeId,
+    passingGrade: passingGrade,
+  );
 
   // --- PAYMENTS MANAGEMENT ---
 
-  Future<Map<String, dynamic>?> getFraisByClasse(
-    int classId,
-    int anneeId,
-  ) async {
-    final db = await database;
-    final result = await db.query(
-      'frais_scolarite',
-      where: 'classe_id = ? AND annee_scolaire_id = ?',
-      whereArgs: [classId, anneeId],
-    );
-    return result.isNotEmpty ? result.first : null;
-  }
+  Future<Map<String, dynamic>?> getFraisByClasse(int classId, int anneeId) =>
+      feesDao.getFraisByClasse(classId, anneeId);
 
   Future<List<Map<String, dynamic>>> getPaiementsByEleve(
     int eleveId,
     int anneeId,
+  ) => feesDao.getPaiementsByEleve(eleveId, anneeId);
+
+  Future<void> addPaiement(Map<String, dynamic> data) =>
+      feesDao.addPaiement(data);
+
+  Future<List<Map<String, dynamic>>> searchEleves(
+    String query,
+    int anneeId,
   ) async {
-    final db = await database;
-    return await db.query(
-      'paiement_detail',
-      where: 'eleve_id = ? AND annee_scolaire_id = ?',
-      whereArgs: [eleveId, anneeId],
-      orderBy: 'date_paiement DESC',
-    );
+    return await eleveDao.searchEleves(query, anneeId);
   }
 
-  Future<void> addPaiement(Map<String, dynamic> data) async {
-    final db = await database;
+  Future<List<Map<String, dynamic>>> getClassesByAnnee(int anneeId) =>
+      classeDao.getClassesByAnnee(anneeId);
 
-    await db.transaction((txn) async {
-      // 1. Insert into paiement_detail
-      // Ensure classe_id and frais_id are included if available or fetch them
-      if (!data.containsKey('classe_id') || !data.containsKey('frais_id')) {
-        final eleve = await txn.query(
-          'eleve',
-          columns: ['classe_id'],
-          where: 'id = ?',
-          whereArgs: [data['eleve_id']],
-        );
-        if (eleve.isNotEmpty) {
-          final int classeId = eleve.first['classe_id'] as int;
-          data['classe_id'] = classeId;
-
-          final fees = await txn.query(
-            'frais_scolarite',
-            columns: ['id'],
-            where: 'classe_id = ? AND annee_scolaire_id = ?',
-            whereArgs: [classeId, data['annee_scolaire_id']],
-          );
-          if (fees.isNotEmpty) {
-            data['frais_id'] = fees.first['id'];
-          }
-        }
-      }
-
-      await txn.insert('paiement_detail', data);
-
-      // 2. Update or insert into aggregate 'paiement' table
-      final existing = await txn.query(
-        'paiement',
-        where: 'eleve_id = ? AND annee_scolaire_id = ?',
-        whereArgs: [data['eleve_id'], data['annee_scolaire_id']],
-      );
-
-      if (existing.isNotEmpty) {
-        final double currentPaid =
-            (existing.first['montant_paye'] as num?)?.toDouble() ?? 0.0;
-        final double total =
-            (existing.first['montant_total'] as num?)?.toDouble() ?? 0.0;
-        final double newPaid =
-            currentPaid + (data['montant'] as num).toDouble();
-        final double newRemaining = total - newPaid;
-
-        await txn.update(
-          'paiement',
-          {
-            'montant_paye': newPaid,
-            'montant_restant': newRemaining,
-            'mode_paiement': data['mode_paiement'],
-            'reference_paiement': data['observation'],
-            'date_paiement': data['date_paiement'],
-            'type_paiement': data['type_frais'],
-            'statut': newRemaining <= 0 ? 'Réglé' : 'Partiel',
-            'classe_id': data['classe_id'],
-            'frais_id': data['frais_id'],
-          },
-          where: 'id = ?',
-          whereArgs: [existing.first['id']],
-        );
-      } else {
-        // We need to know the total fees for the class
-        final eleve = await txn.query(
-          'eleve',
-          columns: ['classe_id'],
-          where: 'id = ?',
-          whereArgs: [data['eleve_id']],
-        );
-        int? classeId = eleve.isNotEmpty
-            ? eleve.first['classe_id'] as int?
-            : null;
-
-        double totalFees = 0.0;
-        if (classeId != null) {
-          final fees = await txn.query(
-            'frais_scolarite',
-            columns: ['montant_total'],
-            where: 'classe_id = ? AND annee_scolaire_id = ?',
-            whereArgs: [classeId, data['annee_scolaire_id']],
-          );
-          if (fees.isNotEmpty) {
-            totalFees =
-                (fees.first['montant_total'] as num?)?.toDouble() ?? 0.0;
-          }
-        }
-
-        final double montantPaye = (data['montant'] as num).toDouble();
-        await txn.insert('paiement', {
-          'eleve_id': data['eleve_id'],
-          'classe_id': data['classe_id'],
-          'frais_id': data['frais_id'],
-          'annee_scolaire_id': data['annee_scolaire_id'],
-          'montant_total': totalFees,
-          'montant_paye': montantPaye,
-          'montant_restant': totalFees - montantPaye,
-          'mode_paiement': data['mode_paiement'],
-          'reference_paiement': data['observation'],
-          'date_paiement': data['date_paiement'],
-          'type_paiement': data['type_frais'],
-          'statut': (totalFees - montantPaye) <= 0 ? 'Réglé' : 'Partiel',
-        });
-      }
-    });
-  }
-
-  Future<List<Map<String, dynamic>>> searchEleves(String query) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT e.*, c.nom as classe_nom 
-      FROM eleve e
-      LEFT JOIN classe c ON e.classe_id = c.id
-      WHERE e.nom LIKE ? OR e.prenom LIKE ? OR e.matricule LIKE ?
-      LIMIT 20
-    ''',
-      ['%$query%', '%$query%', '%$query%'],
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getClassesByAnnee(int anneeId) async {
-    final db = await database;
-    return await db.query(
-      'classe',
-      where: 'annee_scolaire_id = ?',
-      whereArgs: [anneeId],
-      orderBy: 'nom ASC',
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getElevesByClasse(int classeId) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT e.*, c.nom as classe_nom 
-      FROM eleve e
-      LEFT JOIN classe c ON e.classe_id = c.id
-      WHERE e.classe_id = ?
-    ''',
-      [classeId],
-    );
+  Future<List<Map<String, dynamic>>> getElevesByClasse(
+    int classeId,
+    int anneeId,
+  ) async {
+    return await eleveDao.getElevesByClasse(classeId, anneeId);
   }
 
   // ===================================================================
@@ -2936,744 +508,100 @@ class DatabaseHelper {
   // ===================================================================
 
   /// Get current and previous academic year IDs for comparison
-  Future<Map<String, int?>> getYearComparison() async {
-    final db = await database;
-
-    // Get current active year
-    final currentYear = await getActiveAnnee();
-    final currentYearId = currentYear?['id'] as int?;
-
-    // Get previous year (the one before the active year by date)
-    final previousYearResult = await db.rawQuery(
-      '''
-      SELECT id FROM annee_scolaire 
-      WHERE date_debut < (SELECT date_debut FROM annee_scolaire WHERE id = ?)
-      ORDER BY date_debut DESC
-      LIMIT 1
-    ''',
-      [currentYearId],
-    );
-
-    final previousYearId = previousYearResult.isNotEmpty
-        ? previousYearResult.first['id'] as int?
-        : null;
-
-    return {'currentYearId': currentYearId, 'previousYearId': previousYearId};
-  }
+  Future<Map<String, int?>> getYearComparison() =>
+      anneeScolaireDao.getYearComparison();
 
   /// Get student enrollment analytics comparing two years
   Future<Map<String, dynamic>> getStudentAnalytics(
     int currentYearId,
     int? previousYearId,
-  ) async {
-    final db = await database;
-
-    // Current year students
-    final currentStudents = await db.rawQuery(
-      '''
-      SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN sexe = 'M' THEN 1 ELSE 0 END) as males,
-        SUM(CASE WHEN sexe = 'F' THEN 1 ELSE 0 END) as females,
-        SUM(CASE WHEN statut = 'inscrit' THEN 1 ELSE 0 END) as new_students,
-        SUM(CASE WHEN statut = 'reinscrit' THEN 1 ELSE 0 END) as returning_students
-      FROM eleve
-      WHERE annee_scolaire_id = ?
-    ''',
-      [currentYearId],
-    );
-
-    // Previous year students
-    Map<String, dynamic>? previousStudents;
-    if (previousYearId != null) {
-      final prevResult = await db.rawQuery(
-        '''
-        SELECT 
-          COUNT(*) as total,
-          SUM(CASE WHEN sexe = 'M' THEN 1 ELSE 0 END) as males,
-          SUM(CASE WHEN sexe = 'F' THEN 1 ELSE 0 END) as females
-        FROM eleve
-        WHERE annee_scolaire_id = ?
-      ''',
-        [previousYearId],
-      );
-      previousStudents = prevResult.first;
-    }
-
-    // Distribution by cycle
-    final cycleDistribution = await db.rawQuery(
-      '''
-      SELECT cy.nom as cycle, COUNT(e.id) as count
-      FROM eleve e
-      JOIN classe c ON e.classe_id = c.id
-      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      WHERE e.annee_scolaire_id = ?
-      GROUP BY cy.nom
-    ''',
-      [currentYearId],
-    );
-
-    return {
-      'current': currentStudents.first,
-      'previous': previousStudents,
-      'cycleDistribution': cycleDistribution,
-    };
-  }
+  ) => eleveDao.getStudentAnalytics(
+    currentYearId,
+    previousYearId: previousYearId,
+  );
 
   /// Get financial analytics comparing two years
   Future<Map<String, dynamic>> getFinancialAnalytics(
     int currentYearId,
     int? previousYearId,
-  ) async {
-    final db = await database;
-
-    // Current year financial data
-    final currentFinances = await db.rawQuery(
-      '''
-      SELECT 
-        COUNT(DISTINCT pd.eleve_id) as students_paid,
-        SUM(pd.montant) as total_collected,
-        COUNT(pd.id) as payment_count
-      FROM paiement_detail pd
-      JOIN eleve e ON pd.eleve_id = e.id
-      WHERE e.annee_scolaire_id = ?
-    ''',
-      [currentYearId],
-    );
-
-    // Get total expected fees for current year
-    final currentExpected = await db.rawQuery(
-      '''
-      SELECT 
-        SUM(
-          (fs.inscription + fs.reinscription + fs.tranche1 + fs.tranche2 + fs.tranche3) * 
-          (SELECT COUNT(*) FROM eleve WHERE classe_id = fs.classe_id AND annee_scolaire_id = ?)
-        ) as total_expected
-      FROM frais_scolarite fs
-      JOIN classe c ON fs.classe_id = c.id
-      WHERE fs.annee_scolaire_id = ?
-    ''',
-      [currentYearId, currentYearId],
-    );
-
-    // Previous year financial data
-    Map<String, dynamic>? previousFinances;
-    if (previousYearId != null) {
-      final prevResult = await db.rawQuery(
-        '''
-        SELECT 
-          COUNT(DISTINCT pd.eleve_id) as students_paid,
-          SUM(pd.montant) as total_collected,
-          COUNT(pd.id) as payment_count
-        FROM paiement_detail pd
-        JOIN eleve e ON pd.eleve_id = e.id
-        WHERE e.annee_scolaire_id = ?
-      ''',
-        [previousYearId],
-      );
-      previousFinances = prevResult.first;
-    }
-
-    // Payment methods distribution
-    final paymentMethods = await db.rawQuery(
-      '''
-      SELECT pd.mode_paiement, COUNT(*) as count, SUM(pd.montant) as total
-      FROM paiement_detail pd
-      JOIN eleve e ON pd.eleve_id = e.id
-      WHERE e.annee_scolaire_id = ?
-      GROUP BY pd.mode_paiement
-    ''',
-      [currentYearId],
-    );
-
-    return {
-      'current': {
-        ...currentFinances.first,
-        'expected': currentExpected.first['total_expected'] ?? 0,
-      },
-      'previous': previousFinances,
-      'paymentMethods': paymentMethods,
-    };
-  }
+  ) => feesDao.getFinancialAnalytics(currentYearId, previousYearId);
 
   /// Get academic performance analytics comparing two years
   Future<Map<String, dynamic>> getAcademicAnalytics(
     int currentYearId,
     int? previousYearId,
-  ) async {
-    final db = await database;
-
-    // Current year academic performance
-    final currentAcademic = await db.rawQuery(
-      '''
-      SELECT 
-        AVG(n.note) as average_grade,
-        COUNT(DISTINCT n.eleve_id) as students_graded,
-        COUNT(n.id) as total_grades
-      FROM notes n
-      JOIN eleve e ON n.eleve_id = e.id
-      WHERE e.annee_scolaire_id = ?
-    ''',
-      [currentYearId],
-    );
-
-    // Previous year academic performance
-    Map<String, dynamic>? previousAcademic;
-    if (previousYearId != null) {
-      final prevResult = await db.rawQuery(
-        '''
-        SELECT 
-          AVG(n.note) as average_grade,
-          COUNT(DISTINCT n.eleve_id) as students_graded,
-          COUNT(n.id) as total_grades
-        FROM notes n
-        JOIN eleve e ON n.eleve_id = e.id
-        WHERE e.annee_scolaire_id = ?
-      ''',
-        [previousYearId],
-      );
-      previousAcademic = prevResult.first;
-    }
-
-    // Performance by trimester (current year)
-    final trimesterPerformance = await db.rawQuery(
-      '''
-      SELECT 
-        n.trimestre,
-        AVG(n.note) as average,
-        COUNT(DISTINCT n.eleve_id) as students
-      FROM notes n
-      JOIN eleve e ON n.eleve_id = e.id
-      WHERE e.annee_scolaire_id = ?
-      GROUP BY n.trimestre
-      ORDER BY n.trimestre
-    ''',
-      [currentYearId],
-    );
-
-    // Performance by class (current year)
-    final classPerformance = await db.rawQuery(
-      '''
-      SELECT 
-        c.nom as class_name,
-        cy.nom as cycle,
-        AVG(n.note) as average,
-        COUNT(DISTINCT n.eleve_id) as students
-      FROM notes n
-      JOIN eleve e ON n.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
-      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      WHERE e.annee_scolaire_id = ?
-      GROUP BY c.id
-      ORDER BY cy.nom, c.nom
-    ''',
-      [currentYearId],
-    );
-
-    return {
-      'current': currentAcademic.first,
-      'previous': previousAcademic,
-      'trimesterPerformance': trimesterPerformance,
-      'classPerformance': classPerformance,
-    };
-  }
+  ) => resultDao.getAcademicAnalytics(currentYearId, previousYearId);
 
   /// Get class distribution analytics comparing two years
   Future<Map<String, dynamic>> getClassAnalytics(
     int currentYearId,
     int? previousYearId,
-  ) async {
-    final db = await database;
-
-    // Current year class data
-    final currentClasses = await db.rawQuery(
-      '''
-      SELECT 
-        COUNT(DISTINCT c.id) as total_classes,
-        AVG(student_counts.count) as avg_class_size,
-        MAX(student_counts.count) as max_class_size,
-        MIN(student_counts.count) as min_class_size
-      FROM classe c
-      LEFT JOIN (
-        SELECT classe_id, COUNT(*) as count
-        FROM eleve
-        WHERE annee_scolaire_id = ?
-        GROUP BY classe_id
-      ) student_counts ON c.id = student_counts.classe_id
-    ''',
-      [currentYearId],
-    );
-
-    // Previous year class data
-    Map<String, dynamic>? previousClasses;
-    if (previousYearId != null) {
-      final prevResult = await db.rawQuery(
-        '''
-        SELECT 
-          COUNT(DISTINCT c.id) as total_classes,
-          AVG(student_counts.count) as avg_class_size
-        FROM classe c
-        LEFT JOIN (
-          SELECT classe_id, COUNT(*) as count
-          FROM eleve
-          WHERE annee_scolaire_id = ?
-          GROUP BY classe_id
-        ) student_counts ON c.id = student_counts.classe_id
-      ''',
-        [previousYearId],
-      );
-      previousClasses = prevResult.first;
-    }
-
-    // Distribution by cycle (current year)
-    final cycleDistribution = await db.rawQuery(
-      '''
-      SELECT 
-        cy.nom as cycle,
-        COUNT(DISTINCT c.id) as class_count,
-        COUNT(e.id) as student_count
-      FROM classe c
-      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      LEFT JOIN eleve e ON c.id = e.classe_id AND e.annee_scolaire_id = ?
-      GROUP BY cy.nom
-    ''',
-      [currentYearId],
-    );
-
-    // Distribution by level (current year)
-    final levelDistribution = await db.rawQuery(
-      '''
-      SELECT 
-        n.nom as niveau,
-        COUNT(DISTINCT c.id) as class_count,
-        COUNT(e.id) as student_count
-      FROM classe c
-      JOIN niveaux n ON c.niveau_id = n.id
-      LEFT JOIN eleve e ON c.id = e.classe_id AND e.annee_scolaire_id = ?
-      GROUP BY n.nom
-      ORDER BY n.ordre
-    ''',
-      [currentYearId],
-    );
-
-    return {
-      'current': currentClasses.first,
-      'previous': previousClasses,
-      'cycleDistribution': cycleDistribution,
-      'levelDistribution': levelDistribution,
-    };
-  }
+  ) => classeDao.getClassAnalytics(currentYearId, previousYearId);
 
   /// Get teacher analytics comparing two years
   Future<Map<String, dynamic>> getTeacherAnalytics(
     int currentYearId,
     int? previousYearId,
-  ) async {
-    final db = await database;
-
-    // Total teachers (not year-specific in current schema)
-    final teacherCount = await db.rawQuery(
-      'SELECT COUNT(*) as total FROM enseignant',
-    );
-
-    // Get student count for ratio calculation
-    final currentStudentCount = await db.rawQuery(
-      '''
-      SELECT COUNT(*) as total FROM eleve WHERE annee_scolaire_id = ?
-    ''',
-      [currentYearId],
-    );
-
-    int? previousStudentCount;
-    if (previousYearId != null) {
-      final prevResult = await db.rawQuery(
-        '''
-        SELECT COUNT(*) as total FROM eleve WHERE annee_scolaire_id = ?
-      ''',
-        [previousYearId],
-      );
-      previousStudentCount = prevResult.first['total'] as int?;
-    }
-
-    // Teachers by speciality
-    final specialityDistribution = await db.rawQuery('''
-      SELECT specialite, COUNT(*) as count
-      FROM enseignant
-      WHERE specialite IS NOT NULL AND specialite != ''
-      GROUP BY specialite
-      ORDER BY count DESC
-    ''');
-
-    final totalTeachers = teacherCount.first['total'] as int;
-    final currentStudents = currentStudentCount.first['total'] as int;
-
-    return {
-      'totalTeachers': totalTeachers,
-      'current': {
-        'studentTeacherRatio': totalTeachers > 0
-            ? currentStudents / totalTeachers
-            : 0,
-        'students': currentStudents,
-      },
-      'previous': previousStudentCount != null
-          ? {
-              'studentTeacherRatio': totalTeachers > 0
-                  ? previousStudentCount / totalTeachers
-                  : 0,
-              'students': previousStudentCount,
-            }
-          : null,
-      'specialityDistribution': specialityDistribution,
-    };
-  }
-
-  // --- NEW FINANCIAL ANALYTICS ---
-
-  // (Removed duplicates replaced by proxy methods at the top of the class)
+  ) => enseignantDao.getTeacherAnalytics(
+    currentYearId,
+    previousYearId: previousYearId,
+  );
 
   Future<Map<String, double>> getStudentFinancialStatus(
     int eleveId,
     int anneeId,
-  ) async {
-    final db = await database;
-
-    // 1. Get total paid by student for the year
-    final paidResult = await db.rawQuery(
-      '''
-      SELECT SUM(montant) as total_paid
-      FROM paiement_detail
-      WHERE eleve_id = ? AND annee_scolaire_id = ?
-    ''',
-      [eleveId, anneeId],
-    );
-
-    final totalPaid =
-        (paidResult.first['total_paid'] as num?)?.toDouble() ?? 0.0;
-
-    // 2. Get student's class ID and status
-    final studentResult = await db.query(
-      'eleve',
-      columns: ['classe_id', 'statut'],
-      where: 'id = ?',
-      whereArgs: [eleveId],
-      limit: 1,
-    );
-
-    if (studentResult.isEmpty) {
-      return {'totalPaid': totalPaid, 'totalExpected': 0.0, 'balance': 0.0};
-    }
-
-    final classeId = studentResult.first['classe_id'] as int;
-    final statut = studentResult.first['statut'] as String?;
-
-    // 3. Get total expected fees for the class from frais_scolarite
-    final feesResult = await db.query(
-      'frais_scolarite',
-      where: 'classe_id = ? AND annee_scolaire_id = ?',
-      whereArgs: [classeId, anneeId],
-      limit: 1,
-    );
-
-    double totalExpected = 0.0;
-    if (feesResult.isNotEmpty) {
-      final fees = feesResult.first;
-      final double inscription =
-          (fees['inscription'] as num?)?.toDouble() ?? 0.0;
-      final double reinscription =
-          (fees['reinscription'] as num?)?.toDouble() ?? 0.0;
-      final double t1 = (fees['tranche1'] as num?)?.toDouble() ?? 0.0;
-      final double t2 = (fees['tranche2'] as num?)?.toDouble() ?? 0.0;
-      final double t3 = (fees['tranche3'] as num?)?.toDouble() ?? 0.0;
-
-      // Determine registration fee based on status (inscrit = Nouveau, else = Ancien)
-      double registrationFee = (statut == 'inscrit')
-          ? inscription
-          : reinscription;
-
-      totalExpected = registrationFee + t1 + t2 + t3;
-    }
-
-    return {
-      'totalPaid': totalPaid,
-      'totalExpected': totalExpected,
-
-      'balance': totalExpected - totalPaid,
-    };
-  }
+  ) => feesDao.getStudentFinancialStatus(eleveId, anneeId);
 
   Future<List<Map<String, dynamic>>> getPaymentHistory(
     int eleveId,
     int anneeId,
-  ) async {
-    final db = await database;
-    return await db.query(
-      'paiement_detail',
-      columns: [
-        'date_paiement',
-        'type_frais as motif',
-        'montant',
-        'mode_paiement',
-      ],
-      where: 'eleve_id = ? AND annee_scolaire_id = ?',
-      whereArgs: [eleveId, anneeId],
-      orderBy: 'date_paiement DESC',
-    );
-  }
+  ) => feesDao.getPaiementsByEleve(eleveId, anneeId);
 
   Future<Map<String, dynamic>> getDashboardStats(int anneeId) =>
       dashboardDao.getDashboardData(anneeId);
 
-  Future<List<Map<String, dynamic>>> getAllClasses() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT c.*, cy.nom as cycle_nom 
-      FROM classe c 
-      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id 
-      ORDER BY c.nom ASC
-    ''');
-  }
+  Future<List<Map<String, dynamic>>> getAllClasses() =>
+      classeDao.getClassesByAnnee();
 
-  Future<List<Map<String, dynamic>>> getCycles() async {
-    final db = await database;
-    return await db.query('cycles_scolaires', orderBy: 'ordre ASC');
-  }
+  Future<List<Map<String, dynamic>>> getCycles() =>
+      configDao.getCyclesScolaires();
 
   Future<List<Map<String, dynamic>>> getStudentPaymentControlData(
     int anneeId,
-  ) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT 
-        e.id, e.nom, e.prenom, e.matricule, e.statut as eleve_statut, e.photo,
-        c.nom as classe_nom, c.id as classe_id,
-        cy.nom as cycle_nom,
-        fs.inscription, fs.reinscription, fs.tranche1, fs.tranche2, fs.tranche3, fs.montant_total,
-        COALESCE(p.montant_paye, 0) as total_paye
-      FROM eleve e
-      JOIN classe c ON e.classe_id = c.id
-      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      LEFT JOIN frais_scolarite fs ON e.classe_id = fs.classe_id AND e.annee_scolaire_id = fs.annee_scolaire_id
-      LEFT JOIN paiement p ON p.eleve_id = e.id AND p.annee_scolaire_id = e.annee_scolaire_id
-      WHERE e.annee_scolaire_id = ?
-      ORDER BY c.nom ASC, e.nom ASC
-    ''',
-      [anneeId],
-    );
-  }
+  ) => eleveDao.getStudentPaymentControlData(anneeId);
 
-  Future<List<Map<String, dynamic>>> getOverdueStudents(int anneeId) async {
-    final db = await database;
-    final now = DateTime.now();
-    final DateFormat formatter = DateFormat('dd/MM/yyyy');
-
-    // 1. Get all students with their class and fee info
-    final data = await db.rawQuery(
-      '''
-      SELECT 
-        e.id, e.nom, e.prenom, e.matricule, e.photo,
-        c.nom as classe_nom,
-        fs.date_limite_t1, fs.tranche1,
-        fs.date_limite_t2, fs.tranche2,
-        fs.date_limite_t3, fs.tranche3,
-        COALESCE(p.montant_paye, 0) as total_paye,
-        COALESCE(fs.inscription, 0) as inscription,
-        COALESCE(fs.reinscription, 0) as reinscription,
-        e.statut as eleve_statut
-      FROM eleve e
-      JOIN classe c ON e.classe_id = c.id
-      JOIN frais_scolarite fs ON e.classe_id = fs.classe_id AND e.annee_scolaire_id = fs.annee_scolaire_id
-      LEFT JOIN paiement p ON p.eleve_id = e.id AND p.annee_scolaire_id = e.annee_scolaire_id
-      WHERE e.annee_scolaire_id = ?
-    ''',
-      [anneeId],
-    );
-
-    List<Map<String, dynamic>> overdue = [];
-
-    for (var row in data) {
-      double totalPaye = (row['total_paye'] as num).toDouble();
-      double initialFee = (row['eleve_statut'] == 'inscrit'
-          ? (row['inscription'] as num).toDouble()
-          : (row['reinscription'] as num).toDouble());
-
-      double remainingAfterInitial = totalPaye - initialFee;
-
-      // Check Tranche 1
-      if (row['date_limite_t1'] != null && (row['tranche1'] as num) > 0) {
-        try {
-          DateTime deadline = formatter.parse(row['date_limite_t1'] as String);
-          if (now.isAfter(deadline)) {
-            double tranche1 = (row['tranche1'] as num).toDouble();
-            if (remainingAfterInitial < tranche1) {
-              overdue.add({
-                ...row,
-                'overdue_tranche': 'Tranche 1',
-                'amount_due':
-                    tranche1 -
-                    (remainingAfterInitial > 0 ? remainingAfterInitial : 0),
-                'deadline': row['date_limite_t1'],
-              });
-              continue; // Only report the first overdue tranche
-            }
-            remainingAfterInitial -= tranche1;
-          } else {
-            remainingAfterInitial -= (row['tranche1'] as num).toDouble();
-          }
-        } catch (e) {
-          debugPrint('Error parsing T1 deadline: ${row['date_limite_t1']}');
-        }
-      }
-
-      // Check Tranche 2
-      if (row['date_limite_t2'] != null && (row['tranche2'] as num) > 0) {
-        try {
-          DateTime deadline = formatter.parse(row['date_limite_t2'] as String);
-          if (now.isAfter(deadline)) {
-            double tranche2 = (row['tranche2'] as num).toDouble();
-            if (remainingAfterInitial < tranche2) {
-              overdue.add({
-                ...row,
-                'overdue_tranche': 'Tranche 2',
-                'amount_due':
-                    tranche2 -
-                    (remainingAfterInitial > 0 ? remainingAfterInitial : 0),
-                'deadline': row['date_limite_t2'],
-              });
-              continue;
-            }
-            remainingAfterInitial -= tranche2;
-          } else {
-            remainingAfterInitial -= (row['tranche2'] as num).toDouble();
-          }
-        } catch (e) {
-          debugPrint('Error parsing T2 deadline: ${row['date_limite_t2']}');
-        }
-      }
-
-      // Check Tranche 3
-      if (row['date_limite_t3'] != null && (row['tranche3'] as num) > 0) {
-        try {
-          DateTime deadline = formatter.parse(row['date_limite_t3'] as String);
-          if (now.isAfter(deadline)) {
-            double tranche3 = (row['tranche3'] as num).toDouble();
-            if (remainingAfterInitial < tranche3) {
-              overdue.add({
-                ...row,
-                'overdue_tranche': 'Tranche 3',
-                'amount_due':
-                    tranche3 -
-                    (remainingAfterInitial > 0 ? remainingAfterInitial : 0),
-                'deadline': row['date_limite_t3'],
-              });
-            }
-          }
-        } catch (e) {
-          debugPrint('Error parsing T3 deadline: ${row['date_limite_t3']}');
-        }
-      }
-    }
-
-    return overdue;
-  }
+  Future<List<Map<String, dynamic>>> getOverdueStudents(int anneeId) =>
+      feesDao.getOverdueStudents(anneeId);
 
   Future<List<Map<String, dynamic>>> getAttributionsByClass(
     int classeId, [
-    int? anneeId, // Optional for backward compatibility
-  ]) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT ae.*, e.nom, e.prenom, m.nom as matiere_nom
-      FROM attribution_enseignant ae
-      JOIN enseignant e ON ae.enseignant_id = e.id
-      JOIN matiere m ON ae.matiere_id = m.id
-      WHERE ae.classe_id = ?
-    ''',
-      [classeId],
-    );
-  }
+    int? anneeId,
+  ]) => enseignantDao.getAttributionsByClass(classeId, anneeId);
 
   Future<void> saveAllAttributions(
     int classeId,
     int? anneeId,
     Map<int, int?> assignments,
-  ) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      // Nettoyage des anciennes attributions pour cette classe (globalement)
-      await txn.delete(
-        'attribution_enseignant',
-        where: 'classe_id = ?',
-        whereArgs: [classeId],
-      );
+  ) => enseignantDao.saveAllAttributions(classeId, anneeId, assignments);
 
-      for (var entry in assignments.entries) {
-        if (entry.value != null) {
-          await txn.insert('attribution_enseignant', {
-            'classe_id': classeId,
-            'matiere_id': entry.key,
-            'enseignant_id': entry.value,
-          }, conflictAlgorithm: ConflictAlgorithm.replace);
-        }
-      }
-    });
-  }
-
-  Future<void> saveAttribution(Map<String, dynamic> attribution) async {
-    final db = await database;
-    // Sauvegarder l'affectation enseignant seulement pour cette classe spécifique
-    await db.insert(
-      'attribution_enseignant',
-      attribution,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
+  Future<void> saveAttribution(Map<String, dynamic> attribution) =>
+      enseignantDao.saveAttribution(attribution);
 
   Future<Map<String, dynamic>?> getAssignedTeacher(
     int classeId,
     int matiereId, [
     int? anneeId,
-  ]) async {
-    final db = await database;
-    final results = await db.rawQuery(
-      '''
-      SELECT e.*
-      FROM attribution_enseignant ae
-      JOIN enseignant e ON ae.enseignant_id = e.id
-      WHERE ae.classe_id = ? AND ae.matiere_id = ?
-    ''',
-      [classeId, matiereId],
-    );
-
-    if (results.isNotEmpty) return results.first;
-    return null;
-  }
+  ]) => enseignantDao.getAssignedTeacher(classeId, matiereId, anneeId ?? 0);
 
   Future<List<Map<String, dynamic>>> rawQuery(
     String sql, [
     List<Object?>? arguments,
-  ]) async {
-    final db = await database;
-    return await db.rawQuery(sql, arguments);
-  }
+  ]) => commonDao.rawQuery(sql, arguments);
 
   Future<List<Map<String, dynamic>>> getSubjectsByClass(
     int classeId, [
     int? anneeId,
-  ]) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT m.*, cm.coefficient
-      FROM matiere m
-      JOIN classe_matiere cm ON m.id = cm.matiere_id
-      WHERE cm.classe_id = ?
-      ORDER BY m.nom ASC
-    ''',
-      [classeId],
-    );
-  }
+  ]) => matiereDao.getSubjectsByClass(classeId, anneeId);
 
   Future<void> saveClassSubjects(
     int classeId,
@@ -3681,483 +609,117 @@ class DatabaseHelper {
     List<Map<String, dynamic>> subjectsData,
   ) => classeDao.saveClassSubjects(classeId, anneeId, subjectsData);
 
-  Future<bool> isSubjectInClass(
-    int classeId,
-    int matiereId, [
-    int? anneeId,
-  ]) async {
-    final db = await database;
-    final result = await db.query(
-      'classe_matiere',
-      where: 'classe_id = ? AND matiere_id = ?',
-      whereArgs: [classeId, matiereId],
-    );
-    return result.isNotEmpty;
-  }
+  Future<bool> isSubjectInClass(int classeId, int matiereId, [int? anneeId]) =>
+      matiereDao.isSubjectInClass(classeId, matiereId, anneeId);
 
   // --- STUDENT DETAILS & HISTORY ---
 
-  Future<Map<String, dynamic>?> getStudentById(int id) async {
-    final db = await database;
-    final result = await db.rawQuery(
-      '''
-      SELECT e.*, c.nom as classe_nom, a.libelle as annee_nom
-      FROM eleve e
-      LEFT JOIN classe c ON e.classe_id = c.id
-      LEFT JOIN annee_scolaire a ON e.annee_scolaire_id = a.id
-      WHERE e.id = ?
-    ''',
-      [id],
-    );
-    return result.isNotEmpty ? result.first : null;
-  }
+  Future<Map<String, dynamic>?> getStudentById(int id) =>
+      eleveDao.getEleveById(id);
 
-  Future<List<Map<String, dynamic>>> getStudentParcours(int id) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT p.*, c.nom as classe_nom, a.libelle as annee_nom
-      FROM eleve_parcours p
-      JOIN classe c ON p.classe_id = c.id
-      JOIN annee_scolaire a ON p.annee_scolaire_id = a.id
-      WHERE p.eleve_id = ?
-      ORDER BY a.date_debut DESC
-    ''',
-      [id],
-    );
-  }
+  Future<List<Map<String, dynamic>>> getStudentParcours(int id) =>
+      eleveDao.getEleveParcours(id);
 
-  Future<List<Map<String, dynamic>>> getStudentPayments(int id) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT p.*, c.nom as classe_nom, a.libelle as annee_nom
-      FROM paiement p
-      JOIN classe c ON p.classe_id = c.id
-      JOIN annee_scolaire a ON p.annee_scolaire_id = a.id
-      WHERE p.eleve_id = ?
-      ORDER BY a.date_debut DESC
-    ''',
-      [id],
-    );
-  }
+  Future<List<Map<String, dynamic>>> getStudentPayments(int id) =>
+      paiementDao.getPaymentsByStudent(id);
 
   Future<List<Map<String, dynamic>>> getStudentPaymentDetails(
     int id, {
     int? anneeId,
-  }) async {
-    final db = await database;
-    String query = '''
-      SELECT pd.*, c.nom as classe_nom, a.libelle as annee_nom
-      FROM paiement_detail pd
-      LEFT JOIN classe c ON pd.classe_id = c.id
-      LEFT JOIN annee_scolaire a ON pd.annee_scolaire_id = a.id
-      WHERE pd.eleve_id = ?
-    ''';
-    List<dynamic> args = [id];
+  }) => paiementDao.getPaymentDetails(id, anneeId: anneeId);
 
-    if (anneeId != null) {
-      query += ' AND pd.annee_scolaire_id = ?';
-      args.add(anneeId);
-    }
-
-    query += ' ORDER BY pd.date_paiement DESC';
-
-    return await db.rawQuery(query, args);
-  }
-
-  Future<List<Map<String, dynamic>>> getStudentResults(int id) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT n.*, m.nom as matiere_nom, a.libelle as annee_nom,
-             ens.nom as enseignant_nom, ens.prenom as enseignant_prenom
-      FROM notes n
-      JOIN matiere m ON n.matiere_id = m.id
-      JOIN annee_scolaire a ON n.annee_scolaire_id = a.id
-      LEFT JOIN attribution_enseignant ae ON ae.classe_id = (SELECT classe_id FROM eleve WHERE id = n.eleve_id) 
-           AND ae.matiere_id = n.matiere_id AND ae.annee_scolaire_id = n.annee_scolaire_id
-      LEFT JOIN enseignant ens ON ae.enseignant_id = ens.id
-      WHERE n.eleve_id = ?
-      ORDER BY a.date_debut DESC, n.trimestre ASC, n.sequence ASC
-    ''',
-      [id],
-    );
-  }
+  Future<List<Map<String, dynamic>>> getStudentResults(int id) =>
+      notesDao.getStudentResults(id);
 
   // --- FRAIS SCOLAIRES MANAGEMENT ---
 
-  /// Créer des frais pour plusieurs classes avec les mêmes montants
   Future<void> createFraisForMultipleClasses(
     List<int> classeIds,
     int anneeScolaireId,
     Map<String, dynamic> fraisData,
-  ) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      for (int classeId in classeIds) {
-        final fraisMap = {
-          'classe_id': classeId,
-          'annee_scolaire_id': anneeScolaireId,
-          ...fraisData,
-          'created_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
-        };
-
-        // Vérifier si des frais existent déjà pour cette classe
-        final existing = await txn.query(
-          'frais_scolarite',
-          where: 'classe_id = ? AND annee_scolaire_id = ?',
-          whereArgs: [classeId, anneeScolaireId],
-        );
-
-        if (existing.isNotEmpty) {
-          // Mettre à jour les frais existants
-          await txn.update(
-            'frais_scolarite',
-            fraisMap,
-            where: 'id = ?',
-            whereArgs: [existing.first['id']],
-          );
-        } else {
-          // Créer de nouveaux frais
-          await txn.insert('frais_scolarite', fraisMap);
-        }
-      }
-    });
-  }
+  ) => feesDao.createFraisForMultipleClasses(
+    classeIds,
+    anneeScolaireId,
+    fraisData,
+  );
 
   /// Obtenir toutes les classes avec leurs frais pour une année scolaire
-  Future<List<Map<String, dynamic>>> getClassesWithFrais(
-    int anneeScolaireId,
-  ) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT c.*, fs.id as frais_id, fs.inscription, fs.reinscription, 
-             fs.tranche1, fs.date_limite_t1, fs.tranche2, fs.date_limite_t2,
-             fs.tranche3, fs.date_limite_t3, fs.montant_total,
-             (SELECT COUNT(*) FROM eleve WHERE classe_id = c.id AND annee_scolaire_id = ?) as nb_eleves
-      FROM classe c
-      LEFT JOIN frais_scolarite fs ON c.id = fs.classe_id AND fs.annee_scolaire_id = ?
-      ORDER BY c.nom ASC
-    ''',
-      [anneeScolaireId, anneeScolaireId],
-    );
-  }
+  Future<List<Map<String, dynamic>>> getClassesWithFrais(int anneeScolaireId) =>
+      feesDao.getClassesWithFrais(anneeScolaireId);
 
-  /// Obtenir les classes qui ont les mêmes frais (montants identiques)
   Future<List<Map<String, dynamic>>> getClassesWithSameFees(
     int anneeScolaireId,
     Map<String, dynamic> fraisReference,
-  ) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT c.*, fs.*
-      FROM classe c
-      JOIN frais_scolarite fs ON c.id = fs.classe_id
-      WHERE fs.annee_scolaire_id = ? 
-        AND fs.inscription = ? 
-        AND fs.reinscription = ?
-        AND fs.tranche1 = ?
-        AND fs.tranche2 = ?
-        AND fs.tranche3 = ?
-      ORDER BY c.nom ASC
-    ''',
-      [
-        anneeScolaireId,
-        fraisReference['inscription'] ?? 0.0,
-        fraisReference['reinscription'] ?? 0.0,
-        fraisReference['tranche1'] ?? 0.0,
-        fraisReference['tranche2'] ?? 0.0,
-        fraisReference['tranche3'] ?? 0.0,
-      ],
-    );
-  }
+  ) => feesDao.getClassesWithSameFees(anneeScolaireId, fraisReference);
 
-  /// Dupliquer les frais d'une classe vers d'autres classes
   Future<void> duplicateFraisToClasses(
     int sourceClasseId,
     List<int> targetClasseIds,
     int anneeScolaireId,
-  ) async {
-    // Obtenir les frais de la classe source
-    final sourceFrais = await getFraisByClasse(sourceClasseId, anneeScolaireId);
-    if (sourceFrais == null) {
-      throw Exception('Aucun frais trouvé pour la classe source');
-    }
+  ) => feesDao.duplicateFraisToClasses(
+    sourceClasseId,
+    targetClasseIds,
+    anneeScolaireId,
+  );
 
-    // Copier vers les classes cibles
-    final fraisData = {
-      'inscription': sourceFrais['inscription'],
-      'reinscription': sourceFrais['reinscription'],
-      'tranche1': sourceFrais['tranche1'],
-      'date_limite_t1': sourceFrais['date_limite_t1'],
-      'tranche2': sourceFrais['tranche2'],
-      'date_limite_t2': sourceFrais['date_limite_t2'],
-      'tranche3': sourceFrais['tranche3'],
-      'date_limite_t3': sourceFrais['date_limite_t3'],
-      'montant_total': sourceFrais['montant_total'],
-    };
-
-    await createFraisForMultipleClasses(
-      targetClasseIds,
-      anneeScolaireId,
-      fraisData,
-    );
-  }
-
-  /// Obtenir les statistiques des frais par année scolaire
-  Future<Map<String, dynamic>> getFraisStatistics(int anneeScolaireId) async {
-    final db = await database;
-
-    final stats = await db.rawQuery(
-      '''
-      SELECT 
-        COUNT(DISTINCT fs.classe_id) as classes_with_fees,
-        COUNT(DISTINCT c.id) as total_classes,
-        AVG(fs.montant_total) as average_fees,
-        MIN(fs.montant_total) as min_fees,
-        MAX(fs.montant_total) as max_fees,
-        SUM(fs.montant_total * (
-          SELECT COUNT(*) FROM eleve 
-          WHERE classe_id = fs.classe_id AND annee_scolaire_id = ?
-        )) as total_expected_revenue
-      FROM classe c
-      LEFT JOIN frais_scolarite fs ON c.id = fs.classe_id AND fs.annee_scolaire_id = ?
-    ''',
-      [anneeScolaireId, anneeScolaireId],
-    );
-
-    return stats.first;
-  }
+  Future<Map<String, dynamic>> getFraisStatistics(int anneeScolaireId) =>
+      feesDao.getFraisStatistics(anneeScolaireId);
 
   Future<List<Map<String, dynamic>>> getClassesByTeacher(
     int enseignantId, [
     int? anneeId,
-  ]) async {
-    final db = await database;
-    return await db.rawQuery(
-      '''
-      SELECT DISTINCT c.nom, cy.nom as cycle, n.nom as niveau
-      FROM classe c
-      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      LEFT JOIN niveaux n ON c.niveau_id = n.id
-      JOIN attribution_enseignant ae ON c.id = ae.classe_id
-      WHERE ae.enseignant_id = ?
-      ORDER BY c.nom ASC
-    ''',
-      [enseignantId],
-    );
-  }
+  ]) => enseignantDao.getClassesByTeacher(enseignantId, anneeId);
 
-  /// Supprimer les frais pour plusieurs classes
   Future<void> deleteFraisForClasses(
     List<int> classeIds,
     int anneeScolaireId,
-  ) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      for (int classeId in classeIds) {
-        await txn.delete(
-          'frais_scolarite',
-          where: 'classe_id = ? AND annee_scolaire_id = ?',
-          whereArgs: [classeId, anneeScolaireId],
-        );
-      }
-    });
-  }
+  ) => feesDao.deleteFraisForClasses(classeIds, anneeScolaireId);
+
   // ==============================================================================
   // GESTION DES UTILISATEURS
   // ==============================================================================
 
-  Future<Map<String, dynamic>?> getUser(int id) async {
-    final db = await database;
-    final results = await db.query(
-      'user',
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
-    );
-    if (results.isNotEmpty) return results.first;
-    return null;
-  }
+  Future<Map<String, dynamic>?> getUser(int id) => userDao.getUser(id);
 
-  Future<List<Map<String, dynamic>>> getUsers() async {
-    final db = await database;
-    return await db.query('user', orderBy: 'pseudo ASC');
-  }
+  Future<List<Map<String, dynamic>>> getUsers() => userDao.getUsers();
 
-  Future<int> addUser(Map<String, dynamic> user) async {
-    final db = await database;
-    return await db.insert('user', user);
-  }
+  Future<int> addUser(Map<String, dynamic> user) => userDao.addUser(user);
 
-  Future<int> updateUser(Map<String, dynamic> user) async {
-    final db = await database;
-    return await db.update(
-      'user',
-      user,
-      where: 'id = ?',
-      whereArgs: [user['id']],
-    );
-  }
+  Future<int> updateUser(Map<String, dynamic> user) => userDao.updateUser(user);
 
   Future<Map<String, dynamic>> getEcoleInfo() async {
-    final db = await database;
-    try {
-      final result = await db.query('ecole', limit: 1);
-      if (result.isNotEmpty) {
-        return result.first;
-      }
-    } catch (e) {
-      debugPrint('Error fetching school info: $e');
-    }
-    return {
-      'nom': 'Guiner Schools',
-      'adresse': 'Conakry, Guinée',
-      'telephone': '+224 600 00 00 00',
-      'email': 'contact@guinerschools.com',
-      'logo': null,
-    };
+    final ecole = await ecoleDao.getSchoolProfile();
+    return ecole ??
+        {
+          'nom': 'Guiner Schools',
+          'adresse': 'Conakry, Guinée',
+          'telephone': '+224 600 00 00 00',
+          'email': 'contact@guinerschools.com',
+          'logo': null,
+        };
   }
 
-  Future<int> changePassword(int id, String newPassword) async {
-    final db = await database;
-    return await db.update(
-      'user',
-      {'password': newPassword},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
+  Future<int> changePassword(int id, String newPassword) =>
+      userDao.changePassword(id, newPassword);
 
-  Future<int> deleteUser(int id) async {
-    final db = await database;
-    return await db.delete('user', where: 'id = ?', whereArgs: [id]);
-  }
+  Future<int> deleteUser(int id) => userDao.deleteUser(id);
+
   // ==============================================================================
   // GESTION DES SEQUENCES ET TRIMESTRES (DYNAMIC)
   // ==============================================================================
 
   /// Get configured sequences for a specific academic year
-  Future<List<Map<String, dynamic>>> getSequences(int anneeId) async {
-    final db = await database;
-    try {
-      // First try to get explicit sequence definitions from sequence_planification
-      // We fetch all sequences for the year, regardless of status, to allow full visibility in grades management
-      final sequences = await db.query(
-        'sequence_planification',
-        where: 'annee_scolaire_id = ?',
-        whereArgs: [anneeId],
-        orderBy: 'trimestre ASC, numero_sequence ASC',
-      );
-
-      if (sequences.isNotEmpty) {
-        return sequences;
-      }
-
-      // Fallback: Check configuration_evaluation
-      final config = await db.query(
-        'configuration_evaluation',
-        where: 'annee_scolaire_id = ?',
-        whereArgs: [anneeId],
-        limit: 1,
-      );
-
-      if (config.isNotEmpty) {
-        final conf = config.first;
-        final int nbSeq = (conf['nombre_sequences_trimestre'] as int?) ?? 2;
-        final int nbTrim = (conf['nombre_trimestres_annee'] as int?) ?? 3;
-
-        List<Map<String, dynamic>> generated = [];
-        for (int t = 1; t <= nbTrim; t++) {
-          for (int s = 1; s <= nbSeq; s++) {
-            generated.add({
-              'id': generated.length + 1, // Fake ID
-              'nom': 'Séquence $s',
-              'trimestre': t,
-              'numero_sequence': s,
-            });
-          }
-        }
-        return generated;
-      }
-    } catch (e) {
-      debugPrint('Error loading sequences: $e');
-    }
-
-    // Default fallback
-    return List.generate(6, (index) {
-      final t = (index ~/ 2) + 1;
-      final s = (index % 2) + 1;
-      return {
-        'id': index + 1,
-        'nom': 'Séquence $s',
-        'trimestre': t,
-        'numero_sequence':
-            index +
-            1, // Global sequence number or per trimester? Usually per trimester logic in UI
-      };
-    });
-  }
+  Future<List<Map<String, dynamic>>> getSequences(int anneeId) =>
+      configDao.getSequences(anneeId);
 
   /// Get configured sequences for a specific trimester and academic year
   Future<List<Map<String, dynamic>>> getSequencesForTrimester(
     int anneeId,
     int trimester,
-  ) async {
-    final db = await database;
-    try {
-      return await db.query(
-        'sequence_planification',
-        where: 'annee_scolaire_id = ? AND trimestre = ?',
-        whereArgs: [anneeId, trimester],
-        orderBy: 'numero_sequence ASC',
-      );
-    } catch (e) {
-      debugPrint('Error loading sequences for trimester: $e');
-      return [];
-    }
-  }
+  ) => configDao.getSequencesForTrimester(anneeId, trimester);
 
   /// Get configured trimesters for a specific academic year
 
-  Future<List<int>> getTrimesters(int anneeId) async {
-    final db = await database;
-    try {
-      // First try sequence_planification to get trimesters that actually have sequences planned
-      final sequences = await db.query(
-        'sequence_planification',
-        where: 'annee_scolaire_id = ?',
-        whereArgs: [anneeId],
-        columns: ['trimestre'],
-        distinct: true,
-        orderBy: 'trimestre ASC',
-      );
-
-      if (sequences.isNotEmpty) {
-        return sequences.map((s) => s['trimestre'] as int).toList();
-      }
-
-      // Fallback: Check configuration_evaluation
-      final config = await db.query(
-        'configuration_evaluation',
-        where: 'annee_scolaire_id = ?',
-        whereArgs: [anneeId],
-        limit: 1,
-      );
-
-      if (config.isNotEmpty) {
-        final int nbTrim =
-            (config.first['nombre_trimestres_annee'] as int?) ?? 3;
-        return List.generate(nbTrim, (i) => i + 1);
-      }
-    } catch (e) {
-      debugPrint('Error loading trimesters: $e');
-    }
-    // Default
-    return [1, 2, 3];
-  }
+  Future<List<int>> getTrimesters(int anneeId) =>
+      configDao.getTrimesters(anneeId);
 }

@@ -17,17 +17,18 @@ class NotesDao extends BaseDao {
       SELECT e.id as eleve_id, e.nom, e.prenom, e.matricule, e.photo, n.note, n.id as note_id,
              COALESCE(cm.coefficient, 1) as coefficient
       FROM eleve e
+      JOIN eleve_parcours ep ON e.id = ep.eleve_id AND ep.annee_scolaire_id = ?
       LEFT JOIN ${NotesSchema.tableName} n ON n.eleve_id = e.id 
           AND n.matiere_id = ? 
           AND n.trimestre = ? 
           AND n.sequence = ?
           AND n.annee_scolaire_id = ?
       LEFT JOIN classe_matiere cm ON cm.matiere_id = ? 
-          AND cm.classe_id = e.classe_id
-      WHERE e.classe_id = ?
+          AND cm.classe_id = ep.classe_id
+      WHERE ep.classe_id = ?
       ORDER BY e.nom ASC, e.prenom ASC
     ''',
-      [subjectId, trimestre, sequence, anneeId, subjectId, classId],
+      [anneeId, subjectId, trimestre, sequence, anneeId, subjectId, classId],
     );
   }
 
@@ -43,16 +44,17 @@ class NotesDao extends BaseDao {
              n.note, n.id as note_id, n.sequence,
              COALESCE(cm.coefficient, 1) as coefficient
       FROM eleve e
+      JOIN eleve_parcours ep ON e.id = ep.eleve_id AND ep.annee_scolaire_id = ?
       LEFT JOIN ${NotesSchema.tableName} n ON n.eleve_id = e.id 
           AND n.matiere_id = ? 
           AND n.trimestre = ? 
           AND n.annee_scolaire_id = ?
       LEFT JOIN classe_matiere cm ON cm.matiere_id = ? 
-          AND cm.classe_id = e.classe_id
-      WHERE e.classe_id = ?
+          AND cm.classe_id = ep.classe_id
+      WHERE ep.classe_id = ?
       ORDER BY e.nom ASC, e.prenom ASC, n.sequence ASC
     ''',
-      [subjectId, trimestre, anneeId, subjectId, classId],
+      [anneeId, subjectId, trimestre, anneeId, subjectId, classId],
     );
   }
 
@@ -210,9 +212,9 @@ class NotesDao extends BaseDao {
       '''
       SELECT n.note, cm.coefficient 
       FROM ${NotesSchema.tableName} n
-      JOIN eleve e ON n.eleve_id = e.id
+      JOIN eleve_parcours p ON n.eleve_id = p.eleve_id AND n.annee_scolaire_id = p.annee_scolaire_id
       JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id 
-        AND cm.classe_id = e.classe_id 
+        AND cm.classe_id = p.classe_id 
       WHERE n.eleve_id = ? AND n.annee_scolaire_id = ?
     ''',
       [eleveId, anneeId],
@@ -631,7 +633,7 @@ class NotesDao extends BaseDao {
       JOIN matiere m ON n.matiere_id = m.id
       JOIN annee_scolaire a ON n.annee_scolaire_id = a.id
       LEFT JOIN attribution_enseignant ae ON ae.classe_id = (SELECT classe_id FROM eleve WHERE id = n.eleve_id) 
-           AND ae.matiere_id = n.matiere_id
+           AND ae.matiere_id = n.matiere_id AND ae.annee_scolaire_id = n.annee_scolaire_id
       LEFT JOIN enseignant ens ON ae.enseignant_id = ens.id
       WHERE n.eleve_id = ?
       ORDER BY a.date_debut DESC, n.trimestre ASC, n.sequence ASC

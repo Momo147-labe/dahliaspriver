@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../models/matiere.dart';
 import '../../../theme/app_theme.dart';
+import '../../../providers/academic_year_provider.dart';
 import '../../../widgets/school/add_subject_modal.dart';
 
 class SubjectsPage extends StatefulWidget {
@@ -22,7 +24,20 @@ class _SubjectsPageState extends State<SubjectsPage>
   String _sortBy = 'nom';
   bool _isAscending = true;
   String _viewMode = 'grid'; // 'grid' or 'list'
+  int? _lastAnneeId;
   late AnimationController _animationController;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final academicProvider = Provider.of<AcademicYearProvider>(context);
+    final anneeId = academicProvider.selectedAnneeId;
+
+    if (anneeId != null && anneeId != _lastAnneeId) {
+      _lastAnneeId = anneeId;
+      Future.microtask(() => _loadData());
+    }
+  }
 
   @override
   void initState() {

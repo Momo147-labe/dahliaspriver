@@ -8,6 +8,8 @@ import '../../../core/utils/mention_helper.dart';
 import '../../../models/ecole.dart';
 import '../../grades/result_sheet_selection_modal.dart';
 import '../../../theme/app_theme.dart';
+import '../../../providers/academic_year_provider.dart';
+import 'package:provider/provider.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -48,12 +50,25 @@ class _ReportsPageState extends State<ReportsPage> {
   bool _isAnnualMode = false;
 
   String? _anneeLibelle;
+  int? _lastAnneeId;
   bool get _isAnnualSelected => _selectedTrimestre == _trimestres.length - 1;
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final academicProvider = Provider.of<AcademicYearProvider>(context);
+    final anneeId = academicProvider.selectedAnneeId;
+
+    if (anneeId != null && anneeId != _lastAnneeId) {
+      _lastAnneeId = anneeId;
+      Future.microtask(() => _loadInitialData());
+    }
   }
 
   void _showClassSearch() async {
@@ -104,7 +119,7 @@ class _ReportsPageState extends State<ReportsPage> {
       }
     }
 
-    final classesList = await _dbHelper.getClassesForReports();
+    final classesList = await _dbHelper.getClassesForReports(anneeId ?? 0);
 
     // Load dynamic periods for active year
     if (anneeId != null) {
@@ -152,11 +167,11 @@ class _ReportsPageState extends State<ReportsPage> {
   Future<void> _loadStudentsForClass(int classId) async {
     setState(() => _isLoading = true);
 
+    final anneeId = await _dbHelper.ensureActiveAnneeCached();
     // Load students
-    final students = await _dbHelper.getStudentsByClasse(classId);
+    final students = await _dbHelper.getStudentsByClasse(classId, anneeId ?? 0);
 
     // Load completion status for current term
-    final anneeId = await _dbHelper.ensureActiveAnneeCached();
     if (anneeId != null) {
       final statusList = await _dbHelper.getStudentsCompletionStatus(
         classId,
@@ -217,7 +232,7 @@ class _ReportsPageState extends State<ReportsPage> {
           _selectedStudent!['id'],
           _selectedClasse!['id'],
           anneeId,
-          _dbHelper.getStudentsByClasse,
+          (id) => _dbHelper.getStudentsByClasse(id, anneeId),
         );
         final rawNotes = await _dbHelper.getAnnualGradesForStudent(
           _selectedStudent!['id'],
@@ -1153,6 +1168,7 @@ class _ReportsPageState extends State<ReportsPage> {
       List<Map<String, dynamic>> studentsData = [];
       final students = await _dbHelper.getStudentsByClasse(
         _selectedClasse!['id'],
+        anneeId,
       );
 
       for (var student in students) {
@@ -1166,7 +1182,7 @@ class _ReportsPageState extends State<ReportsPage> {
             student['id'],
             _selectedClasse!['id'],
             anneeId,
-            _dbHelper.getStudentsByClasse,
+            (id) => _dbHelper.getStudentsByClasse(id, anneeId),
           );
           final normalizedGrades = _normalizeAnnualGrades(
             grades,

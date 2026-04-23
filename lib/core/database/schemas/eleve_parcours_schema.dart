@@ -11,6 +11,7 @@ class EleveParcoursSchema {
       decision TEXT, -- 'Admis', 'Redoublant', 'Sorti'
       moyenne REAL,
       rang INTEGER,
+      confirmation_statut TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (eleve_id) REFERENCES eleve(id),

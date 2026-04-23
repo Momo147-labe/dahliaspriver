@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../theme/app_theme.dart';
+import '../../../providers/academic_year_provider.dart';
+import 'package:provider/provider.dart';
 
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
@@ -19,11 +21,24 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   Map<String, dynamic> _teacherData = {};
   int? _currentYearId;
   int? _previousYearId;
+  int? _lastAnneeId;
 
   @override
   void initState() {
     super.initState();
     _loadAnalytics();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final academicProvider = Provider.of<AcademicYearProvider>(context);
+    final anneeId = academicProvider.selectedAnneeId;
+
+    if (anneeId != null && anneeId != _lastAnneeId) {
+      _lastAnneeId = anneeId;
+      Future.microtask(() => _loadAnalytics());
+    }
   }
 
   Future<void> _loadAnalytics() async {
