@@ -115,7 +115,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
                             color: isSelected
-                                ? AppTheme.primaryColor.withOpacity(0.1)
+                                ? AppTheme.primaryColor.withValues(alpha: 0.1)
                                 : Colors.transparent,
                             border: isSelected
                                 ? const Border(

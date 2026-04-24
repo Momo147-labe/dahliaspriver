@@ -55,7 +55,7 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -75,7 +75,9 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF13DAEC).withOpacity(0.1),
+                              color: const Color(
+                                0xFF13DAEC,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(
@@ -254,10 +256,14 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF13DAEC).withOpacity(0.05),
+                              color: const Color(
+                                0xFF13DAEC,
+                              ).withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: const Color(0xFF13DAEC).withOpacity(0.2),
+                                color: const Color(
+                                  0xFF13DAEC,
+                                ).withValues(alpha: 0.2),
                               ),
                             ),
                             child: Column(
@@ -311,7 +317,7 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                                       borderSide: BorderSide(
                                         color: const Color(
                                           0xFF13DAEC,
-                                        ).withOpacity(0.3),
+                                        ).withValues(alpha: 0.3),
                                       ),
                                     ),
                                     enabledBorder: OutlineInputBorder(
@@ -319,7 +325,7 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                                       borderSide: BorderSide(
                                         color: const Color(
                                           0xFF13DAEC,
-                                        ).withOpacity(0.3),
+                                        ).withValues(alpha: 0.3),
                                       ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
@@ -411,7 +417,7 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.2,
-                    color: const Color(0xFF13DAEC).withOpacity(0.8),
+                    color: const Color(0xFF13DAEC).withValues(alpha: 0.8),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -631,7 +637,7 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 elevation: 8,
-                shadowColor: const Color(0xFF13DAEC).withOpacity(0.2),
+                shadowColor: const Color(0xFF13DAEC).withValues(alpha: 0.2),
               ),
               child: _isLoading
                   ? const SizedBox(
@@ -668,7 +674,7 @@ class _CreateAdminPageState extends State<CreateAdminPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
               elevation: 8,
-              shadowColor: const Color(0xFF13DAEC).withOpacity(0.2),
+              shadowColor: const Color(0xFF13DAEC).withValues(alpha: 0.2),
             ),
             child: _isLoading
                 ? const SizedBox(

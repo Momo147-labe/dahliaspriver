@@ -29,7 +29,8 @@ class FraisModal extends StatefulWidget {
 class _FraisModalState extends State<FraisModal> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _inscriptionController = TextEditingController();
-  final TextEditingController _reinscriptionController = TextEditingController();
+  final TextEditingController _reinscriptionController =
+      TextEditingController();
   final TextEditingController _tranche1Controller = TextEditingController();
   final TextEditingController _tranche2Controller = TextEditingController();
   final TextEditingController _tranche3Controller = TextEditingController();
@@ -80,8 +81,10 @@ class _FraisModalState extends State<FraisModal> {
   }
 
   void _initializeControllers() {
-    _inscriptionController.text = (widget.frais['inscription'] ?? 0.0).toString();
-    _reinscriptionController.text = (widget.frais['reinscription'] ?? 0.0).toString();
+    _inscriptionController.text = (widget.frais['inscription'] ?? 0.0)
+        .toString();
+    _reinscriptionController.text = (widget.frais['reinscription'] ?? 0.0)
+        .toString();
     _tranche1Controller.text = (widget.frais['tranche1'] ?? 0.0).toString();
     _tranche2Controller.text = (widget.frais['tranche2'] ?? 0.0).toString();
     _tranche3Controller.text = (widget.frais['tranche3'] ?? 0.0).toString();
@@ -112,8 +115,10 @@ class _FraisModalState extends State<FraisModal> {
   }
 
   void _updateFraisData() {
-    widget.frais['inscription'] = double.tryParse(_inscriptionController.text) ?? 0.0;
-    widget.frais['reinscription'] = double.tryParse(_reinscriptionController.text) ?? 0.0;
+    widget.frais['inscription'] =
+        double.tryParse(_inscriptionController.text) ?? 0.0;
+    widget.frais['reinscription'] =
+        double.tryParse(_reinscriptionController.text) ?? 0.0;
     widget.frais['tranche1'] = double.tryParse(_tranche1Controller.text) ?? 0.0;
     widget.frais['tranche2'] = double.tryParse(_tranche2Controller.text) ?? 0.0;
     widget.frais['tranche3'] = double.tryParse(_tranche3Controller.text) ?? 0.0;
@@ -129,11 +134,17 @@ class _FraisModalState extends State<FraisModal> {
         'inscription': double.tryParse(_inscriptionController.text) ?? 0.0,
         'reinscription': double.tryParse(_reinscriptionController.text) ?? 0.0,
         'tranche1': double.tryParse(_tranche1Controller.text) ?? 0.0,
-        'date_limite_t1': _dateLimite1Controller.text.isEmpty ? null : _dateLimite1Controller.text,
+        'date_limite_t1': _dateLimite1Controller.text.isEmpty
+            ? null
+            : _dateLimite1Controller.text,
         'tranche2': double.tryParse(_tranche2Controller.text) ?? 0.0,
-        'date_limite_t2': _dateLimite2Controller.text.isEmpty ? null : _dateLimite2Controller.text,
+        'date_limite_t2': _dateLimite2Controller.text.isEmpty
+            ? null
+            : _dateLimite2Controller.text,
         'tranche3': double.tryParse(_tranche3Controller.text) ?? 0.0,
-        'date_limite_t3': _dateLimite3Controller.text.isEmpty ? null : _dateLimite3Controller.text,
+        'date_limite_t3': _dateLimite3Controller.text.isEmpty
+            ? null
+            : _dateLimite3Controller.text,
         'montant_total': _montantTotal,
       };
 
@@ -146,7 +157,9 @@ class _FraisModalState extends State<FraisModal> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Frais configurés pour ${_selectedClassIds.length} classe(s)'),
+            content: Text(
+              'Frais configurés pour ${_selectedClassIds.length} classe(s)',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -155,10 +168,7 @@ class _FraisModalState extends State<FraisModal> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -226,7 +236,7 @@ class _FraisModalState extends State<FraisModal> {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -244,13 +254,23 @@ class _FraisModalState extends State<FraisModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildSectionHeader('Context Global', Symbols.event_note, Colors.blue, isDark),
+                      _buildSectionHeader(
+                        'Context Global',
+                        Symbols.event_note,
+                        Colors.blue,
+                        isDark,
+                      ),
                       const SizedBox(height: 16),
                       widget.allowMultipleClasses
                           ? _buildMultiClassSelection(isDark)
                           : _buildSingleClassSelection(isDark),
                       const SizedBox(height: 32),
-                      _buildSectionHeader('Frais Inscription', Symbols.account_balance_wallet, Colors.orange, isDark),
+                      _buildSectionHeader(
+                        'Frais Inscription',
+                        Symbols.account_balance_wallet,
+                        Colors.orange,
+                        isDark,
+                      ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -276,13 +296,36 @@ class _FraisModalState extends State<FraisModal> {
                         ],
                       ),
                       const SizedBox(height: 32),
-                      _buildSectionHeader('Échéancier de Paiement', Symbols.schedule, Colors.purple, isDark),
+                      _buildSectionHeader(
+                        'Échéancier de Paiement',
+                        Symbols.schedule,
+                        Colors.purple,
+                        isDark,
+                      ),
                       const SizedBox(height: 16),
-                      _buildTrancheRow(1, _tranche1Controller, _dateLimite1Controller, Colors.blue, isDark),
+                      _buildTrancheRow(
+                        1,
+                        _tranche1Controller,
+                        _dateLimite1Controller,
+                        Colors.blue,
+                        isDark,
+                      ),
                       const SizedBox(height: 12),
-                      _buildTrancheRow(2, _tranche2Controller, _dateLimite2Controller, Colors.green, isDark),
+                      _buildTrancheRow(
+                        2,
+                        _tranche2Controller,
+                        _dateLimite2Controller,
+                        Colors.green,
+                        isDark,
+                      ),
                       const SizedBox(height: 12),
-                      _buildTrancheRow(3, _tranche3Controller, _dateLimite3Controller, Colors.purple, isDark),
+                      _buildTrancheRow(
+                        3,
+                        _tranche3Controller,
+                        _dateLimite3Controller,
+                        Colors.purple,
+                        isDark,
+                      ),
                       const SizedBox(height: 32),
                       _buildTotalSummary(isDark),
                     ],
@@ -313,7 +356,7 @@ class _FraisModalState extends State<FraisModal> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
@@ -328,9 +371,11 @@ class _FraisModalState extends State<FraisModal> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.allowMultipleClasses 
+                  widget.allowMultipleClasses
                       ? 'Configurer Frais Multi-Classes'
-                      : (widget.isEdit ? 'Modifier les frais' : 'Configurer les frais'),
+                      : (widget.isEdit
+                            ? 'Modifier les frais'
+                            : 'Configurer les frais'),
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -341,10 +386,10 @@ class _FraisModalState extends State<FraisModal> {
                   widget.allowMultipleClasses
                       ? 'Sélectionnez plusieurs classes avec les mêmes frais'
                       : (widget.isEdit
-                          ? 'Ajustez les montants pour la classe sélectionnée'
-                          : 'Définissez la structure tarifaire pour une classe'),
+                            ? 'Ajustez les montants pour la classe sélectionnée'
+                            : 'Définissez la structure tarifaire pour une classe'),
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 14,
                   ),
                 ),
@@ -355,7 +400,7 @@ class _FraisModalState extends State<FraisModal> {
             onPressed: widget.onClose,
             icon: const Icon(Icons.close_rounded, color: Colors.white),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.2),
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
             ),
           ),
         ],
@@ -371,7 +416,10 @@ class _FraisModalState extends State<FraisModal> {
             label: 'Classe',
             value: widget.frais['classe_id'] as int?,
             items: widget.classes
-                .map((c) => MapEntry(c['id'] as int, '${c['nom']} - ${c['niveau']}'))
+                .map(
+                  (c) =>
+                      MapEntry(c['id'] as int, '${c['nom']} - ${c['niveau']}'),
+                )
                 .toList(),
             onChanged: (val) => setState(() => widget.frais['classe_id'] = val),
             icon: Symbols.school,
@@ -382,7 +430,8 @@ class _FraisModalState extends State<FraisModal> {
         Expanded(
           child: _buildTextField(
             controller: TextEditingController(
-              text: _anneesScolaires
+              text:
+                  _anneesScolaires
                       .firstWhere(
                         (a) => a['id'] == widget.frais['annee_scolaire_id'],
                         orElse: () => {'libelle': 'N/A'},
@@ -406,7 +455,8 @@ class _FraisModalState extends State<FraisModal> {
       children: [
         _buildTextField(
           controller: TextEditingController(
-            text: _anneesScolaires
+            text:
+                _anneesScolaires
                     .firstWhere(
                       (a) => a['id'] == widget.frais['annee_scolaire_id'],
                       orElse: () => {'libelle': 'N/A'},
@@ -425,34 +475,45 @@ class _FraisModalState extends State<FraisModal> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white.withOpacity(0.9) : Colors.blueGrey.shade800,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.9)
+                : Colors.blueGrey.shade800,
           ),
         ),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.03)
+                : Colors.grey.shade50,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.blue.withOpacity(0.2)),
+            border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
           ),
           child: Column(
             children: [
               Row(
                 children: [
                   Checkbox(
-                    value: _selectedClassIds.length == widget.classes.length && widget.classes.isNotEmpty,
+                    value:
+                        _selectedClassIds.length == widget.classes.length &&
+                        widget.classes.isNotEmpty,
                     onChanged: (value) {
                       setState(() {
                         if (value == true) {
-                          _selectedClassIds = widget.classes.map((c) => c['id'] as int).toList();
+                          _selectedClassIds = widget.classes
+                              .map((c) => c['id'] as int)
+                              .toList();
                         } else {
                           _selectedClassIds.clear();
                         }
                       });
                     },
                   ),
-                  const Text('Sélectionner toutes les classes', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Sélectionner toutes les classes',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -472,16 +533,23 @@ class _FraisModalState extends State<FraisModal> {
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
-                        color: isSelected 
-                            ? AppTheme.primaryColor.withOpacity(0.1)
-                            : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+                        color: isSelected
+                            ? AppTheme.primaryColor.withValues(alpha: 0.1)
+                            : (isDark
+                                  ? Colors.white.withValues(alpha: 0.05)
+                                  : Colors.white),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isSelected 
+                          color: isSelected
                               ? AppTheme.primaryColor
-                              : (isDark ? Colors.white10 : Colors.grey.shade200),
+                              : (isDark
+                                    ? Colors.white10
+                                    : Colors.grey.shade200),
                           width: isSelected ? 2 : 1,
                         ),
                       ),
@@ -489,14 +557,20 @@ class _FraisModalState extends State<FraisModal> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (isSelected) ...[
-                            Icon(Icons.check_circle, color: AppTheme.primaryColor, size: 16),
+                            Icon(
+                              Icons.check_circle,
+                              color: AppTheme.primaryColor,
+                              size: 16,
+                            ),
                             const SizedBox(width: 6),
                           ],
                           Text(
                             '${classe['nom']} - ${classe['niveau'] ?? ''}',
                             style: TextStyle(
                               fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                               color: isSelected ? AppTheme.primaryColor : null,
                             ),
                           ),
@@ -511,7 +585,7 @@ class _FraisModalState extends State<FraisModal> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -531,7 +605,12 @@ class _FraisModalState extends State<FraisModal> {
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon, Color color, bool isDark) {
+  Widget _buildSectionHeader(
+    String title,
+    IconData icon,
+    Color color,
+    bool isDark,
+  ) {
     return Row(
       children: [
         Icon(icon, color: color, size: 20),
@@ -541,7 +620,9 @@ class _FraisModalState extends State<FraisModal> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white.withOpacity(0.9) : Colors.blueGrey.shade800,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.9)
+                : Colors.blueGrey.shade800,
           ),
         ),
       ],
@@ -581,12 +662,17 @@ class _FraisModalState extends State<FraisModal> {
               color: isDark ? Colors.white30 : Colors.grey.shade400,
             ),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+            fillColor: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.grey.shade50,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 16,
+            ),
           ),
         ),
       ],
@@ -616,14 +702,21 @@ class _FraisModalState extends State<FraisModal> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.grey.shade50,
             borderRadius: BorderRadius.circular(16),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<T>(
               value: value,
               isExpanded: true,
-              items: items.map((e) => DropdownMenuItem<T>(value: e.key, child: Text(e.value))).toList(),
+              items: items
+                  .map(
+                    (e) =>
+                        DropdownMenuItem<T>(value: e.key, child: Text(e.value)),
+                  )
+                  .toList(),
               onChanged: onChanged,
             ),
           ),
@@ -632,23 +725,34 @@ class _FraisModalState extends State<FraisModal> {
     );
   }
 
-  Widget _buildTrancheRow(int number, TextEditingController amountCtrl, TextEditingController dateCtrl, Color color, bool isDark) {
+  Widget _buildTrancheRow(
+    int number,
+    TextEditingController amountCtrl,
+    TextEditingController dateCtrl,
+    Color color,
+    bool isDark,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Text('$number', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+            child: Text(
+              '$number',
+              style: TextStyle(color: color, fontWeight: FontWeight.bold),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -667,23 +771,41 @@ class _FraisModalState extends State<FraisModal> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Date Limite', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                const Text(
+                  'Date Limite',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueGrey,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 InkWell(
                   onTap: () => _selectDate(number),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: isDark ? Colors.white10 : Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
+                      border: Border.all(
+                        color: isDark ? Colors.white10 : Colors.grey.shade200,
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Symbols.calendar_today, size: 18, color: Colors.blueGrey),
+                        const Icon(
+                          Symbols.calendar_today,
+                          size: 18,
+                          color: Colors.blueGrey,
+                        ),
                         const SizedBox(width: 12),
                         Text(
-                          dateCtrl.text.isEmpty ? 'Sélectionner une date' : dateCtrl.text,
+                          dateCtrl.text.isEmpty
+                              ? 'Sélectionner une date'
+                              : dateCtrl.text,
                           style: TextStyle(
                             color: dateCtrl.text.isEmpty
                                 ? Colors.grey
@@ -707,10 +829,13 @@ class _FraisModalState extends State<FraisModal> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppTheme.primaryColor.withOpacity(0.1), Colors.orange.withOpacity(0.1)],
+          colors: [
+            AppTheme.primaryColor.withValues(alpha: 0.1),
+            Colors.orange.withValues(alpha: 0.1),
+          ],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -720,11 +845,16 @@ class _FraisModalState extends State<FraisModal> {
             children: [
               const Text(
                 'MONTANT TOTAL CALCULÉ',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.blueGrey),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  color: Colors.blueGrey,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
-                widget.allowMultipleClasses 
+                widget.allowMultipleClasses
                     ? 'Pour ${_selectedClassIds.length} classe(s) sélectionnée(s)'
                     : 'Somme de tous les frais saisis',
                 style: const TextStyle(fontSize: 14, color: Colors.grey),
@@ -733,7 +863,11 @@ class _FraisModalState extends State<FraisModal> {
           ),
           Text(
             '${_montantTotal.toStringAsFixed(0)} FG',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AppTheme.primaryColor),
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: AppTheme.primaryColor,
+            ),
           ),
         ],
       ),
@@ -744,7 +878,9 @@ class _FraisModalState extends State<FraisModal> {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.02) : Colors.grey.shade50,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.02)
+            : Colors.grey.shade50,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
       child: Row(
@@ -754,7 +890,9 @@ class _FraisModalState extends State<FraisModal> {
             onPressed: widget.onClose,
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Annuler'),
           ),
@@ -763,19 +901,22 @@ class _FraisModalState extends State<FraisModal> {
             onPressed: _isLoading
                 ? null
                 : () async {
-                    if (widget.allowMultipleClasses && _selectedClassIds.isEmpty) {
+                    if (widget.allowMultipleClasses &&
+                        _selectedClassIds.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Veuillez sélectionner au moins une classe'),
+                          content: Text(
+                            'Veuillez sélectionner au moins une classe',
+                          ),
                           backgroundColor: Colors.red,
                         ),
                       );
                       return;
                     }
-                    
+
                     setState(() => _isLoading = true);
                     _updateFraisData();
-                    
+
                     if (widget.allowMultipleClasses) {
                       await _saveMultipleClassesFrais();
                     } else {
@@ -783,19 +924,28 @@ class _FraisModalState extends State<FraisModal> {
                     }
                   },
             style: ElevatedButton.styleFrom(
-              backgroundColor: widget.isEdit ? Colors.blue.shade600 : AppTheme.primaryColor,
+              backgroundColor: widget.isEdit
+                  ? Colors.blue.shade600
+                  : AppTheme.primaryColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               elevation: 4,
             ),
             child: _isLoading
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
-                : Text(widget.isEdit ? 'Mettre à jour' : 'Enregistrer les frais'),
+                : Text(
+                    widget.isEdit ? 'Mettre à jour' : 'Enregistrer les frais',
+                  ),
           ),
         ],
       ),

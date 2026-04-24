@@ -43,7 +43,9 @@ class StudentTable extends StatelessWidget {
               ),
               border: Border(
                 bottom: BorderSide(
-                  color: isDark ? const Color(0xFF4b5563) : const Color(0xFFe5e7eb),
+                  color: isDark
+                      ? const Color(0xFF4b5563)
+                      : const Color(0xFFe5e7eb),
                   width: 1,
                 ),
               ),
@@ -60,7 +62,9 @@ class StudentTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFd1d5db) : const Color(0xFF6b7280),
+                        color: isDark
+                            ? const Color(0xFFd1d5db)
+                            : const Color(0xFF6b7280),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -73,7 +77,9 @@ class StudentTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFd1d5db) : const Color(0xFF6b7280),
+                        color: isDark
+                            ? const Color(0xFFd1d5db)
+                            : const Color(0xFF6b7280),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -86,7 +92,9 @@ class StudentTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFd1d5db) : const Color(0xFF6b7280),
+                        color: isDark
+                            ? const Color(0xFFd1d5db)
+                            : const Color(0xFF6b7280),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -99,7 +107,9 @@ class StudentTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFd1d5db) : const Color(0xFF6b7280),
+                        color: isDark
+                            ? const Color(0xFFd1d5db)
+                            : const Color(0xFF6b7280),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -112,7 +122,9 @@ class StudentTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFd1d5db) : const Color(0xFF6b7280),
+                        color: isDark
+                            ? const Color(0xFFd1d5db)
+                            : const Color(0xFF6b7280),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -125,7 +137,9 @@ class StudentTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFd1d5db) : const Color(0xFF6b7280),
+                        color: isDark
+                            ? const Color(0xFFd1d5db)
+                            : const Color(0xFF6b7280),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -138,7 +152,9 @@ class StudentTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFd1d5db) : const Color(0xFF6b7280),
+                        color: isDark
+                            ? const Color(0xFFd1d5db)
+                            : const Color(0xFF6b7280),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -151,7 +167,9 @@ class StudentTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFd1d5db) : const Color(0xFF6b7280),
+                        color: isDark
+                            ? const Color(0xFFd1d5db)
+                            : const Color(0xFF6b7280),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -164,7 +182,9 @@ class StudentTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFd1d5db) : const Color(0xFF6b7280),
+                        color: isDark
+                            ? const Color(0xFFd1d5db)
+                            : const Color(0xFF6b7280),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -177,7 +197,9 @@ class StudentTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFd1d5db) : const Color(0xFF6b7280),
+                        color: isDark
+                            ? const Color(0xFFd1d5db)
+                            : const Color(0xFF6b7280),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -197,18 +219,23 @@ class StudentTable extends StatelessWidget {
                   child: Column(
                     children: students.map((student) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
-                          color: isDark 
-                            ? (students.indexOf(student) % 2 == 0) 
-                              ? const Color(0xFF1f2937) 
-                              : const Color(0xFF111827) 
-                            : (students.indexOf(student) % 2 == 0) 
-                              ? const Color(0xFFffffff) 
+                          color: isDark
+                              ? (students.indexOf(student) % 2 == 0)
+                                    ? const Color(0xFF1f2937)
+                                    : const Color(0xFF111827)
+                              : (students.indexOf(student) % 2 == 0)
+                              ? const Color(0xFFffffff)
                               : const Color(0xFFf9fafb),
                           border: Border(
                             bottom: BorderSide(
-                              color: isDark ? const Color(0xFF374151) : const Color(0xFFe5e7eb),
+                              color: isDark
+                                  ? const Color(0xFF374151)
+                                  : const Color(0xFFe5e7eb),
                               width: 1,
                             ),
                           ),
@@ -227,158 +254,185 @@ class StudentTable extends StatelessWidget {
                                   child: student.photo.isEmpty
                                       ? Icon(
                                           Icons.person,
-                                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                          color: isDark
+                                              ? Colors.grey.shade400
+                                              : Colors.grey.shade600,
                                           size: 20,
                                         )
                                       : null,
                                 ),
                               ),
                             ),
-                          // Matricule
-                          SizedBox(
-                            width: 150,
-                            child: Text(
-                              student.matricule,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: isDark ? const Color(0xFFf9fafb) : const Color(0xFF111827),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          // Nom & Prénom
-                          SizedBox(
-                            width: 200,
-                            child: Text(
-                              '${student.nom} ${student.prenom}',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: isDark ? const Color(0xFFf9fafb) : const Color(0xFF111827),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          // Date
-                          SizedBox(
-                            width: 120,
-                            child: Text(
-                              student.dateNaissance,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: isDark ? const Color(0xFFf9fafb) : const Color(0xFF111827),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          // Lieu
-                          SizedBox(
-                            width: 120,
-                            child: Text(
-                              student.lieuNaissance,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: isDark ? const Color(0xFFf9fafb) : const Color(0xFF111827),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          // Sexe
-                          SizedBox(
-                            width: 60,
-                            child: Text(
-                              student.sexe,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: isDark ? const Color(0xFFf9fafb) : const Color(0xFF111827),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          // Année
-                          SizedBox(
-                            width: 120,
-                            child: Text(
-                              student.annee.isNotEmpty ? student.annee : 'Non défini',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: isDark ? const Color(0xFFf9fafb) : const Color(0xFF111827),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          // Classe
-                          SizedBox(
-                            width: 100,
-                            child: Text(
-                              student.classe,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: isDark ? const Color(0xFFf9fafb) : const Color(0xFF111827),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          // Statut
-                          SizedBox(
-                            width: 100,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _getStatusColor(student.statut).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
+                            // Matricule
+                            SizedBox(
+                              width: 150,
                               child: Text(
-                                student.statut,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: _getStatusColor(student.statut),
-                                  fontWeight: FontWeight.w600,
+                                student.matricule,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? const Color(0xFFf9fafb)
+                                      : const Color(0xFF111827),
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
-                          ),
-                          // Actions
-                          SizedBox(
-                            width: 120,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                // Bouton Modifier
-                                IconButton(
-                                  onPressed: () => onEdit(student),
-                                  icon: Icon(
-                                    Icons.edit,
-                                    color: const Color(0xFF3b82f6),
-                                    size: 18,
-                                  ),
-                                  tooltip: 'Modifier',
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: const Color(0xFF3b82f6).withOpacity(0.1),
-                                    padding: const EdgeInsets.all(6),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    minimumSize: const Size(32, 32),
-                                  ),
+                            // Nom & Prénom
+                            SizedBox(
+                              width: 200,
+                              child: Text(
+                                '${student.nom} ${student.prenom}',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? const Color(0xFFf9fafb)
+                                      : const Color(0xFF111827),
+                                  fontWeight: FontWeight.w500,
                                 ),
-                                const SizedBox(width: 8),
-                                // Bouton Supprimer
-                                IconButton(
-                                  onPressed: () => onDelete(student),
-                                  icon: Icon(
-                                    Icons.delete,
-                                    color: const Color(0xFFef4444),
-                                    size: 18,
-                                  ),
-                                  tooltip: 'Supprimer',
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: const Color(0xFFef4444).withOpacity(0.1),
-                                    padding: const EdgeInsets.all(6),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    minimumSize: const Size(32, 32),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+                            // Date
+                            SizedBox(
+                              width: 120,
+                              child: Text(
+                                student.dateNaissance,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? const Color(0xFFf9fafb)
+                                      : const Color(0xFF111827),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            // Lieu
+                            SizedBox(
+                              width: 120,
+                              child: Text(
+                                student.lieuNaissance,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? const Color(0xFFf9fafb)
+                                      : const Color(0xFF111827),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            // Sexe
+                            SizedBox(
+                              width: 60,
+                              child: Text(
+                                student.sexe,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? const Color(0xFFf9fafb)
+                                      : const Color(0xFF111827),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            // Année
+                            SizedBox(
+                              width: 120,
+                              child: Text(
+                                student.annee.isNotEmpty
+                                    ? student.annee
+                                    : 'Non défini',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? const Color(0xFFf9fafb)
+                                      : const Color(0xFF111827),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            // Classe
+                            SizedBox(
+                              width: 100,
+                              child: Text(
+                                student.classe,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? const Color(0xFFf9fafb)
+                                      : const Color(0xFF111827),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            // Statut
+                            SizedBox(
+                              width: 100,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(
+                                    student.statut,
+                                  ).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  student.statut,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: _getStatusColor(student.statut),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Actions
+                            SizedBox(
+                              width: 120,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  // Bouton Modifier
+                                  IconButton(
+                                    onPressed: () => onEdit(student),
+                                    icon: Icon(
+                                      Icons.edit,
+                                      color: const Color(0xFF3b82f6),
+                                      size: 18,
+                                    ),
+                                    tooltip: 'Modifier',
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: const Color(
+                                        0xFF3b82f6,
+                                      ).withValues(alpha: 0.1),
+                                      padding: const EdgeInsets.all(6),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      minimumSize: const Size(32, 32),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Bouton Supprimer
+                                  IconButton(
+                                    onPressed: () => onDelete(student),
+                                    icon: Icon(
+                                      Icons.delete,
+                                      color: const Color(0xFFef4444),
+                                      size: 18,
+                                    ),
+                                    tooltip: 'Supprimer',
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: const Color(
+                                        0xFFef4444,
+                                      ).withValues(alpha: 0.1),
+                                      padding: const EdgeInsets.all(6),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      minimumSize: const Size(32, 32),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
               ),

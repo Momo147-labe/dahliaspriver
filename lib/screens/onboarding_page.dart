@@ -18,27 +18,30 @@ class _OnboardingPageState extends State<OnboardingPage> {
       title: "Bienvenue sur Guinée École",
       subtitle:
           "Transformez la gestion de votre établissement scolaire avec notre solution complète et intuitive. Conçue spécialement pour les écoles guinéennes, cette application vous permet de gérer efficacement tous les aspects administratifs et pédagogiques, même dans les zones à connectivité limitée.",
-      imageUrl:
-          "assets/ondoarding/Gemini_Generated_Image_bntnrmbntnrmbntn.png",
+      imageUrl: "assets/ondoarding/Gemini_Generated_Image_bntnrmbntnrmbntn.png",
     ),
     _OnboardData(
       title: "Gestion Complète des Élèves",
-      subtitle: "Créez des profils détaillés pour chaque élève avec photos, informations personnelles, historique académique et suivi des performances. Gérez les inscriptions, les transferts et maintenez un registre complet de tous vos étudiants avec une interface simple et rapide.",
+      subtitle:
+          "Créez des profils détaillés pour chaque élève avec photos, informations personnelles, historique académique et suivi des performances. Gérez les inscriptions, les transferts et maintenez un registre complet de tous vos étudiants avec une interface simple et rapide.",
       imageUrl: "assets/ondoarding/Gemini_Generated_Image_hq85bvhq85bvhq85.png",
     ),
     _OnboardData(
       title: "Organisation des Classes & Enseignants",
-      subtitle: "Structurez votre établissement en créant des classes, en assignant les enseignants et en gérant les emplois du temps. Suivez les effectifs, organisez les groupes pédagogiques et optimisez la répartition des ressources humaines pour un enseignement de qualité.",
+      subtitle:
+          "Structurez votre établissement en créant des classes, en assignant les enseignants et en gérant les emplois du temps. Suivez les effectifs, organisez les groupes pédagogiques et optimisez la répartition des ressources humaines pour un enseignement de qualité.",
       imageUrl: "assets/ondoarding/Gemini_Generated_Image_i1nxjyi1nxjyi1nx.png",
     ),
     _OnboardData(
       title: "Système d'Évaluation Avancé",
-      subtitle: "Enregistrez les notes, calculez automatiquement les moyennes trimestrielles et annuelles, générez des bulletins personnalisés et établissez des classements par mérite. Un système complet pour suivre et évaluer les progrès de chaque élève.",
+      subtitle:
+          "Enregistrez les notes, calculez automatiquement les moyennes trimestrielles et annuelles, générez des bulletins personnalisés et établissez des classements par mérite. Un système complet pour suivre et évaluer les progrès de chaque élève.",
       imageUrl: "assets/ondoarding/Gemini_Generated_Image_q2quvq2quvq2quvq.png",
     ),
     _OnboardData(
       title: "Fonctionnement 100% Hors Ligne",
-      subtitle: "Travaillez en toute autonomie sans dépendre d'une connexion internet. Toutes vos données sont stockées localement de manière sécurisée sur votre appareil. Synchronisez quand vous le souhaitez et gardez le contrôle total de vos informations scolaires.",
+      subtitle:
+          "Travaillez en toute autonomie sans dépendre d'une connexion internet. Toutes vos données sont stockées localement de manière sécurisée sur votre appareil. Synchronisez quand vous le souhaitez et gardez le contrôle total de vos informations scolaires.",
       imageUrl: "assets/ondoarding/Gemini_Generated_Image_wqpapvwqpapvwqpa.png",
     ),
   ];
@@ -58,8 +61,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
         child: SafeArea(
           child: Column(
             children: [
-            
-              
               // PageView
               Expanded(
                 child: PageView.builder(
@@ -93,7 +94,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       height: 10,
                       width: _currentPage == index ? 30 : 10,
                       decoration: BoxDecoration(
-                        color: _currentPage == index ? Colors.blue.shade600 : Colors.grey.shade300,
+                        color: _currentPage == index
+                            ? Colors.blue.shade600
+                            : Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(5),
                       ),
                     ),
@@ -108,7 +111,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, -2),
                     ),
@@ -138,9 +141,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           ),
                         ),
                       ),
-                    
+
                     const Spacer(),
-                    
+
                     // Bouton principal
                     Container(
                       height: 50,
@@ -178,7 +181,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              _currentPage == pages.length - 1 ? "Commencer" : "Suivant",
+                              _currentPage == pages.length - 1
+                                  ? "Commencer"
+                                  : "Suivant",
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
@@ -223,13 +228,13 @@ class _OnboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
-    
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
       child: isTablet ? _buildTabletLayout() : _buildMobileLayout(),
     );
   }
-  
+
   Widget _buildTabletLayout() {
     return Row(
       children: [
@@ -242,7 +247,7 @@ class _OnboardPage extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
@@ -250,16 +255,13 @@ class _OnboardPage extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                imageUrl,
-                fit: BoxFit.cover,
-              ),
+              child: Image.asset(imageUrl, fit: BoxFit.cover),
             ),
           ),
         ),
-        
+
         const SizedBox(width: 32),
-        
+
         // Texte à droite
         Expanded(
           flex: 6,
@@ -268,7 +270,10 @@ class _OnboardPage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(20),
@@ -307,7 +312,7 @@ class _OnboardPage extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildMobileLayout() {
     return Column(
       children: [
@@ -320,7 +325,7 @@ class _OnboardPage extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -335,16 +340,19 @@ class _OnboardPage extends StatelessWidget {
             ),
           ),
         ),
-        
+
         const SizedBox(height: 32),
-        
+
         // Texte en bas
         Expanded(
           child: SingleChildScrollView(
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(20),

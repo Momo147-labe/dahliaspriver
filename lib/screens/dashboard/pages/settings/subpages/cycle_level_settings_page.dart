@@ -29,7 +29,7 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
       for (var cycle in cycles) {
         final levels = await _db.rawQuery(
           '''
-          SELECT n.*, next.nom as next_niveau_nom, c.nom as cycle_nom
+          SELECT n.*, next.nom as next_niveau_nom, c.nom as cycle_nom, c.note_max
           FROM niveaux n
           LEFT JOIN niveaux next ON n.next_niveau_id = next.id
           LEFT JOIN cycles_scolaires c ON n.cycle_id = c.id
@@ -157,7 +157,7 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -174,7 +174,7 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(Icons.school, color: color),
@@ -206,9 +206,11 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: const Text(
                       'Terminal',
@@ -301,7 +303,7 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? Colors.grey[900]!.withOpacity(0.3)
+                          ? Colors.grey[900]!.withValues(alpha: 0.3)
                           : Colors.grey[50],
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
@@ -369,7 +371,7 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
           const SizedBox(height: 8),
           Text(
             lvl['moyenne_passage'] != null
-                ? 'Seuil: ${lvl['moyenne_passage']}/20'
+                ? 'Seuil: ${lvl['moyenne_passage']}/${(lvl['note_max'] as num?)?.toInt() ?? 20}'
                 : 'Seuil hérité',
             style: TextStyle(color: Colors.grey[500], fontSize: 11),
           ),
@@ -467,7 +469,7 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.05),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.05),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(28),
                     ),
@@ -655,7 +657,7 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.05),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.05),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(28),
                     ),
@@ -841,7 +843,7 @@ class _CycleLevelSettingsPageState extends State<CycleLevelSettingsPage> {
                 ? Icon(
                     icon,
                     size: 20,
-                    color: AppTheme.primaryColor.withOpacity(0.5),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.5),
                   )
                 : null,
             filled: true,

@@ -578,7 +578,7 @@ class _AppreciationSettingsPageState extends State<AppreciationSettingsPage> {
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 20,
                 spreadRadius: 1,
                 offset: const Offset(0, 8),

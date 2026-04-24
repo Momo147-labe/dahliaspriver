@@ -284,6 +284,11 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
     final activeAnnee = await DatabaseHelper.instance.getActiveAnnee();
     if (activeAnnee == null) return;
 
+    final classesAvecFrais = _frais.map((f) => f['classe_id']).toSet();
+    final classesSansFrais = _classes
+        .where((c) => !classesAvecFrais.contains(c['id']))
+        .toList();
+
     showDialog(
       context: context,
       builder: (context) => FraisModal(
@@ -296,7 +301,7 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
           'tranche2': 0.0,
           'tranche3': 0.0,
         },
-        classes: _classes,
+        classes: classesSansFrais,
         allowMultipleClasses: true,
         onSave: () {
           Navigator.of(context).pop();
@@ -582,7 +587,7 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.primaryColor.withOpacity(0.3),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.3),
                       blurRadius: 15,
                       offset: const Offset(0, 8),
                     ),
@@ -679,7 +684,7 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.3),
+            color: color.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -784,7 +789,7 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: colors[0].withOpacity(0.3),
+            color: colors[0].withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -822,7 +827,7 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(icon, color: Colors.white, size: 28),
@@ -837,8 +842,8 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.8),
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -867,7 +872,7 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
                   ),
                   filled: true,
                   fillColor: isDark
-                      ? Colors.white.withOpacity(0.05)
+                      ? Colors.white.withValues(alpha: 0.05)
                       : Colors.grey.shade100,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -922,7 +927,9 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(16),
       ),
       child: DropdownButtonHideUnderline(

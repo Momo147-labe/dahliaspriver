@@ -24,12 +24,16 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadData() async {
     try {
       final db = await DatabaseHelper.instance.database;
-      
+
       // Charger les informations de l'école
       final ecoles = await db.query('ecole');
-      final annees = await db.query('annee_scolaire', orderBy: 'created_at DESC', limit: 1);
+      final annees = await db.query(
+        'annee_scolaire',
+        orderBy: 'created_at DESC',
+        limit: 1,
+      );
       final users = await db.query('user');
-      
+
       setState(() {
         _ecoleInfo = ecoles.isNotEmpty ? ecoles.first : null;
         _anneeScolaire = annees.isNotEmpty ? annees.first : null;
@@ -54,7 +58,9 @@ class _SettingsPageState extends State<SettingsPage> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.backgroundDark : AppTheme.backgroundLight,
+      backgroundColor: isDark
+          ? AppTheme.backgroundDark
+          : AppTheme.backgroundLight,
       appBar: AppBar(
         title: const Text('Paramètres'),
         backgroundColor: isDark ? AppTheme.cardDark : AppTheme.cardLight,
@@ -68,88 +74,76 @@ class _SettingsPageState extends State<SettingsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Section École
-                  _buildSection(
-                    'Informations de l\'École',
-                    Icons.school,
-                    [
-                      _buildInfoCard(
-                        'Nom de l\'école',
-                        _ecoleInfo?['nom'] ?? 'Non défini',
-                        Icons.business,
-                      ),
-                      _buildInfoCard(
-                        'Fondateur',
-                        _ecoleInfo?['fondateur'] ?? 'Non défini',
-                        Icons.person,
-                      ),
-                      _buildInfoCard(
-                        'Directeur',
-                        _ecoleInfo?['directeur'] ?? 'Non défini',
-                        Icons.admin_panel_settings,
-                      ),
-                      _buildInfoCard(
-                        'Téléphone',
-                        _ecoleInfo?['telephone'] ?? 'Non défini',
-                        Icons.phone,
-                      ),
-                      _buildInfoCard(
-                        'Email',
-                        _ecoleInfo?['email'] ?? 'Non défini',
-                        Icons.email,
-                      ),
-                    ],
-                  ),
-                  
+                  _buildSection('Informations de l\'École', Icons.school, [
+                    _buildInfoCard(
+                      'Nom de l\'école',
+                      _ecoleInfo?['nom'] ?? 'Non défini',
+                      Icons.business,
+                    ),
+                    _buildInfoCard(
+                      'Fondateur',
+                      _ecoleInfo?['fondateur'] ?? 'Non défini',
+                      Icons.person,
+                    ),
+                    _buildInfoCard(
+                      'Directeur',
+                      _ecoleInfo?['directeur'] ?? 'Non défini',
+                      Icons.admin_panel_settings,
+                    ),
+                    _buildInfoCard(
+                      'Téléphone',
+                      _ecoleInfo?['telephone'] ?? 'Non défini',
+                      Icons.phone,
+                    ),
+                    _buildInfoCard(
+                      'Email',
+                      _ecoleInfo?['email'] ?? 'Non défini',
+                      Icons.email,
+                    ),
+                  ]),
+
                   const SizedBox(height: 24),
-                  
+
                   // Section Année Scolaire
-                  _buildSection(
-                    'Année Scolaire Active',
-                    Icons.calendar_today,
-                    [
-                      _buildInfoCard(
-                        'Libellé',
-                        _anneeScolaire?['libelle'] ?? 'Non défini',
-                        Icons.label,
-                      ),
-                      _buildInfoCard(
-                        'Statut',
-                        _anneeScolaire?['statut'] ?? 'Non défini',
-                        Icons.info,
-                      ),
-                      _buildInfoCard(
-                        'Date de début',
-                        _anneeScolaire?['date_debut'] ?? 'Non défini',
-                        Icons.play_arrow,
-                      ),
-                      _buildInfoCard(
-                        'Date de fin',
-                        _anneeScolaire?['date_fin'] ?? 'Non défini',
-                        Icons.stop,
-                      ),
-                    ],
-                  ),
-                  
+                  _buildSection('Année Scolaire Active', Icons.calendar_today, [
+                    _buildInfoCard(
+                      'Libellé',
+                      _anneeScolaire?['libelle'] ?? 'Non défini',
+                      Icons.label,
+                    ),
+                    _buildInfoCard(
+                      'Statut',
+                      _anneeScolaire?['statut'] ?? 'Non défini',
+                      Icons.info,
+                    ),
+                    _buildInfoCard(
+                      'Date de début',
+                      _anneeScolaire?['date_debut'] ?? 'Non défini',
+                      Icons.play_arrow,
+                    ),
+                    _buildInfoCard(
+                      'Date de fin',
+                      _anneeScolaire?['date_fin'] ?? 'Non défini',
+                      Icons.stop,
+                    ),
+                  ]),
+
                   const SizedBox(height: 24),
-                  
+
                   // Section Utilisateurs
-                  _buildSection(
-                    'Utilisateurs',
-                    Icons.people,
-                    [
-                      ..._users.map((user) => _buildUserCard(user)).toList(),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _showAddUserDialog,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Ajouter un utilisateur'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
-                        ),
+                  _buildSection('Utilisateurs', Icons.people, [
+                    ..._users.map((user) => _buildUserCard(user)).toList(),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _showAddUserDialog,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Ajouter un utilisateur'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
                       ),
-                    ],
-                  ),
+                    ),
+                  ]),
                 ],
               ),
             ),
@@ -194,7 +188,7 @@ class _SettingsPageState extends State<SettingsPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -243,7 +237,7 @@ class _SettingsPageState extends State<SettingsPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -276,14 +270,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(height: 4),
                 Text(
                   user['email']?.toString() ?? '',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: _getRoleColor(user['role']?.toString()),
                     borderRadius: BorderRadius.circular(8),
@@ -372,7 +366,9 @@ class _SettingsPageState extends State<SettingsPage> {
   void _showEditUserDialog(Map<String, dynamic> user) {
     // TODO: Implémenter la modification d'utilisateur
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Modification d\'utilisateur à implémenter')),
+      const SnackBar(
+        content: Text('Modification d\'utilisateur à implémenter'),
+      ),
     );
   }
 
@@ -381,7 +377,9 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmer la suppression'),
-        content: Text('Voulez-vous vraiment supprimer l\'utilisateur ${user['pseudo']}?'),
+        content: Text(
+          'Voulez-vous vraiment supprimer l\'utilisateur ${user['pseudo']}?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -392,8 +390,12 @@ class _SettingsPageState extends State<SettingsPage> {
               Navigator.of(context).pop();
               try {
                 final db = await DatabaseHelper.instance.database;
-                await db.delete('user', where: 'id = ?', whereArgs: [user['id']]);
-                
+                await db.delete(
+                  'user',
+                  where: 'id = ?',
+                  whereArgs: [user['id']],
+                );
+
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(

@@ -62,6 +62,19 @@ class PaymentControlPdfService {
     }
   }
 
+  static double _getActualTotalDue(Map<String, dynamic> student) {
+    final double inscription =
+        (student['inscription'] as num?)?.toDouble() ?? 0.0;
+    final double reinscription =
+        (student['reinscription'] as num?)?.toDouble() ?? 0.0;
+    final double t1 = (student['tranche1'] as num?)?.toDouble() ?? 0.0;
+    final double t2 = (student['tranche2'] as num?)?.toDouble() ?? 0.0;
+    final double t3 = (student['tranche3'] as num?)?.toDouble() ?? 0.0;
+
+    final bool isReinscrit = student['eleve_statut'] == 'reinscrit';
+    return (isReinscrit ? reinscription : inscription) + t1 + t2 + t3;
+  }
+
   Future<pw.Document> generate(
     List<Map<String, dynamic>> students,
     String anneeLabel, {
@@ -80,7 +93,7 @@ class PaymentControlPdfService {
             final double? rest = s['montant_restant'] != null
                 ? (s['montant_restant'] as num).toDouble()
                 : null;
-            final total = (s['montant_total'] as num?)?.toDouble() ?? 0.0;
+            final total = _getActualTotalDue(s);
             final paid = (s['total_paye'] as num?)?.toDouble() ?? 0.0;
 
             if (rest != null) return rest <= 0 && total > 0;
@@ -91,7 +104,7 @@ class PaymentControlPdfService {
             final double? rest = s['montant_restant'] != null
                 ? (s['montant_restant'] as num).toDouble()
                 : null;
-            final total = (s['montant_total'] as num?)?.toDouble() ?? 0.0;
+            final total = _getActualTotalDue(s);
             final paid = (s['total_paye'] as num?)?.toDouble() ?? 0.0;
 
             if (total == 0) return false;
@@ -110,7 +123,7 @@ class PaymentControlPdfService {
       final double? rest = s['montant_restant'] != null
           ? (s['montant_restant'] as num).toDouble()
           : null;
-      final total = (s['montant_total'] as num?)?.toDouble() ?? 0.0;
+      final total = _getActualTotalDue(s);
       final paid = (s['total_paye'] as num?)?.toDouble() ?? 0.0;
 
       if (total == 0) return false;
@@ -118,13 +131,10 @@ class PaymentControlPdfService {
       return paid >= total;
     }).length;
     final int enRetard =
-        students
-            .where((s) => ((s['montant_total'] as num?)?.toDouble() ?? 0.0) > 0)
-            .length -
-        enRegle;
+        students.where((s) => _getActualTotalDue(s) > 0).length - enRegle;
     final double totalExpected = students.fold(
       0,
-      (sum, s) => sum + ((s['montant_total'] as num?)?.toDouble() ?? 0.0),
+      (sum, s) => sum + _getActualTotalDue(s),
     );
     final double totalCollected = students.fold(
       0,
@@ -205,8 +215,7 @@ class PaymentControlPdfService {
                     : PdfColor.fromHex('#F8FAFC');
 
                 final paid = (student['total_paye'] as num?)?.toDouble() ?? 0.0;
-                final total =
-                    (student['montant_total'] as num?)?.toDouble() ?? 0.0;
+                final total = _getActualTotalDue(student);
                 final isUpToDate = paid >= total;
 
                 final insc = _getStatus(student, 'Inscription');

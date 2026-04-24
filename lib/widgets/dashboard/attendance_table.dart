@@ -202,7 +202,9 @@ class AttendanceTable extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: _getRateColor(data['rate']).withOpacity(0.1),
+                            color: _getRateColor(
+                              data['rate'],
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(

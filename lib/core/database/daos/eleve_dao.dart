@@ -183,10 +183,12 @@ class EleveDao extends BaseDao {
   Future<List<Map<String, dynamic>>> getEleveParcours(int id) async {
     return await db.rawQuery(
       '''
-      SELECT p.*, c.nom as classe_nom, a.libelle as annee_nom
+      SELECT p.*, c.nom as classe_nom, a.libelle as annee_nom,
+             cy.note_max, cy.moyenne_passage
       FROM eleve_parcours p
       JOIN classe c ON p.classe_id = c.id
       JOIN annee_scolaire a ON p.annee_scolaire_id = a.id
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       WHERE p.eleve_id = ?
       ORDER BY a.date_debut DESC
     ''',
@@ -332,31 +334,38 @@ class EleveDao extends BaseDao {
     int currentYearId, {
     int? previousYearId,
   }) async {
-    final currentStats = await db.rawQuery(
-      '''
+    const statsQuery = '''
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN e.sexe = 'M' THEN 1 ELSE 0 END) as males,
         SUM(CASE WHEN e.sexe = 'F' THEN 1 ELSE 0 END) as females,
-        SUM(CASE WHEN p.type_inscription = 'Promotion' THEN 1 ELSE 0 END) as returning_students,
-        SUM(CASE WHEN p.type_inscription = 'Redoublement' THEN 1 ELSE 0 END) as repeaters,
-        SUM(CASE WHEN p.type_inscription IS NULL OR p.type_inscription = 'Inscrit' THEN 1 ELSE 0 END) as new_students,
+        SUM(CASE WHEN LOWER(p.type_inscription) IN ('promotion', 'reinscrit', 'réinscrit') THEN 1 ELSE 0 END) as returning_students,
+        SUM(CASE WHEN LOWER(p.type_inscription) = 'redoublement' THEN 1 ELSE 0 END) as repeaters,
+        SUM(CASE WHEN p.type_inscription IS NULL OR LOWER(p.type_inscription) IN ('inscrit', 'nouveau', 'en attente') THEN 1 ELSE 0 END) as new_students,
         AVG(CASE 
           WHEN e.date_naissance IS NOT NULL AND e.date_naissance != '' 
           THEN (strftime('%Y', 'now') - strftime('%Y', e.date_naissance)) 
           ELSE NULL 
         END) as average_age
-      FROM ${EleveSchema.tableName} e
+      FROM eleve e
       JOIN eleve_parcours p ON e.id = p.eleve_id
       WHERE p.annee_scolaire_id = ?
-    ''',
-      [currentYearId],
-    );
+    ''';
+
+    final currentStats = await db.rawQuery(statsQuery, [currentYearId]);
+
+    Map<String, dynamic>? previousStats;
+    if (previousYearId != null) {
+      final prevResult = await db.rawQuery(statsQuery, [previousYearId]);
+      if (prevResult.isNotEmpty) {
+        previousStats = prevResult.first;
+      }
+    }
 
     final cycleDistribution = await db.rawQuery(
       '''
       SELECT cy.nom as cycle, COUNT(e.id) as count
-      FROM ${EleveSchema.tableName} e
+      FROM eleve e
       JOIN eleve_parcours p ON e.id = p.eleve_id
       JOIN classe c ON p.classe_id = c.id
       JOIN cycles_scolaires cy ON c.cycle_id = cy.id
@@ -369,7 +378,7 @@ class EleveDao extends BaseDao {
     final classDistribution = await db.rawQuery(
       '''
       SELECT c.nom as classe, COUNT(e.id) as count
-      FROM ${EleveSchema.tableName} e
+      FROM eleve e
       JOIN eleve_parcours p ON e.id = p.eleve_id
       JOIN classe c ON p.classe_id = c.id
       WHERE p.annee_scolaire_id = ?
@@ -379,7 +388,8 @@ class EleveDao extends BaseDao {
     );
 
     return {
-      'stats': currentStats.first,
+      'current': currentStats.first,
+      'previous': previousStats,
       'cycleDistribution': cycleDistribution,
       'classDistribution': classDistribution,
     };
@@ -392,12 +402,14 @@ class EleveDao extends BaseDao {
       '''
       SELECT 
         e.id, e.nom, e.prenom, e.matricule, e.statut as eleve_statut, e.photo,
-        c.nom as classe_nom,
+        c.id as classe_id, c.nom as classe_nom,
+        cy.nom as cycle_nom,
         fs.inscription, fs.reinscription, fs.tranche1, fs.tranche2, fs.tranche3, fs.montant_total,
         COALESCE(p_main.montant_paye, 0) as total_paye
       FROM ${EleveSchema.tableName} e
       JOIN eleve_parcours p ON e.id = p.eleve_id
       JOIN classe c ON p.classe_id = c.id
+      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN frais_scolarite fs ON p.classe_id = fs.classe_id AND p.annee_scolaire_id = fs.annee_scolaire_id
       LEFT JOIN paiement p_main ON p_main.eleve_id = e.id AND p_main.annee_scolaire_id = p.annee_scolaire_id
       WHERE p.annee_scolaire_id = ?
@@ -500,6 +512,22 @@ class EleveDao extends BaseDao {
     );
   }
 
+  Future<int> updateEleveParcoursStatut(
+    int eleveId,
+    int anneeId,
+    String statut,
+  ) async {
+    return await db.update(
+      'eleve_parcours',
+      {
+        'confirmation_statut': statut,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'eleve_id = ? AND annee_scolaire_id = ?',
+      whereArgs: [eleveId, anneeId],
+    );
+  }
+
   Future<void> transfererEleve({
     required int eleveId,
     required int newClasseId,
@@ -552,5 +580,63 @@ class EleveDao extends BaseDao {
         whereArgs: [eleveId, anneeId],
       );
     });
+  }
+
+  Future<List<Map<String, dynamic>>> getAgeDistribution(int anneeId) async {
+    return await db.rawQuery(
+      '''
+      SELECT 
+        CASE 
+          WHEN age < 6 THEN '0-5'
+          WHEN age BETWEEN 6 AND 10 THEN '6-10'
+          WHEN age BETWEEN 11 AND 14 THEN '11-14'
+          WHEN age BETWEEN 15 AND 18 THEN '15-18'
+          ELSE '19+'
+        END as bracket,
+        COUNT(*) as count
+      FROM (
+        SELECT (strftime('%Y', 'now') - strftime('%Y', e.date_naissance)) as age
+        FROM eleve e
+        JOIN eleve_parcours p ON e.id = p.eleve_id
+        WHERE p.annee_scolaire_id = ? AND e.date_naissance IS NOT NULL AND e.date_naissance != ''
+      )
+      GROUP BY bracket
+      ORDER BY bracket
+      ''',
+      [anneeId],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getGeographicDistribution(
+    int anneeId,
+  ) async {
+    return await db.rawQuery(
+      '''
+      SELECT e.lieu_naissance, COUNT(*) as count
+      FROM eleve e
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      WHERE p.annee_scolaire_id = ? AND e.lieu_naissance IS NOT NULL AND e.lieu_naissance != ''
+      GROUP BY e.lieu_naissance
+      ORDER BY count DESC
+      ''',
+      [anneeId],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getGenderStatsByCycle(int anneeId) async {
+    return await db.rawQuery(
+      '''
+      SELECT cy.nom, 
+             SUM(CASE WHEN e.sexe = 'M' THEN 1 ELSE 0 END) as male_count,
+             SUM(CASE WHEN e.sexe = 'F' THEN 1 ELSE 0 END) as female_count
+      FROM eleve e
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      JOIN classe c ON p.classe_id = c.id
+      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+      WHERE p.annee_scolaire_id = ?
+      GROUP BY cy.nom
+      ''',
+      [anneeId],
+    );
   }
 }

@@ -317,11 +317,15 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 
   void _showResultSheetModal() {
+    if (_lastAnneeId == null) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ResultSheetSelectionModal(dbHelper: _dbHelper),
+      builder: (context) => ResultSheetSelectionModal(
+        dbHelper: _dbHelper,
+        anneeId: _lastAnneeId!,
+      ),
     );
   }
 
@@ -352,7 +356,7 @@ class _ReportsPageState extends State<ReportsPage> {
         ? AppTheme.backgroundDark
         : AppTheme.backgroundLight;
     final surfaceSecondary = isDark
-        ? AppTheme.cardDark.withOpacity(0.5)
+        ? AppTheme.cardDark.withValues(alpha: 0.5)
         : AppTheme.cardLight;
 
     return Container(
@@ -465,7 +469,7 @@ class _ReportsPageState extends State<ReportsPage> {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.1),
+                            color: primaryColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -483,7 +487,7 @@ class _ReportsPageState extends State<ReportsPage> {
                               shaderCallback: (bounds) => LinearGradient(
                                 colors: [
                                   primaryColor,
-                                  primaryColor.withOpacity(0.8),
+                                  primaryColor.withValues(alpha: 0.8),
                                 ],
                               ).createShader(bounds),
                               child: const Text(
@@ -826,7 +830,7 @@ class _ReportsPageState extends State<ReportsPage> {
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? primaryColor.withOpacity(0.05)
+                                ? primaryColor.withValues(alpha: 0.05)
                                 : Colors.transparent,
                             border: Border(
                               left: BorderSide(
@@ -843,7 +847,7 @@ class _ReportsPageState extends State<ReportsPage> {
                               CircleAvatar(
                                 radius: 18,
                                 backgroundColor: isSelected
-                                    ? primaryColor.withOpacity(0.2)
+                                    ? primaryColor.withValues(alpha: 0.2)
                                     : surfaceSecondary,
                                 child: Text(
                                   initiales.toUpperCase(),
@@ -889,7 +893,7 @@ class _ReportsPageState extends State<ReportsPage> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.1),
+                                    color: Colors.green.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: const Text(
@@ -908,7 +912,7 @@ class _ReportsPageState extends State<ReportsPage> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.orange.withOpacity(0.1),
+                                    color: Colors.orange.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: const Text(
@@ -964,7 +968,9 @@ class _ReportsPageState extends State<ReportsPage> {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderMain = isDark ? Colors.white10 : Colors.black.withOpacity(0.05);
+    final borderMain = isDark
+        ? Colors.white10
+        : Colors.black.withValues(alpha: 0.05);
     final isAnnual = _isAnnualSelected;
     final columns = _getDynamicColumns();
     final noteKey = _getNoteKey();
@@ -975,7 +981,9 @@ class _ReportsPageState extends State<ReportsPage> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.grey[100],
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: borderMain),
           ),
@@ -1030,7 +1038,7 @@ class _ReportsPageState extends State<ReportsPage> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: isDark
-                  ? AppTheme.backgroundDark.withOpacity(0.3)
+                  ? AppTheme.backgroundDark.withValues(alpha: 0.3)
                   : Colors.grey[50],
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: borderMain),

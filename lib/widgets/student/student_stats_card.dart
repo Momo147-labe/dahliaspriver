@@ -31,9 +31,9 @@ class StudentStatsCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: isDark 
-                ? Colors.black.withOpacity(0.2)
-                : Colors.black.withOpacity(0.05),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.2)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -44,14 +44,10 @@ class StudentStatsCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 20,
-            ),
+            child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -61,7 +57,9 @@ class StudentStatsCard extends StatelessWidget {
                 Text(
                   title,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
+                    color: isDark
+                        ? AppTheme.textDarkSecondary
+                        : AppTheme.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -69,7 +67,9 @@ class StudentStatsCard extends StatelessWidget {
                 Text(
                   value,
                   style: theme.textTheme.titleLarge?.copyWith(
-                    color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
+                    color: isDark
+                        ? AppTheme.textDarkPrimary
+                        : AppTheme.textPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

@@ -79,14 +79,15 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
       // Since we implemented "Assign Teachers", we might check assignments, but simplest is checking grades + matiere table.
 
       // 2. Load Subjects for this Class
-      // Find subjects that have grades for students in this class
+      // Find subjects that have grades for students in this class for this specific year
       final subjectsRes = await db.rawQuery(
         '''
         SELECT DISTINCT m.id, m.nom
         FROM matiere m
         INNER JOIN notes n ON n.matiere_id = m.id
-        INNER JOIN eleve e ON n.eleve_id = e.id
-        WHERE e.classe_id = ? AND n.annee_scolaire_id = ?
+        INNER JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id 
+          AND n.annee_scolaire_id = ep.annee_scolaire_id
+        WHERE ep.classe_id = ? AND n.annee_scolaire_id = ?
         ORDER BY m.nom
       ''',
         [widget.classeId, widget.anneeId],
@@ -98,18 +99,14 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
       if (widget.trimestre == 4) {
         final trimRows = await db.rawQuery(
           '''
-          SELECT DISTINCT trimestre, MIN(nom) as nom
+          SELECT DISTINCT trimestre
           FROM sequence_planification
           WHERE annee_scolaire_id = ?
-          GROUP BY trimestre
           ORDER BY trimestre ASC
         ''',
           [widget.anneeId],
         );
         if (trimRows.isNotEmpty) {
-          // Build a name from the first sequence name of each trimester
-          // e.g. "Séquence 1" → strip to "1er Trim." or use trimestre number
-          // But best: derive trim name from trimestre number
           for (var row in trimRows) {
             final t = row['trimestre'] as int;
             _trimesterNames[t] = t == 1 ? '1er Trim.' : '${t}ème Trim.';
@@ -121,11 +118,9 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
         }
       }
 
-      // 3. Load Students
-      final students = await db.rawQuery(
-        'SELECT * FROM eleve WHERE classe_id = ? ORDER BY nom, prenom',
-        [widget.classeId],
-      );
+      // 3. Load Students (filtered by year via eleve_parcours)
+      final students = await DatabaseHelper.instance.reportsDao
+          .getStudentsByClasse(widget.classeId, widget.anneeId);
 
       // 4. Calculate Results
       List<Map<String, dynamic>> calculatedResults = [];
@@ -269,7 +264,7 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
         );
         double classAvg = classSum / _studentResults.length;
         int passedCount = _studentResults
-            .where((item) => (item['moyenne_generale'] as double) >= 10)
+            .where((item) => item['is_admis'] == true)
             .length;
         double successRate = (passedCount / _studentResults.length) * 100;
 
@@ -336,7 +331,7 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -351,7 +346,7 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
                           child: Container(
                             decoration: BoxDecoration(
                               border: Border.all(
-                                color: Colors.grey.withOpacity(0.1),
+                                color: Colors.grey.withValues(alpha: 0.1),
                                 width: 8,
                               ),
                               borderRadius: BorderRadius.circular(1000),
@@ -363,7 +358,7 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
                               style: TextStyle(
                                 fontSize: 60,
                                 fontWeight: FontWeight.w900,
-                                color: Colors.grey.withOpacity(0.05),
+                                color: Colors.grey.withValues(alpha: 0.05),
                               ),
                             ),
                           ),

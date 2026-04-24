@@ -225,7 +225,7 @@ class _PaymentsPageState extends State<PaymentsPage>
               borderRadius: BorderRadius.circular(16),
             ),
             elevation: 4,
-            shadowColor: AppTheme.primaryColor.withOpacity(0.4),
+            shadowColor: AppTheme.primaryColor.withValues(alpha: 0.4),
           ),
         ),
         ElevatedButton.icon(
@@ -342,18 +342,18 @@ class _PaymentsPageState extends State<PaymentsPage>
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: highlight
-              ? color.withOpacity(0.5)
+              ? color.withValues(alpha: 0.5)
               : (isDark ? Colors.white10 : Colors.grey.shade200),
           width: highlight ? 2 : 1,
         ),
         boxShadow: [
           if (!isDark)
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -411,7 +411,7 @@ class _PaymentsPageState extends State<PaymentsPage>
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -470,7 +470,9 @@ class _PaymentsPageState extends State<PaymentsPage>
             padding: const EdgeInsets.all(32),
             height: 400,
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.white,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
                 color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -513,7 +515,9 @@ class _PaymentsPageState extends State<PaymentsPage>
             padding: const EdgeInsets.all(32),
             height: 400,
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.white,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
                 color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -541,7 +545,7 @@ class _PaymentsPageState extends State<PaymentsPage>
                         child: CircularProgressIndicator(
                           value: 0.7, // Dummy for visually similar ring
                           strokeWidth: 20,
-                          backgroundColor: Colors.orange.withOpacity(0.2),
+                          backgroundColor: Colors.orange.withValues(alpha: 0.2),
                           valueColor: const AlwaysStoppedAnimation<Color>(
                             AppTheme.primaryColor,
                           ),
@@ -592,7 +596,7 @@ class _PaymentsPageState extends State<PaymentsPage>
             width: 40,
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.05)
+                  ? Colors.white.withValues(alpha: 0.05)
                   : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(8),
             ),
@@ -602,7 +606,7 @@ class _PaymentsPageState extends State<PaymentsPage>
               child: Container(
                 width: 40,
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.6),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
@@ -679,7 +683,7 @@ class _PaymentsPageState extends State<PaymentsPage>
   Widget _buildRecentTransactions(bool isDark, ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -795,7 +799,7 @@ class _PaymentsPageState extends State<PaymentsPage>
                                       : Colors.grey.shade300),
                           ),
                           color: _selectedModeFilter != 'Tous'
-                              ? AppTheme.primaryColor.withOpacity(0.1)
+                              ? AppTheme.primaryColor.withValues(alpha: 0.1)
                               : null,
                         ),
                         child: Row(
@@ -856,7 +860,7 @@ class _PaymentsPageState extends State<PaymentsPage>
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -895,7 +899,7 @@ class _PaymentsPageState extends State<PaymentsPage>
       icon: Icon(icon),
       style: IconButton.styleFrom(
         backgroundColor: isDark
-            ? Colors.white.withOpacity(0.05)
+            ? Colors.white.withValues(alpha: 0.05)
             : Colors.grey.shade100,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
@@ -922,7 +926,7 @@ class _PaymentsPageState extends State<PaymentsPage>
           dataRowMinHeight: 65,
           headingRowHeight: 60,
           headingRowColor: WidgetStateProperty.all(
-            isDark ? Colors.white.withOpacity(0.02) : Colors.grey.shade50,
+            isDark ? Colors.white.withValues(alpha: 0.02) : Colors.grey.shade50,
           ),
           columns: const [
             DataColumn(
@@ -1006,7 +1010,9 @@ class _PaymentsPageState extends State<PaymentsPage>
                     children: [
                       CircleAvatar(
                         radius: 16,
-                        backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                        backgroundColor: AppTheme.primaryColor.withValues(
+                          alpha: 0.1,
+                        ),
                         backgroundImage:
                             t['eleve_photo'] != null &&
                                 t['eleve_photo'].isNotEmpty
@@ -1054,7 +1060,7 @@ class _PaymentsPageState extends State<PaymentsPage>
                     ),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? Colors.white.withOpacity(0.05)
+                          ? Colors.white.withValues(alpha: 0.05)
                           : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(6),
                     ),
@@ -1074,7 +1080,7 @@ class _PaymentsPageState extends State<PaymentsPage>
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(

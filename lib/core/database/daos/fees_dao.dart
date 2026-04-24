@@ -332,21 +332,17 @@ class FeesDao extends BaseDao {
     int currentYearId,
     int? previousYearId,
   ) async {
-    final currentFinances = await db.rawQuery(
-      '''
+    const financesQuery = '''
       SELECT 
         COUNT(DISTINCT pd.eleve_id) as students_paid,
         SUM(pd.montant) as total_collected,
         COUNT(pd.id) as payment_count
       FROM paiement_detail pd
-      JOIN eleve_parcours ep ON pd.eleve_id = ep.eleve_id
-      WHERE ep.annee_scolaire_id = ?
-    ''',
-      [currentYearId],
-    );
+      WHERE pd.annee_scolaire_id = ?
+    ''';
 
-    final currentExpected = await db.rawQuery(
-      '''
+    const expectedQuery =
+        '''
       SELECT 
         SUM(
           (fs.inscription + fs.reinscription + fs.tranche1 + fs.tranche2 + fs.tranche3) * 
@@ -354,17 +350,36 @@ class FeesDao extends BaseDao {
         ) as total_expected
       FROM ${FraisScolariteSchema.tableName} fs
       WHERE fs.annee_scolaire_id = ?
-    ''',
-      [currentYearId, currentYearId],
-    );
+    ''';
+
+    final currentFinances = await db.rawQuery(financesQuery, [currentYearId]);
+    final currentExpected = await db.rawQuery(expectedQuery, [
+      currentYearId,
+      currentYearId,
+    ]);
+
+    Map<String, dynamic>? previousData;
+    if (previousYearId != null) {
+      final prevFinances = await db.rawQuery(financesQuery, [previousYearId]);
+      final prevExpected = await db.rawQuery(expectedQuery, [
+        previousYearId,
+        previousYearId,
+      ]);
+
+      if (prevFinances.isNotEmpty) {
+        previousData = {
+          ...prevFinances.first,
+          'total_expected': prevExpected.first['total_expected'],
+        };
+      }
+    }
 
     final paymentMethods = await db.rawQuery(
       '''
-      SELECT pd.mode_paiement, COUNT(*) as count, SUM(pd.montant) as total
-      FROM paiement_detail pd
-      JOIN eleve_parcours ep ON pd.eleve_id = ep.eleve_id
-      WHERE ep.annee_scolaire_id = ?
-      GROUP BY pd.mode_paiement
+      SELECT mode_paiement, COUNT(*) as count, SUM(montant) as total
+      FROM paiement_detail
+      WHERE annee_scolaire_id = ?
+      GROUP BY mode_paiement
     ''',
       [currentYearId],
     );
@@ -374,6 +389,7 @@ class FeesDao extends BaseDao {
         ...currentFinances.first,
         'total_expected': currentExpected.first['total_expected'],
       },
+      'previous': previousData,
       'paymentMethods': paymentMethods,
     };
   }
@@ -433,6 +449,23 @@ class FeesDao extends BaseDao {
       )
     ''',
       [anneeId, anneeId],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getMonthlyCollectionCurve(
+    int anneeId,
+  ) async {
+    return await db.rawQuery(
+      '''
+      SELECT 
+        strftime('%m', pd.date_paiement) as month,
+        SUM(pd.montant) as total
+      FROM paiement_detail pd
+      WHERE pd.annee_scolaire_id = ?
+      GROUP BY month
+      ORDER BY month ASC
+      ''',
+      [anneeId],
     );
   }
 }

@@ -205,7 +205,7 @@ class _MainLayoutState extends State<MainLayout> {
                     decoration: BoxDecoration(
                       color: isDark
                           ? Colors.white10
-                          : Colors.black.withOpacity(0.05),
+                          : Colors.black.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isDark ? Colors.white10 : Colors.black12,
@@ -254,7 +254,7 @@ class _MainLayoutState extends State<MainLayout> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: selected
-                          ? AppTheme.primaryColor.withOpacity(0.15)
+                          ? AppTheme.primaryColor.withValues(alpha: 0.15)
                           : Colors.transparent,
                     ),
                     child: Center(
@@ -281,7 +281,7 @@ class _MainLayoutState extends State<MainLayout> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 color: selected
-                    ? AppTheme.primaryColor.withOpacity(0.15)
+                    ? AppTheme.primaryColor.withValues(alpha: 0.15)
                     : Colors.transparent,
                 border: selected
                     ? const Border(

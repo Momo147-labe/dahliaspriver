@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
@@ -74,6 +75,11 @@ class _AddStudentModalState extends State<AddStudentModal> {
     super.initState();
     if (widget.isValidationMode && widget.initialStudent != null) {
       _prefillData();
+    } else {
+      // Synchroniser le nom du père avec le nom de l'élève
+      _nomController.addListener(() {
+        _nomPereController.text = _nomController.text;
+      });
     }
     _loadData();
     // Générer la référence initiale
@@ -383,13 +389,22 @@ class _AddStudentModalState extends State<AddStudentModal> {
       // Calculer le matricule définitivement (uniquement si nouveau)
       if (!widget.isValidationMode || widget.initialStudent == null) {
         if (_matriculeController.text.isEmpty) {
-          final year = DateTime.now().year;
-          final count = await db.rawQuery(
-            'SELECT COUNT(*) as count FROM eleve',
-          );
-          final studentCount = ((count.first['count'] as int?) ?? 0) + 1;
+          final yearStr = DateTime.now().year.toString().substring(2);
+          final nom = _nomController.text.trim().toUpperCase();
+          final prenom = _prenomController.text.trim().toUpperCase();
+
+          final nomPart = nom.length >= 2
+              ? nom.substring(0, 2)
+              : nom.padRight(2, 'X');
+          final prenomPart = prenom.length >= 2
+              ? prenom.substring(0, 2)
+              : prenom.padRight(2, 'X');
+
+          final randomValue =
+              Random().nextInt(9000) + 1000; // 4 chiffres aléatoires
+
           _matriculeController.text =
-              '$year-STUD-${studentCount.toString().padLeft(4, '0')}';
+              'GE$yearStr-$nomPart$prenomPart-$randomValue';
         }
       }
 
@@ -625,7 +640,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -681,7 +696,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(
@@ -710,7 +725,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
                     ? 'Finalisation de l\'admission pour ${widget.initialStudent?.fullName} (${widget.initialStudent?.matricule})'
                     : 'Nouveau formulaire d\'admission scolaire',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontSize: 14,
                 ),
               ),
@@ -725,8 +740,8 @@ class _AddStudentModalState extends State<AddStudentModal> {
               size: 28,
             ),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.1),
-              hoverColor: Colors.white.withOpacity(0.2),
+              backgroundColor: Colors.white.withValues(alpha: 0.1),
+              hoverColor: Colors.white.withValues(alpha: 0.2),
             ),
           ),
         ],
@@ -778,11 +793,9 @@ class _AddStudentModalState extends State<AddStudentModal> {
                           child: _buildTextField(
                             controller: _matriculeController,
                             label: 'Matricule',
-                            hintText: '',
+                            hintText: 'Laisser vide pour auto-génération',
                             icon: Icons.badge,
                             isRequired: false,
-                            isReadOnly: true,
-                            prefixText: 'Auto',
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -859,12 +872,66 @@ class _AddStudentModalState extends State<AddStudentModal> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
-                  controller: _nomPereController,
-                  label: 'Nom du Père',
-                  hintText: 'Nom',
-                  icon: Icons.person,
-                  isRequired: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Nom du Père',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Auto',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _nomPereController,
+                      readOnly: true,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      decoration: InputDecoration(
+                        hintText: 'Identique au nom de l\'élève',
+                        prefixIcon: const Icon(Icons.person, size: 20),
+                        filled: true,
+                        fillColor: Colors.grey.withValues(alpha: 0.1),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: Colors.grey.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        suffixIcon: const Icon(
+                          Icons.lock_outline,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 16),
@@ -937,7 +1004,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
             prefixIcon: Icon(
               Icons.calendar_today_rounded,
               size: 20,
-              color: AppTheme.primaryColor.withOpacity(0.7),
+              color: AppTheme.primaryColor.withValues(alpha: 0.7),
             ),
             suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
             contentPadding: const EdgeInsets.symmetric(
@@ -964,7 +1031,9 @@ class _AddStudentModalState extends State<AddStudentModal> {
               ),
             ),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            fillColor: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.white,
           ),
           validator: (value) {
             if (value == null || value.isEmpty)
@@ -1002,12 +1071,12 @@ class _AddStudentModalState extends State<AddStudentModal> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: AppTheme.primaryColor.withOpacity(0.5),
+              color: AppTheme.primaryColor.withValues(alpha: 0.5),
               width: 3,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 10,
                 spreadRadius: 2,
               ),
@@ -1095,11 +1164,11 @@ class _AddStudentModalState extends State<AddStudentModal> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.blue.withOpacity(0.05),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.blue.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isDark ? Colors.white24 : Colors.blue.withOpacity(0.2),
+            color: isDark ? Colors.white24 : Colors.blue.withValues(alpha: 0.2),
           ),
         ),
         child: Row(
@@ -1252,34 +1321,69 @@ class _AddStudentModalState extends State<AddStudentModal> {
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: widget.isValidationMode
-                ? _buildTextField(
-                    controller: TextEditingController(
-                      text: _selectedTypeInscription.toUpperCase(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Type d\'inscription',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    label: 'Type d\'inscription',
-                    icon: Icons.app_registration_rounded,
-                    isRequired: false,
-                    isReadOnly: true,
-                  )
-                : _buildDropdownField(
-                    label: 'Type d\'inscription',
-                    selectedValue: _selectedTypeInscription,
-                    values: ['nouveau', 'redoublant', 'reinscrit'],
-                    displayValues: ['Nouveau', 'Redoublant', 'Réinscrit'],
-                    onChanged: (v) {
-                      if (v != null) {
-                        setState(() {
-                          _selectedTypeInscription = v;
-                          _selectedTypePaiement = (v == 'reinscrit')
-                              ? 'reinscription'
-                              : 'inscription';
-                        });
-                        _loadFraisScolarite();
-                      }
-                    },
-                    isRequired: true,
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Fixe',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: TextEditingController(text: 'Nouveau'),
+                  readOnly: true,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(
+                      Icons.app_registration_rounded,
+                      size: 20,
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.withValues(alpha: 0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Colors.grey.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    suffixIcon: const Icon(
+                      Icons.lock_outline,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
                   ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1299,16 +1403,16 @@ class _AddStudentModalState extends State<AddStudentModal> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.05),
+                color: Colors.orange.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.orange.withOpacity(0.2)),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: Colors.orange.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -1339,8 +1443,8 @@ class _AddStudentModalState extends State<AddStudentModal> {
                 gradient: LinearGradient(
                   colors: isDark
                       ? [
-                          const Color(0xFF1E3A8A).withOpacity(0.3),
-                          const Color(0xFF1E40AF).withOpacity(0.3),
+                          const Color(0xFF1E3A8A).withValues(alpha: 0.3),
+                          const Color(0xFF1E40AF).withValues(alpha: 0.3),
                         ]
                       : [const Color(0xFFEFF6FF), const Color(0xFFDBEAFE)],
                   begin: Alignment.topLeft,
@@ -1349,7 +1453,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isDark
-                      ? Colors.blue.withOpacity(0.2)
+                      ? Colors.blue.withValues(alpha: 0.2)
                       : Colors.blue.shade100,
                 ),
               ),
@@ -1358,7 +1462,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
@@ -1404,11 +1508,11 @@ class _AddStudentModalState extends State<AddStudentModal> {
                               ),
                               decoration: BoxDecoration(
                                 color: isDark
-                                    ? Colors.white.withOpacity(0.05)
+                                    ? Colors.white.withValues(alpha: 0.05)
                                     : Colors.white,
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: Colors.blue.withOpacity(0.1),
+                                  color: Colors.blue.withValues(alpha: 0.1),
                                 ),
                               ),
                               child: Text(
@@ -1549,7 +1653,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF2563EB).withOpacity(0.3),
+                color: const Color(0xFF2563EB).withValues(alpha: 0.3),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -1607,16 +1711,18 @@ class _AddStudentModalState extends State<AddStudentModal> {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.02) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.02) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade200,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade200,
         ),
         boxShadow: isDark
             ? []
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -1629,7 +1735,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.03)
+                  ? Colors.white.withValues(alpha: 0.03)
                   : Colors.grey.shade50,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
@@ -1645,7 +1751,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: isDark
-                        ? Colors.white.withOpacity(0.9)
+                        ? Colors.white.withValues(alpha: 0.9)
                         : Colors.blueGrey.shade800,
                   ),
                 ),
@@ -1700,7 +1806,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
               Icons.account_balance_rounded,
               size: 20,
               color: (montantRestant > 0 ? Colors.orange : Colors.green)
-                  .withOpacity(0.7),
+                  .withValues(alpha: 0.7),
             ),
             prefixText: 'GNF ',
             contentPadding: const EdgeInsets.symmetric(
@@ -1728,7 +1834,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
             ),
             filled: true,
             fillColor: isDark
-                ? Colors.white.withOpacity(0.03)
+                ? Colors.white.withValues(alpha: 0.03)
                 : Colors.grey.shade50,
           ),
         ),
@@ -1782,7 +1888,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
             prefixIcon: Icon(
               icon,
               size: 20,
-              color: AppTheme.primaryColor.withOpacity(0.7),
+              color: AppTheme.primaryColor.withValues(alpha: 0.7),
             ),
             prefixText: prefixText,
             contentPadding: const EdgeInsets.symmetric(
@@ -1811,9 +1917,11 @@ class _AddStudentModalState extends State<AddStudentModal> {
             filled: true,
             fillColor: isReadOnly
                 ? (isDark
-                      ? Colors.white.withOpacity(0.03)
+                      ? Colors.white.withValues(alpha: 0.03)
                       : Colors.grey.shade100)
-                : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+                : (isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.white),
             hintStyle: TextStyle(
               color: isDark ? Colors.white24 : Colors.grey.shade400,
               fontSize: 14,
@@ -1825,7 +1933,8 @@ class _AddStudentModalState extends State<AddStudentModal> {
             }
             if (label.toLowerCase().contains('montant payé')) {
               if (value != null && value.isNotEmpty) {
-                final montant = double.tryParse(value);
+                final cleanedValue = value.replaceAll(',', '.').trim();
+                final montant = double.tryParse(cleanedValue);
                 if (montant == null) return 'Montant invalide';
                 if (montant < 0) return 'Le montant ne peut pas être négatif';
                 if (montant > _fraisScolariteTotal) {
@@ -1875,7 +1984,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
             prefixIcon: Icon(
               Icons.arrow_drop_down_circle_rounded,
               size: 20,
-              color: AppTheme.primaryColor.withOpacity(0.7),
+              color: AppTheme.primaryColor.withValues(alpha: 0.7),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -1901,7 +2010,9 @@ class _AddStudentModalState extends State<AddStudentModal> {
               ),
             ),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            fillColor: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.white,
           ),
           dropdownColor: isDark ? const Color(0xFF1F2937) : Colors.white,
           items: values.asMap().entries.map((entry) {
@@ -1911,7 +2022,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
                 displayValues[entry.key],
                 style: TextStyle(
                   color: isDark
-                      ? Colors.white.withOpacity(0.9)
+                      ? Colors.white.withValues(alpha: 0.9)
                       : Colors.black87,
                 ),
               ),

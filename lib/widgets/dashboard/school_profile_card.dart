@@ -22,16 +22,12 @@ class SchoolProfileCard extends StatelessWidget {
         gradient: LinearGradient(
           colors: [
             AppTheme.primaryColor,
-            AppTheme.primaryColor.withOpacity(0.8),
+            AppTheme.primaryColor.withValues(alpha: 0.8),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: const Icon(
-        Icons.school,
-        color: Colors.white,
-        size: 40,
-      ),
+      child: const Icon(Icons.school, color: Colors.white, size: 40),
     );
   }
 
@@ -40,9 +36,9 @@ class SchoolProfileCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark 
-            ? AppTheme.primaryColor.withOpacity(0.1) 
-            : AppTheme.primaryColor.withOpacity(0.05),
+        color: isDark
+            ? AppTheme.primaryColor.withValues(alpha: 0.1)
+            : AppTheme.primaryColor.withValues(alpha: 0.05),
         border: Border(
           bottom: BorderSide(
             color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
@@ -64,7 +60,7 @@ class SchoolProfileCard extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -84,7 +80,7 @@ class SchoolProfileCard extends StatelessWidget {
                 : _buildDefaultSchoolLogo(),
           ),
           const SizedBox(height: 16),
-          
+
           // Loading state
           if (isLoading)
             Column(

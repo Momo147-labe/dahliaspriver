@@ -169,14 +169,23 @@ class ResultDao extends BaseDao {
       SELECT 
           sr.*,
           m.nom as matiere_nom,
-          COALESCE(cm.coefficient, 1) as coefficient
+          COALESCE(cm.coefficient, 1) as coefficient,
+          cy.note_max
       FROM SubjectRanks sr
       JOIN matiere m ON sr.matiere_id = m.id
+      JOIN classe c ON c.id = ?
+      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = sr.matiere_id AND cm.classe_id = ?
       WHERE sr.eleve_id = ?
       ORDER BY m.nom
       ''',
-      [effectiveClassId, anneeId, effectiveClassId, studentId],
+      [
+        effectiveClassId,
+        anneeId,
+        effectiveClassId,
+        effectiveClassId,
+        studentId,
+      ],
     );
 
     // 3. Prepare notes map for each subject
@@ -194,6 +203,7 @@ class ResultDao extends BaseDao {
       int matId = row['matiere_id'] as int;
       double moyAnnuelle = (row['moy_annuelle'] as num).toDouble();
       double coeff = (row['coefficient'] as num).toDouble();
+      double noteMax = (row['note_max'] as num?)?.toDouble() ?? 20.0;
 
       return {
         'matiere_id': matId,
@@ -203,9 +213,10 @@ class ResultDao extends BaseDao {
         'notes_par_trimestre': notesPerSubject[matId] ?? {},
         'moy_annuelle': moyAnnuelle,
         'note': moyAnnuelle,
+        'note_max': noteMax,
         'total': moyAnnuelle * coeff,
         'rang': row['rang'],
-        'appreciation': appreciationAutomatique(moyAnnuelle),
+        'appreciation': appreciationAutomatique(moyAnnuelle, noteMax: noteMax),
       };
     }).toList();
   }
@@ -403,19 +414,24 @@ class ResultDao extends BaseDao {
     int currentYearId,
     int? previousYearId,
   ) async {
-    // Current year academic performance
-    final currentAcademic = await db.rawQuery(
-      '''
+    const academicQuery = '''
       SELECT 
         AVG(n.note) as average_grade,
         COUNT(DISTINCT n.eleve_id) as students_graded,
         COUNT(n.id) as total_grades
       FROM notes n
-      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
-      WHERE ep.annee_scolaire_id = ?
-    ''',
-      [currentYearId],
-    );
+      WHERE n.annee_scolaire_id = ?
+    ''';
+
+    final currentAcademic = await db.rawQuery(academicQuery, [currentYearId]);
+
+    Map<String, dynamic>? previousAcademic;
+    if (previousYearId != null) {
+      final prevResult = await db.rawQuery(academicQuery, [previousYearId]);
+      if (prevResult.isNotEmpty) {
+        previousAcademic = prevResult.first;
+      }
+    }
 
     // Performance by trimester (current year)
     final trimesterPerformance = await db.rawQuery(
@@ -425,8 +441,7 @@ class ResultDao extends BaseDao {
         AVG(n.note) as average,
         COUNT(DISTINCT n.eleve_id) as students
       FROM notes n
-      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
-      WHERE ep.annee_scolaire_id = ?
+      WHERE n.annee_scolaire_id = ?
       GROUP BY n.trimestre
       ORDER BY n.trimestre
     ''',
@@ -445,7 +460,7 @@ class ResultDao extends BaseDao {
       JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
       JOIN classe c ON ep.classe_id = c.id
       JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      WHERE ep.annee_scolaire_id = ?
+      WHERE n.annee_scolaire_id = ?
       GROUP BY c.id
       ORDER BY cy.nom, c.nom
     ''',
@@ -454,6 +469,7 @@ class ResultDao extends BaseDao {
 
     return {
       'current': currentAcademic.first,
+      'previous': previousAcademic,
       'trimesterPerformance': trimesterPerformance,
       'classPerformance': classPerformance,
     };
@@ -516,26 +532,68 @@ class ResultDao extends BaseDao {
     await batch.commit(noResult: true);
   }
 
-  String appreciationAutomatique(double moyenne) {
-    if (moyenne >= 18) return 'Excellent';
-    if (moyenne >= 16) return 'Très Bien';
-    if (moyenne >= 14) return 'Bien';
-    if (moyenne >= 12) return 'Assez Bien';
-    if (moyenne >= 10) return 'Passable';
+  String appreciationAutomatique(double moyenne, {double noteMax = 20.0}) {
+    double ratio = noteMax > 0 ? moyenne / noteMax : 0;
+    if (ratio >= 0.9) return 'Excellent';
+    if (ratio >= 0.8) return 'Très Bien';
+    if (ratio >= 0.7) return 'Bien';
+    if (ratio >= 0.6) return 'Assez Bien';
+    if (ratio >= 0.5) return 'Passable';
     return 'Médiocre';
   }
 
-  Future<String> getAppreciation(double moyenne) async {
+  Future<String> getAppreciation(double moyenne, {int? cycleId}) async {
+    final whereClause = cycleId != null
+        ? 'note_min <= ? AND note_max >= ? AND cycle_id = ?'
+        : 'note_min <= ? AND note_max >= ?';
+    final whereArgs = cycleId != null
+        ? [moyenne, moyenne, cycleId]
+        : [moyenne, moyenne];
+
     final result = await db.query(
       'mention_config',
-      where: 'min_note <= ? AND max_note >= ?',
-      whereArgs: [moyenne, moyenne],
+      where: whereClause,
+      whereArgs: whereArgs,
       limit: 1,
     );
 
     if (result.isNotEmpty) {
-      return result.first['mention'] as String;
+      return result.first['label'] as String;
     }
     return appreciationAutomatique(moyenne);
+  }
+
+  Future<List<Map<String, dynamic>>> getSubjectPerformanceStats(
+    int anneeId,
+  ) async {
+    return await db.rawQuery(
+      '''
+      SELECT m.nom, AVG(n.note) as avg_grade
+      FROM notes n
+      JOIN matiere m ON n.matiere_id = m.id
+      WHERE n.annee_scolaire_id = ?
+      GROUP BY m.nom
+      ORDER BY avg_grade DESC
+      ''',
+      [anneeId],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getTeacherPerformanceStats(
+    int anneeId,
+  ) async {
+    return await db.rawQuery(
+      '''
+      SELECT ens.nom || ' ' || ens.prenom as nom_complet, AVG(n.note) as avg_grade
+      FROM notes n
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND n.annee_scolaire_id = ep.annee_scolaire_id
+      JOIN attribution_enseignant ae ON n.matiere_id = ae.matiere_id AND ep.classe_id = ae.classe_id
+      JOIN enseignant ens ON ae.enseignant_id = ens.id
+      WHERE n.annee_scolaire_id = ?
+      GROUP BY nom_complet
+      ORDER BY avg_grade DESC
+      ''',
+      [anneeId],
+    );
   }
 }

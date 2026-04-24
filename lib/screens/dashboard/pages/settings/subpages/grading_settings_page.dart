@@ -155,15 +155,15 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
         ],
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.grey.withOpacity(0.1),
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.grey.withValues(alpha: 0.1),
         ),
       ),
       child: Column(
@@ -176,8 +176,8 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: (iconColor ?? AppTheme.primaryColor).withOpacity(
-                      0.1,
+                    color: (iconColor ?? AppTheme.primaryColor).withValues(
+                      alpha: 0.1,
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -453,7 +453,7 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.02) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.02) : Colors.white,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!),
       ),
@@ -470,7 +470,7 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
             child: DataTable(
               columnSpacing: 24,
               headingRowColor: WidgetStateProperty.all(
-                isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+                isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[50],
               ),
               columns: [
                 DataColumn(
@@ -639,7 +639,7 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),
@@ -778,7 +778,7 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: selectedIcon == icon
-                                ? AppTheme.primaryColor.withOpacity(0.1)
+                                ? AppTheme.primaryColor.withValues(alpha: 0.1)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
@@ -1042,9 +1042,9 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.2)),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
           ),
           child: Icon(icon, size: 20, color: color),
         ),

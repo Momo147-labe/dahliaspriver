@@ -77,7 +77,7 @@ class _AddSubjectModalState extends State<AddSubjectModal> {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -139,7 +139,7 @@ class _AddSubjectModalState extends State<AddSubjectModal> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
@@ -166,7 +166,7 @@ class _AddSubjectModalState extends State<AddSubjectModal> {
                       ? 'Modifiez les informations de la matière'
                       : 'Créez une nouvelle matière pour votre école',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 14,
                   ),
                 ),
@@ -177,7 +177,7 @@ class _AddSubjectModalState extends State<AddSubjectModal> {
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.close_rounded, color: Colors.white),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.2),
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
             ),
           ),
         ],
@@ -201,7 +201,7 @@ class _AddSubjectModalState extends State<AddSubjectModal> {
             fontSize: 16,
             fontWeight: FontWeight.bold,
             color: isDark
-                ? Colors.white.withOpacity(0.9)
+                ? Colors.white.withValues(alpha: 0.9)
                 : Colors.blueGrey.shade800,
           ),
         ),
@@ -244,7 +244,7 @@ class _AddSubjectModalState extends State<AddSubjectModal> {
             ),
             filled: true,
             fillColor: isDark
-                ? Colors.white.withOpacity(0.05)
+                ? Colors.white.withValues(alpha: 0.05)
                 : Colors.grey.shade50,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
@@ -264,7 +264,9 @@ class _AddSubjectModalState extends State<AddSubjectModal> {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.02) : Colors.grey.shade50,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.02)
+            : Colors.grey.shade50,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
       child: Row(

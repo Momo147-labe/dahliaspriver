@@ -460,7 +460,7 @@ class _GenerateCardsModalState extends State<GenerateCardsModal> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? color.withOpacity(0.1)
+              ? color.withValues(alpha: 0.1)
               : (isDark ? const Color(0xFF374151) : Colors.grey[100]),
           border: Border.all(
             color: isSelected ? color : Colors.transparent,

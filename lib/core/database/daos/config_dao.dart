@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import '../schemas/configuration_annee_schema.dart';
 import '../schemas/cycles_scolaires_schema.dart';
 import '../schemas/niveaux_schema.dart';
+import '../schemas/matiere_schema.dart';
 import 'base_dao.dart';
 
 class ConfigDao extends BaseDao {
@@ -207,6 +208,294 @@ class ConfigDao extends BaseDao {
 
   Future<List<Map<String, dynamic>>> getNiveaux() async {
     return await db.query(NiveauxSchema.tableName, where: 'actif = 1');
+  }
+
+  Future<void> initializeTeachingStructure({
+    required bool prescolaire,
+    required bool primaire,
+    required bool college,
+    required bool lycee,
+  }) async {
+    await db.transaction((txn) async {
+      final List<Map<String, dynamic>> cyclesToInsert = [];
+      final List<Map<String, dynamic>> niveauxToInsert = [];
+      final Set<String> matieresToInsert = {};
+
+      if (prescolaire) {
+        cyclesToInsert.add({
+          'id': 1,
+          'nom': 'Préscolaire',
+          'ordre': 1,
+          'note_min': 0.0,
+          'note_max': 0.0,
+          'moyenne_passage': 0.0,
+        });
+        niveauxToInsert.addAll([
+          {
+            'nom': 'Petite section',
+            'cycle_id': 1,
+            'ordre': 1,
+            'moyenne_passage': 0.0,
+          },
+          {
+            'nom': 'Moyenne section',
+            'cycle_id': 1,
+            'ordre': 2,
+            'moyenne_passage': 0.0,
+          },
+          {
+            'nom': 'Grande section',
+            'cycle_id': 1,
+            'ordre': 3,
+            'moyenne_passage': 0.0,
+          },
+        ]);
+        // Pas de matières spécifiques pour le préscolaire mentionnées.
+      }
+      if (primaire) {
+        cyclesToInsert.add({
+          'id': 2,
+          'nom': 'Primaire',
+          'ordre': 2,
+          'note_min': 0.0,
+          'note_max': 10.0,
+          'moyenne_passage': 5.0,
+        });
+        niveauxToInsert.addAll([
+          {
+            'nom': '1ère année',
+            'cycle_id': 2,
+            'ordre': 1,
+            'moyenne_passage': 5.0,
+          },
+          {
+            'nom': '2ème année',
+            'cycle_id': 2,
+            'ordre': 2,
+            'moyenne_passage': 5.0,
+          },
+          {
+            'nom': '3ème année',
+            'cycle_id': 2,
+            'ordre': 3,
+            'moyenne_passage': 5.0,
+          },
+          {
+            'nom': '4ème année',
+            'cycle_id': 2,
+            'ordre': 4,
+            'moyenne_passage': 5.0,
+          },
+          {
+            'nom': '5ème année',
+            'cycle_id': 2,
+            'ordre': 5,
+            'moyenne_passage': 5.0,
+          },
+          {
+            'nom': '6ème année',
+            'cycle_id': 2,
+            'ordre': 6,
+            'moyenne_passage': 5.0,
+          },
+        ]);
+        matieresToInsert.addAll([
+          "Français",
+          "Calculs",
+          "Sciences d'observation",
+          "Histoire-Géographie",
+          "ECM",
+          "Dessin / Arts plastiques",
+          "Éducation physique et sportive (EPS)",
+        ]);
+      }
+      if (college) {
+        cyclesToInsert.add({
+          'id': 3,
+          'nom': 'Collège',
+          'ordre': 3,
+          'note_min': 0.0,
+          'note_max': 20.0,
+          'moyenne_passage': 10.0,
+        });
+        niveauxToInsert.addAll([
+          {
+            'nom': '7ème année',
+            'cycle_id': 3,
+            'ordre': 1,
+            'moyenne_passage': 10.0,
+          },
+          {
+            'nom': '8ème année',
+            'cycle_id': 3,
+            'ordre': 2,
+            'moyenne_passage': 10.0,
+          },
+          {
+            'nom': '9ème année',
+            'cycle_id': 3,
+            'ordre': 3,
+            'moyenne_passage': 10.0,
+          },
+          {
+            'nom': '10ème année',
+            'cycle_id': 3,
+            'ordre': 4,
+            'moyenne_passage': 10.0,
+          },
+        ]);
+        matieresToInsert.addAll([
+          "Français",
+          "Mathématiques",
+          "Anglais",
+          "Physique",
+          "Chimie",
+          "Biologie",
+          "Géologie",
+          "Histoire",
+          "Géographie",
+          "ECM",
+          "Informatique",
+          "EPS",
+        ]);
+      }
+      if (lycee) {
+        cyclesToInsert.add({
+          'id': 4,
+          'nom': 'Lycée',
+          'ordre': 4,
+          'note_min': 0.0,
+          'note_max': 20.0,
+          'moyenne_passage': 10.0,
+        });
+        niveauxToInsert.addAll([
+          {
+            'nom': '11ème année',
+            'cycle_id': 4,
+            'ordre': 1,
+            'moyenne_passage': 10.0,
+          },
+          {
+            'nom': '12ème année',
+            'cycle_id': 4,
+            'ordre': 2,
+            'moyenne_passage': 10.0,
+          },
+          {
+            'nom': 'Terminale',
+            'cycle_id': 4,
+            'ordre': 3,
+            'moyenne_passage': 10.0,
+          },
+        ]);
+        matieresToInsert.addAll([
+          "Français",
+          "Philosophie",
+          "Anglais",
+          "Mathématiques",
+          "Physique",
+          "Chimie",
+          "Biologie",
+          "Géologie",
+          "Histoire",
+          "Géographie",
+          "EPS",
+          "Économie",
+        ]);
+      }
+
+      // Insert cycles safely
+      for (var cycle in cyclesToInsert) {
+        await txn.insert(
+          CyclesScolairesSchema.tableName,
+          cycle,
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+
+      // Insert niveaux safely
+      final List<Map<String, dynamic>> insertedNiveaux = [];
+      for (var niveau in niveauxToInsert) {
+        final existing = await txn.query(
+          NiveauxSchema.tableName,
+          where: 'nom = ? AND cycle_id = ?',
+          whereArgs: [niveau['nom'], niveau['cycle_id']],
+        );
+
+        int insertedId;
+        if (existing.isNotEmpty) {
+          insertedId = existing.first['id'] as int;
+          await txn.update(
+            NiveauxSchema.tableName,
+            niveau,
+            where: 'id = ?',
+            whereArgs: [insertedId],
+          );
+        } else {
+          insertedId = await txn.insert(NiveauxSchema.tableName, niveau);
+        }
+
+        insertedNiveaux.add({'id': insertedId, 'nom': niveau['nom']});
+      }
+
+      // Insert matieres safely (avoid duplicates globally)
+      for (var matiereNom in matieresToInsert) {
+        final existing = await txn.query(
+          MatiereSchema.tableName,
+          where: 'nom = ?',
+          whereArgs: [matiereNom],
+        );
+        if (existing.isEmpty) {
+          await txn.insert(MatiereSchema.tableName, {'nom': matiereNom});
+        }
+      }
+
+      // Progression Links mapping
+      final Map<String, String> progressionLinks = {
+        'Petite section': 'Moyenne section',
+        'Moyenne section': 'Grande section',
+        'Grande section': '1ère année',
+        '1ère année': '2ème année',
+        '2ème année': '3ème année',
+        '3ème année': '4ème année',
+        '4ème année': '5ème année',
+        '5ème année': '6ème année',
+        '6ème année': '7ème année',
+        '7ème année': '8ème année',
+        '8ème année': '9ème année',
+        '9ème année': '10ème année',
+        '10ème année': '11ème année',
+        '11ème année': '12ème année',
+        '12ème année': 'Terminale',
+      };
+
+      for (var niveau in insertedNiveaux) {
+        final nom = niveau['nom'] as String;
+        final nextNom = progressionLinks[nom];
+
+        if (nextNom != null) {
+          final nextNiveauIndex = insertedNiveaux.indexWhere(
+            (n) => n['nom'] == nextNom,
+          );
+          if (nextNiveauIndex != -1) {
+            final nextNiveauId = insertedNiveaux[nextNiveauIndex]['id'];
+            await txn.update(
+              NiveauxSchema.tableName,
+              {'next_niveau_id': nextNiveauId},
+              where: 'id = ?',
+              whereArgs: [niveau['id']],
+            );
+          }
+        } else {
+          await txn.update(
+            NiveauxSchema.tableName,
+            {'next_niveau_id': null},
+            where: 'id = ?',
+            whereArgs: [niveau['id']],
+          );
+        }
+      }
+    });
   }
 
   Future<List<Map<String, dynamic>>> getSequencesForTrimester(

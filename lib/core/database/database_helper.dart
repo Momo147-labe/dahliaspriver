@@ -21,6 +21,7 @@ import 'daos/result_dao.dart';
 import 'daos/reports_dao.dart';
 import 'schema/database_schema.dart';
 import 'migrations/database_migrations.dart';
+import 'daos/promotion_log_dao.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -47,6 +48,7 @@ class DatabaseHelper {
   CommonDao get commonDao => CommonDao(_db!);
   ResultDao get resultDao => ResultDao(_db!);
   ReportsDao get reportsDao => ReportsDao(_db!);
+  PromotionLogDao get promotionLogDao => PromotionLogDao(_db!);
 
   // ==============================================================================
   // PROXY METHODS TO DAOs (for UI compatibility)
@@ -153,7 +155,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 59,
+      version: 61,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -568,46 +570,52 @@ class DatabaseHelper {
   ) => eleveDao.getStudentPaymentControlData(anneeId);
 
   Future<List<Map<String, dynamic>>> getOverdueStudents(int anneeId) =>
-      feesDao.getOverdueStudents(anneeId);
+      paiementDao.getOverdueStudents(anneeId);
 
-  Future<List<Map<String, dynamic>>> getAttributionsByClass(
-    int classeId, [
-    int? anneeId,
-  ]) => enseignantDao.getAttributionsByClass(classeId, anneeId);
+  Future<List<Map<String, dynamic>>> getAgeDistribution(int anneeId) =>
+      eleveDao.getAgeDistribution(anneeId);
+  Future<List<Map<String, dynamic>>> getGeographicDistribution(int anneeId) =>
+      eleveDao.getGeographicDistribution(anneeId);
+  Future<List<Map<String, dynamic>>> getGenderStatsByCycle(int anneeId) =>
+      eleveDao.getGenderStatsByCycle(anneeId);
 
-  Future<void> saveAllAttributions(
-    int classeId,
-    int? anneeId,
-    Map<int, int?> assignments,
-  ) => enseignantDao.saveAllAttributions(classeId, anneeId, assignments);
+  Future<List<Map<String, dynamic>>> getSubjectPerformanceStats(int anneeId) =>
+      resultDao.getSubjectPerformanceStats(anneeId);
+  Future<List<Map<String, dynamic>>> getTeacherPerformanceStats(int anneeId) =>
+      resultDao.getTeacherPerformanceStats(anneeId);
+
+  Future<List<Map<String, dynamic>>> getMonthlyCollectionCurve(int anneeId) =>
+      feesDao.getMonthlyCollectionCurve(anneeId);
+
+  Future<List<Map<String, dynamic>>> getAttributionsByClass(int classeId) =>
+      enseignantDao.getAttributionsByClass(classeId);
+
+  Future<void> saveAllAttributions(int classeId, Map<int, int?> assignments) =>
+      enseignantDao.saveAllAttributions(classeId, assignments);
 
   Future<void> saveAttribution(Map<String, dynamic> attribution) =>
       enseignantDao.saveAttribution(attribution);
 
   Future<Map<String, dynamic>?> getAssignedTeacher(
     int classeId,
-    int matiereId, [
-    int? anneeId,
-  ]) => enseignantDao.getAssignedTeacher(classeId, matiereId, anneeId ?? 0);
+    int matiereId,
+  ) => enseignantDao.getAssignedTeacher(classeId, matiereId);
 
   Future<List<Map<String, dynamic>>> rawQuery(
     String sql, [
     List<Object?>? arguments,
   ]) => commonDao.rawQuery(sql, arguments);
 
-  Future<List<Map<String, dynamic>>> getSubjectsByClass(
-    int classeId, [
-    int? anneeId,
-  ]) => matiereDao.getSubjectsByClass(classeId, anneeId);
+  Future<List<Map<String, dynamic>>> getSubjectsByClass(int classeId) =>
+      matiereDao.getSubjectsByClass(classeId);
 
   Future<void> saveClassSubjects(
     int classeId,
-    int? anneeId,
     List<Map<String, dynamic>> subjectsData,
-  ) => classeDao.saveClassSubjects(classeId, anneeId, subjectsData);
+  ) => classeDao.saveClassSubjects(classeId, subjectsData);
 
-  Future<bool> isSubjectInClass(int classeId, int matiereId, [int? anneeId]) =>
-      matiereDao.isSubjectInClass(classeId, matiereId, anneeId);
+  Future<bool> isSubjectInClass(int classeId, int matiereId) =>
+      matiereDao.isSubjectInClass(classeId, matiereId);
 
   // --- STUDENT DETAILS & HISTORY ---
 
@@ -662,21 +670,46 @@ class DatabaseHelper {
   Future<Map<String, dynamic>> getFraisStatistics(int anneeScolaireId) =>
       feesDao.getFraisStatistics(anneeScolaireId);
 
-  Future<List<Map<String, dynamic>>> getClassesByTeacher(
-    int enseignantId, [
-    int? anneeId,
-  ]) => enseignantDao.getClassesByTeacher(enseignantId, anneeId);
+  Future<List<Map<String, dynamic>>> getClassesByTeacher(int enseignantId) =>
+      enseignantDao.getClassesByTeacher(enseignantId);
 
   Future<void> deleteFraisForClasses(
     List<int> classeIds,
     int anneeScolaireId,
   ) => feesDao.deleteFraisForClasses(classeIds, anneeScolaireId);
 
+  Future<int> updateEleveParcoursStatut(
+    int eleveId,
+    int anneeId,
+    String statut,
+  ) => eleveDao.updateEleveParcoursStatut(eleveId, anneeId, statut);
+
   // ==============================================================================
   // GESTION DES UTILISATEURS
   // ==============================================================================
 
   Future<Map<String, dynamic>?> getUser(int id) => userDao.getUser(id);
+
+  // ==============================================================================
+  // PROMOTION LOGGING
+  // ==============================================================================
+
+  Future<bool> hasPromotionBeenLogged(int fromAnneeId, int fromClasseId) =>
+      promotionLogDao.hasPromotionBeenLogged(fromAnneeId, fromClasseId);
+
+  Future<int> logPromotion({
+    required int fromAnneeId,
+    required int fromClasseId,
+    required int toAnneeId,
+    required int toClasseId,
+    String? status,
+  }) => promotionLogDao.logPromotion(
+    fromAnneeId: fromAnneeId,
+    fromClasseId: fromClasseId,
+    toAnneeId: toAnneeId,
+    toClasseId: toClasseId,
+    status: status,
+  );
 
   Future<List<Map<String, dynamic>>> getUsers() => userDao.getUsers();
 

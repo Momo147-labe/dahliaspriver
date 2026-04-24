@@ -158,7 +158,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                                   child: CircleAvatar(
                                     radius: 50,
                                     backgroundColor: AppTheme.primaryColor
-                                        .withOpacity(0.1),
+                                        .withValues(alpha: 0.1),
                                     child: const Icon(
                                       Icons.person,
                                       size: 50,
@@ -316,7 +316,9 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 side: BorderSide(
-                                  color: AppTheme.primaryColor.withOpacity(0.5),
+                                  color: AppTheme.primaryColor.withValues(
+                                    alpha: 0.5,
+                                  ),
                                 ),
                               ),
                               child: const Text(
@@ -377,7 +379,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                                         CircleAvatar(
                                           radius: 16,
                                           backgroundColor: AppTheme.primaryColor
-                                              .withOpacity(0.1),
+                                              .withValues(alpha: 0.1),
                                           child: Text(
                                             user['pseudo']?[0].toUpperCase() ??
                                                 'U',
@@ -426,7 +428,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                                       decoration: BoxDecoration(
                                         color: _getRoleColor(
                                           role,
-                                        ).withOpacity(0.1),
+                                        ).withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
@@ -525,7 +527,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -585,7 +587,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
             prefixIcon: Icon(
               icon,
               size: 20,
-              color: AppTheme.primaryColor.withOpacity(0.5),
+              color: AppTheme.primaryColor.withValues(alpha: 0.5),
             ),
             suffixIcon: suffixIcon,
             filled: true,

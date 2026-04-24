@@ -327,7 +327,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 40,
               offset: const Offset(0, 20),
             ),
@@ -378,7 +378,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(
@@ -403,7 +403,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
               Text(
                 'Mise à jour des informations personnelles',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontSize: 14,
                 ),
               ),
@@ -418,8 +418,8 @@ class _EditStudentModalState extends State<EditStudentModal> {
               size: 28,
             ),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.1),
-              hoverColor: Colors.white.withOpacity(0.2),
+              backgroundColor: Colors.white.withValues(alpha: 0.1),
+              hoverColor: Colors.white.withValues(alpha: 0.2),
             ),
           ),
         ],
@@ -572,7 +572,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
             prefixIcon: Icon(
               Icons.calendar_today_rounded,
               size: 20,
-              color: AppTheme.primaryColor.withOpacity(0.7),
+              color: AppTheme.primaryColor.withValues(alpha: 0.7),
             ),
             suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
             contentPadding: const EdgeInsets.symmetric(
@@ -599,7 +599,9 @@ class _EditStudentModalState extends State<EditStudentModal> {
               ),
             ),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            fillColor: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.white,
           ),
           validator: (value) {
             if (value == null || value.isEmpty)
@@ -637,12 +639,12 @@ class _EditStudentModalState extends State<EditStudentModal> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: AppTheme.primaryColor.withOpacity(0.5),
+              color: AppTheme.primaryColor.withValues(alpha: 0.5),
               width: 3,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 10,
                 spreadRadius: 2,
               ),
@@ -731,7 +733,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isDark ? Colors.white10 : Colors.grey.shade300,
@@ -789,7 +791,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark
-            ? Colors.black.withOpacity(0.2)
+            ? Colors.black.withValues(alpha: 0.2)
             : Colors.white,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
       ),
@@ -844,10 +846,12 @@ class _EditStudentModalState extends State<EditStudentModal> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.03) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade200,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade200,
         ),
       ),
       child: Column(
@@ -908,7 +912,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
             prefixIcon: Icon(
               icon,
               size: 20,
-              color: AppTheme.primaryColor.withOpacity(0.7),
+              color: AppTheme.primaryColor.withValues(alpha: 0.7),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -934,7 +938,9 @@ class _EditStudentModalState extends State<EditStudentModal> {
               ),
             ),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            fillColor: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.white,
           ),
           validator: isRequired
               ? (value) => (value == null || value.isEmpty)
@@ -1036,7 +1042,7 @@ class _EditStudentModalState extends State<EditStudentModal> {
             prefixIcon: Icon(
               Icons.wc_rounded,
               size: 20,
-              color: AppTheme.primaryColor.withOpacity(0.7),
+              color: AppTheme.primaryColor.withValues(alpha: 0.7),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -1062,7 +1068,9 @@ class _EditStudentModalState extends State<EditStudentModal> {
               ),
             ),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            fillColor: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.white,
           ),
           items: List.generate(
             values.length,
@@ -1111,64 +1119,94 @@ class _CameraPreviewModalState extends State<_CameraPreviewModal> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Dialog(
-      backgroundColor: Colors.black,
-      insetPadding: const EdgeInsets.all(0),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          FutureBuilder<void>(
-            future: _initializeControllerFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                return CameraPreview(_controller);
-              } else {
-                return const Center(child: CircularProgressIndicator());
-              }
-            },
-          ),
-          Positioned(
-            bottom: 40,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: Colors.white, size: 32),
-                  padding: const EdgeInsets.all(12),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black45,
-                    shape: const CircleBorder(),
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: 500,
+        height: 600,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF111827) : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.camera_alt_rounded,
+                    color: AppTheme.primaryColor,
                   ),
-                ),
-                const SizedBox(width: 40),
-                GestureDetector(
-                  onTap: _isTakingPicture ? null : _takePicture,
-                  child: Container(
-                    height: 80,
-                    width: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 4),
-                    ),
-                    child: Center(
-                      child: _isTakingPicture
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Container(
-                              height: 60,
-                              width: 60,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                    ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Prendre une photo',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
-              ],
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            Expanded(
+              child: FutureBuilder<void>(
+                future: _initializeControllerFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: CameraPreview(_controller),
+                      ),
+                    );
+                  } else {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    height: 56,
+                    width: 200,
+                    child: ElevatedButton.icon(
+                      onPressed: _isTakingPicture ? null : _takePicture,
+                      icon: _isTakingPicture
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.camera),
+                      label: Text(_isTakingPicture ? 'Capture...' : 'Capturer'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1179,18 +1217,22 @@ class _CameraPreviewModalState extends State<_CameraPreviewModal> {
       await _initializeControllerFuture;
       final image = await _controller.takePicture();
 
-      if (mounted) Navigator.of(context).pop(image);
+      if (mounted) {
+        Navigator.pop(context, image);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur capture : $e'),
+            content: Text('Erreur lors de la capture : $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
-      if (mounted) setState(() => _isTakingPicture = false);
+      if (mounted) {
+        setState(() => _isTakingPicture = false);
+      }
     }
   }
 }

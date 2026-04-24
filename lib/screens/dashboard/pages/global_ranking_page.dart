@@ -352,7 +352,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
         color: widget.isDark ? AppTheme.surfaceDark : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             offset: const Offset(0, 2),
             blurRadius: 10,
           ),
@@ -373,7 +373,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(
@@ -578,7 +578,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
         decoration: BoxDecoration(
           color: isEven
               ? (widget.isDark
-                    ? Colors.white.withOpacity(0.03)
+                    ? Colors.white.withValues(alpha: 0.03)
                     : Colors.grey.shade50)
               : bg,
           border: Border(right: BorderSide(color: border)),
@@ -667,8 +667,8 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
                         children: [
                           CircleAvatar(
                             radius: 13,
-                            backgroundColor: AppTheme.primaryColor.withOpacity(
-                              0.1,
+                            backgroundColor: AppTheme.primaryColor.withValues(
+                              alpha: 0.1,
                             ),
                             backgroundImage: hasPhoto
                                 ? FileImage(io.File(photo))
@@ -764,10 +764,13 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
 
     // Alternating group background colors for visual separation
     final List<Color> groupColors = widget.isDark
-        ? [Colors.blueGrey.withOpacity(0.2), Colors.blueGrey.withOpacity(0.1)]
+        ? [
+            Colors.blueGrey.withValues(alpha: 0.2),
+            Colors.blueGrey.withValues(alpha: 0.1),
+          ]
         : [
-            AppTheme.primaryColor.withOpacity(0.05),
-            AppTheme.primaryColor.withOpacity(0.12),
+            AppTheme.primaryColor.withValues(alpha: 0.05),
+            AppTheme.primaryColor.withValues(alpha: 0.12),
           ];
 
     int groupIdx = 0;
@@ -823,7 +826,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
       groupCell(
         'Moy. Gén.',
         90,
-        bg: AppTheme.primaryColor.withOpacity(0.9),
+        bg: AppTheme.primaryColor.withValues(alpha: 0.9),
         fg: Colors.white,
       ),
     );
@@ -831,7 +834,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
       groupCell(
         'Décision',
         80,
-        bg: AppTheme.primaryColor.withOpacity(0.9),
+        bg: AppTheme.primaryColor.withValues(alpha: 0.9),
         fg: Colors.white,
       ),
     );
@@ -839,7 +842,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
       groupCell(
         'Mention',
         120,
-        bg: AppTheme.primaryColor.withOpacity(0.9),
+        bg: AppTheme.primaryColor.withValues(alpha: 0.9),
         fg: Colors.white,
       ),
     );
@@ -847,7 +850,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
       groupCell(
         'Appréciation',
         220,
-        bg: AppTheme.primaryColor.withOpacity(0.9),
+        bg: AppTheme.primaryColor.withValues(alpha: 0.9),
         fg: Colors.white,
       ),
     );
@@ -965,7 +968,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.12),
+                                color: Colors.orange.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(5),
                               ),
                               child: Text(
@@ -1044,7 +1047,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
                                   decoration: BoxDecoration(
                                     color: MentionHelper.getMentionColor(
                                       mentionData['couleur'],
-                                    ).withOpacity(0.15),
+                                    ).withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: MentionHelper.getMentionColor(
@@ -1135,7 +1138,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -1177,13 +1180,13 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
       margin: const EdgeInsets.only(bottom: 16),
       color: widget.isDark ? AppTheme.cardDark : Colors.white,
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.05),
+      shadowColor: Colors.black.withValues(alpha: 0.05),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(
           color: isPassing
-              ? AppTheme.successColor.withOpacity(0.3)
-              : AppTheme.errorColor.withOpacity(0.3),
+              ? AppTheme.successColor.withValues(alpha: 0.3)
+              : AppTheme.errorColor.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -1191,7 +1194,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           radius: 24,
-          backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
           backgroundImage: (photo != null && photo.isNotEmpty)
               ? FileImage(io.File(photo))
               : null,
@@ -1222,7 +1225,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -1264,9 +1267,11 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
+                            color: color.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: color.withOpacity(0.3)),
+                            border: Border.all(
+                              color: color.withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Text(
                             MentionHelper.stripEmojis(m['label'] ?? ''),
@@ -1371,7 +1376,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -1493,10 +1498,10 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
       decoration: BoxDecoration(
         color: widget.isDark ? AppTheme.cardDark : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.05),
+            color: color.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1508,7 +1513,7 @@ class _GlobalRankingPageState extends State<GlobalRankingPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 24),

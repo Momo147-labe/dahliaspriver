@@ -17,6 +17,7 @@ import '../schemas/eleve_parcours_schema.dart';
 import '../schemas/user_schema.dart';
 import '../schemas/attribution_enseignant_schema.dart';
 import '../schemas/classe_matiere_schema.dart';
+import '../schemas/promotion_log_schema.dart';
 // These tables are defined directly in the create method below because their schema files are missing
 import '../schemas/document_template_schema.dart';
 
@@ -65,6 +66,7 @@ class DatabaseSchema {
     await db.execute(UserSchema.createTable);
     await db.execute(AttributionEnseignantSchema.createTable);
     await db.execute(ClasseMatiereSchema.createTable);
+    await db.execute(PromotionLogSchema.createTable);
 
     // Check if mention_config and appreciation_config have schemas
     // I didn't see them in the list earlier, let's re-verify

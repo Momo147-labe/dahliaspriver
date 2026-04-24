@@ -117,7 +117,7 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -159,10 +159,10 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 20),
                     decoration: BoxDecoration(
-                      color: AppTheme.errorColor.withOpacity(0.1),
+                      color: AppTheme.errorColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: AppTheme.errorColor.withOpacity(0.3),
+                        color: AppTheme.errorColor.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Text(

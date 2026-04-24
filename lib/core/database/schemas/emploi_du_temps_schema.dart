@@ -9,7 +9,7 @@ class EmploiDuTempsSchema {
       matiere_id INTEGER,
       enseignant_id INTEGER,
       annee_scolaire_id INTEGER,
-      jour_semaine TEXT, -- 'Lundi', 'Mardi', etc.
+      jour_semaine INTEGER, -- 1: Lundi, 2: Mardi, ..., 7: Dimanche
       heure_debut TEXT,
       heure_fin TEXT,
       salle TEXT,

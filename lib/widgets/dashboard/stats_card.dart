@@ -96,7 +96,7 @@ class StatsCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: (badgeColor ?? Colors.green).withOpacity(0.1),
+                    color: (badgeColor ?? Colors.green).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(

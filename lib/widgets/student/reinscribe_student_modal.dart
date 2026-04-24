@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../models/student.dart';
 
-
 class ReinscribeStudentModal extends StatelessWidget {
   final Student student;
   final VoidCallback onSuccess;
@@ -44,10 +43,7 @@ class ReinscribeStudentModal extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                IconButton(
-                  onPressed: onClose,
-                  icon: const Icon(Icons.close),
-                ),
+                IconButton(onPressed: onClose, icon: const Icon(Icons.close)),
               ],
             ),
             const SizedBox(height: 24),
@@ -59,7 +55,7 @@ class ReinscribeStudentModal extends StatelessWidget {
                 color: isDark ? AppTheme.backgroundDark : Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.2),
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
                 ),
               ),
               child: Column(
@@ -72,7 +68,11 @@ class ReinscribeStudentModal extends StatelessWidget {
                         backgroundImage: NetworkImage(student.photo),
                         backgroundColor: Colors.grey.shade300,
                         child: student.photo.isEmpty
-                            ? const Icon(Icons.person, color: Colors.grey, size: 30)
+                            ? const Icon(
+                                Icons.person,
+                                color: Colors.grey,
+                                size: 30,
+                              )
                             : null,
                       ),
                       const SizedBox(width: 16),
@@ -134,7 +134,9 @@ class ReinscribeStudentModal extends StatelessWidget {
             DropdownButtonFormField<String>(
               decoration: InputDecoration(
                 filled: true,
-                fillColor: isDark ? AppTheme.backgroundDark : Colors.grey.shade50,
+                fillColor: isDark
+                    ? AppTheme.backgroundDark
+                    : Colors.grey.shade50,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -157,10 +159,7 @@ class ReinscribeStudentModal extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                TextButton(
-                  onPressed: onClose,
-                  child: const Text('Annuler'),
-                ),
+                TextButton(onPressed: onClose, child: const Text('Annuler')),
                 const SizedBox(width: 16),
                 ElevatedButton(
                   onPressed: () {
@@ -170,7 +169,10 @@ class ReinscribeStudentModal extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF8B5CF6),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -200,18 +202,12 @@ class ReinscribeStudentModal extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
-            ),
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
           ),
         ],
       ),

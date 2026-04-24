@@ -43,13 +43,25 @@ class _PaidStudentsPageState extends State<PaidStudentsPage> {
           final double? rest = s['montant_restant'] != null
               ? (s['montant_restant'] as num).toDouble()
               : null;
-          final total = (s['montant_total'] as num?)?.toDouble() ?? 0.0;
+
+          final double inscription =
+              (s['inscription'] as num?)?.toDouble() ?? 0.0;
+          final double reinscription =
+              (s['reinscription'] as num?)?.toDouble() ?? 0.0;
+          final double t1 = (s['tranche1'] as num?)?.toDouble() ?? 0.0;
+          final double t2 = (s['tranche2'] as num?)?.toDouble() ?? 0.0;
+          final double t3 = (s['tranche3'] as num?)?.toDouble() ?? 0.0;
+
+          final bool isReinscrit = s['eleve_statut'] == 'reinscrit';
+          final double totalDue =
+              (isReinscrit ? reinscription : inscription) + t1 + t2 + t3;
+
           final paid = (s['total_paye'] as num?)?.toDouble() ?? 0.0;
 
           if (rest != null) {
-            return rest <= 0 && total > 0;
+            return rest <= 0 && totalDue > 0;
           }
-          return total > 0 && paid >= total;
+          return totalDue > 0 && paid >= totalDue;
         }).toList();
 
         final activeAnnee = await dbHelper.getActiveAnnee();
@@ -258,7 +270,9 @@ class _PaidStudentsPageState extends State<PaidStudentsPage> {
               hintText: "Rechercher...",
               prefixIcon: const Icon(Symbols.search, size: 20),
               filled: true,
-              fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+              fillColor: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
@@ -336,7 +350,7 @@ class _PaidStudentsPageState extends State<PaidStudentsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -368,7 +382,7 @@ class _PaidStudentsPageState extends State<PaidStudentsPage> {
               Icon(
                 Symbols.verified_user,
                 size: 64,
-                color: AppTheme.primaryColor.withOpacity(0.5),
+                color: AppTheme.primaryColor.withValues(alpha: 0.5),
               ),
               const SizedBox(height: 16),
               Text(
@@ -393,7 +407,7 @@ class _PaidStudentsPageState extends State<PaidStudentsPage> {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -441,7 +455,7 @@ class _PaidStudentsPageState extends State<PaidStudentsPage> {
       children: [
         CircleAvatar(
           radius: 18,
-          backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
           child: Text(
             student['nom'][0],
             style: const TextStyle(
@@ -473,7 +487,7 @@ class _PaidStudentsPageState extends State<PaidStudentsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppTheme.successColor.withOpacity(0.1),
+        color: AppTheme.successColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: const Text(

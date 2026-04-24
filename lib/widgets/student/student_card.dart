@@ -32,9 +32,9 @@ class StudentCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: isDark 
-                ? Colors.black.withOpacity(0.2)
-                : Colors.black.withOpacity(0.05),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.2)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -50,12 +50,16 @@ class StudentCard extends StatelessWidget {
                 backgroundImage: student.photo.isNotEmpty
                     ? NetworkImage(student.photo)
                     : null,
-                backgroundColor: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
+                backgroundColor: isDark
+                    ? AppTheme.surfaceDark
+                    : AppTheme.surfaceLight,
                 child: student.photo.isEmpty
                     ? Icon(
-                        Icons.person, 
-                        color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary, 
-                        size: 40
+                        Icons.person,
+                        color: isDark
+                            ? AppTheme.textDarkSecondary
+                            : AppTheme.textSecondary,
+                        size: 40,
                       )
                     : null,
               ),
@@ -68,21 +72,27 @@ class StudentCard extends StatelessWidget {
                       '${student.nom} ${student.prenom}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
+                        color: isDark
+                            ? AppTheme.textDarkPrimary
+                            : AppTheme.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Matricule: ${student.matricule}',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
+                        color: isDark
+                            ? AppTheme.textDarkSecondary
+                            : AppTheme.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Classe: ${student.classe}',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
+                        color: isDark
+                            ? AppTheme.textDarkSecondary
+                            : AppTheme.textSecondary,
                       ),
                     ),
                   ],
@@ -96,9 +106,12 @@ class StudentCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(student.statut).withOpacity(0.1),
+                  color: _getStatusColor(student.statut).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -112,7 +125,9 @@ class StudentCard extends StatelessWidget {
               PopupMenuButton<String>(
                 icon: Icon(
                   Icons.more_vert,
-                  color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
+                  color: isDark
+                      ? AppTheme.textDarkSecondary
+                      : AppTheme.textSecondary,
                 ),
                 itemBuilder: (context) => [
                   PopupMenuItem(
@@ -124,7 +139,9 @@ class StudentCard extends StatelessWidget {
                         Text(
                           'Modifier',
                           style: TextStyle(
-                            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
+                            color: isDark
+                                ? AppTheme.textDarkPrimary
+                                : AppTheme.textPrimary,
                           ),
                         ),
                       ],
@@ -139,7 +156,9 @@ class StudentCard extends StatelessWidget {
                         Text(
                           'Réinscrire',
                           style: TextStyle(
-                            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
+                            color: isDark
+                                ? AppTheme.textDarkPrimary
+                                : AppTheme.textPrimary,
                           ),
                         ),
                       ],
@@ -154,7 +173,9 @@ class StudentCard extends StatelessWidget {
                         Text(
                           'Supprimer',
                           style: TextStyle(
-                            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textPrimary,
+                            color: isDark
+                                ? AppTheme.textDarkPrimary
+                                : AppTheme.textPrimary,
                           ),
                         ),
                       ],

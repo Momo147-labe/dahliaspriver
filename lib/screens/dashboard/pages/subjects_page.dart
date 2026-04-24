@@ -168,7 +168,7 @@ class _SubjectsPageState extends State<SubjectsPage>
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.primaryColor.withOpacity(0.3),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.3),
                       blurRadius: 15,
                       offset: const Offset(0, 8),
                     ),
@@ -222,7 +222,7 @@ class _SubjectsPageState extends State<SubjectsPage>
               backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
               elevation: 8,
-              shadowColor: AppTheme.primaryColor.withOpacity(0.5),
+              shadowColor: AppTheme.primaryColor.withValues(alpha: 0.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -310,7 +310,7 @@ class _SubjectsPageState extends State<SubjectsPage>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: colors[0].withOpacity(0.3),
+            color: colors[0].withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -348,7 +348,7 @@ class _SubjectsPageState extends State<SubjectsPage>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(icon, color: Colors.white, size: 28),
@@ -363,8 +363,8 @@ class _SubjectsPageState extends State<SubjectsPage>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.8),
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -389,7 +389,7 @@ class _SubjectsPageState extends State<SubjectsPage>
                 ),
                 filled: true,
                 fillColor: isDark
-                    ? Colors.white.withOpacity(0.05)
+                    ? Colors.white.withValues(alpha: 0.05)
                     : Colors.grey.shade100,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -435,7 +435,7 @@ class _SubjectsPageState extends State<SubjectsPage>
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.1)
+                  ? Colors.white.withValues(alpha: 0.1)
                   : Colors.grey.shade200,
               borderRadius: BorderRadius.circular(16),
             ),
@@ -460,7 +460,9 @@ class _SubjectsPageState extends State<SubjectsPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(16),
       ),
       child: DropdownButtonHideUnderline(
@@ -489,7 +491,7 @@ class _SubjectsPageState extends State<SubjectsPage>
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 5,
                     offset: const Offset(0, 2),
                   ),
@@ -569,7 +571,7 @@ class _SubjectsPageState extends State<SubjectsPage>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -599,7 +601,7 @@ class _SubjectsPageState extends State<SubjectsPage>
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: colorPair
-                                .map((c) => c.withOpacity(0.1))
+                                .map((c) => c.withValues(alpha: 0.1))
                                 .toList(),
                           ),
                           borderRadius: BorderRadius.circular(12),
@@ -625,7 +627,9 @@ class _SubjectsPageState extends State<SubjectsPage>
                                 size: 18,
                               ),
                               style: IconButton.styleFrom(
-                                backgroundColor: Colors.blue.withOpacity(0.1),
+                                backgroundColor: Colors.blue.withValues(
+                                  alpha: 0.1,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -641,7 +645,9 @@ class _SubjectsPageState extends State<SubjectsPage>
                                 size: 18,
                               ),
                               style: IconButton.styleFrom(
-                                backgroundColor: Colors.red.withOpacity(0.1),
+                                backgroundColor: Colors.red.withValues(
+                                  alpha: 0.1,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -709,7 +715,7 @@ class _SubjectsPageState extends State<SubjectsPage>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(Symbols.menu_book, color: color, size: 28),

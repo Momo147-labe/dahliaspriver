@@ -34,7 +34,7 @@ class SchoolProfileCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -114,7 +114,7 @@ class SchoolProfileCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: AppTheme.successColor.withOpacity(0.15),
+        color: AppTheme.successColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: const Text(

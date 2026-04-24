@@ -45,7 +45,7 @@ class NotificationModal extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppTheme.errorColor.withOpacity(0.1),
+                      color: AppTheme.errorColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -90,7 +90,7 @@ class NotificationModal extends StatelessWidget {
                     Icon(
                       Symbols.check_circle,
                       size: 64,
-                      color: AppTheme.successColor.withOpacity(0.5),
+                      color: AppTheme.successColor.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -115,7 +115,7 @@ class NotificationModal extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? Colors.white.withOpacity(0.02)
+                          ? Colors.white.withValues(alpha: 0.02)
                           : Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
@@ -126,8 +126,8 @@ class NotificationModal extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 20,
-                          backgroundColor: AppTheme.primaryColor.withOpacity(
-                            0.1,
+                          backgroundColor: AppTheme.primaryColor.withValues(
+                            alpha: 0.1,
                           ),
                           child: Text(
                             student['nom'][0],
@@ -150,7 +150,7 @@ class NotificationModal extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                '${student['classe_nom']} • ${student['overdue_tranche']}',
+                                '${student['classe_nom']} • ${student['overdue_tranche'] ?? 'Tranche non spécifiée'}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: AppTheme.textSecondary,
@@ -160,7 +160,7 @@ class NotificationModal extends StatelessWidget {
                               Row(
                                 children: [
                                   Text(
-                                    'Dû: ${currencyFormat.format(student['amount_due'])}',
+                                    'Dû: ${currencyFormat.format(student['amount_due'] ?? 0)}',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: AppTheme.errorColor,
@@ -169,7 +169,7 @@ class NotificationModal extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'Limite: ${student['deadline']}',
+                                    'Limite: ${student['deadline'] ?? 'Non définie'}',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: Colors.grey.shade500,
@@ -192,8 +192,8 @@ class NotificationModal extends StatelessWidget {
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor.withOpacity(
-                              0.1,
+                            backgroundColor: AppTheme.primaryColor.withValues(
+                              alpha: 0.1,
                             ),
                             foregroundColor: AppTheme.primaryColor,
                             elevation: 0,

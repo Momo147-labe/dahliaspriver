@@ -19,6 +19,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _directorController = TextEditingController();
@@ -50,6 +51,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
           _currentEcole = ecole;
           _nameController.text = ecole.nom;
           _addressController.text = ecole.adresse ?? '';
+          _cityController.text = ecole.ville ?? '';
           _phoneController.text = ecole.telephone ?? '';
           _emailController.text = ecole.email ?? '';
           _directorController.text = ecole.directeur;
@@ -85,6 +87,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
   void dispose() {
     _nameController.dispose();
     _addressController.dispose();
+    _cityController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     _directorController.dispose();
@@ -129,6 +132,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
           fondateur: _founderController.text,
           directeur: _directorController.text,
           adresse: _addressController.text,
+          ville: _cityController.text,
           telephone: _phoneController.text,
           email: _emailController.text,
           logo: _logoPath,
@@ -181,6 +185,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
             ? {
                 'nom': _currentEcole!.nom,
                 'adresse': _currentEcole!.adresse,
+                'ville': _currentEcole!.ville,
                 'telephone': _currentEcole!.telephone,
                 'email': _currentEcole!.email,
               }
@@ -396,9 +401,16 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
                             _buildTextField(
                               controller: _addressController,
                               label: 'ADRESSE PHYSIQUE',
-                              hint: 'Quartier, Commune, Ville',
+                              hint: 'Quartier, Commune',
                               icon: Icons.location_on_outlined,
-                              maxLines: 3,
+                              maxLines: 2,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildTextField(
+                              controller: _cityController,
+                              label: 'VILLE',
+                              hint: 'Ex: Conakry',
+                              icon: Icons.location_city_outlined,
                             ),
                           ],
                         ),
@@ -422,10 +434,10 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
+                          color: Colors.green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: Colors.green.withOpacity(0.3),
+                            color: Colors.green.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Row(
@@ -493,6 +505,101 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
                     ],
                   ),
           ),
+          const SizedBox(height: 24),
+          _buildPremiumCard(
+            title: 'Support Technique & Développeur',
+            icon: Icons.code,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person,
+                    color: AppTheme.primaryColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Fodé Momo Soumah',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.email_outlined,
+                            size: 14,
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'fodemomos11@gmail.com',
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.grey[400]
+                                  : Colors.grey[600],
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.phone_outlined,
+                            size: 14,
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Appel: 627 17 25 30 / 666 76 10 76',
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.grey[400]
+                                  : Colors.grey[600],
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.chat_outlined,
+                            size: 14,
+                            color: Colors.green,
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'WhatsApp: 627 17 25 30',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 40),
         ],
       ),
@@ -515,7 +622,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -660,7 +767,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
             prefixIcon: Icon(
               icon,
               size: 20,
-              color: AppTheme.primaryColor.withOpacity(0.5),
+              color: AppTheme.primaryColor.withValues(alpha: 0.5),
             ),
             filled: true,
             fillColor: isDark ? Colors.grey[900] : Colors.grey[50],

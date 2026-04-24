@@ -109,4 +109,12 @@ class TimetableDao extends BaseDao {
       whereArgs: [id],
     );
   }
+
+  Future<int> deleteTimetableByClass(int classId, int anneeId) async {
+    return await db.delete(
+      EmploiDuTempsSchema.tableName,
+      where: 'classe_id = ? AND annee_scolaire_id = ?',
+      whereArgs: [classId, anneeId],
+    );
+  }
 }

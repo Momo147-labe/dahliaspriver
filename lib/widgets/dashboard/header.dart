@@ -92,8 +92,8 @@ class _HeaderState extends State<Header> {
         boxShadow: [
           BoxShadow(
             color: isDark
-                ? Colors.black.withOpacity(0.1)
-                : Colors.black.withOpacity(0.05),
+                ? Colors.black.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -219,11 +219,11 @@ class _HeaderState extends State<Header> {
                 ),
                 decoration: BoxDecoration(
                   color: isDark
-                      ? AppTheme.errorColor.withOpacity(0.1)
-                      : AppTheme.errorColor.withOpacity(0.05),
+                      ? AppTheme.errorColor.withValues(alpha: 0.1)
+                      : AppTheme.errorColor.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppTheme.errorColor.withOpacity(0.2),
+                    color: AppTheme.errorColor.withValues(alpha: 0.2),
                     width: 1,
                   ),
                 ),

@@ -629,12 +629,15 @@ class NotesDao extends BaseDao {
     return await db.rawQuery(
       '''
       SELECT n.*, m.nom as matiere_nom, a.libelle as annee_nom,
-             ens.nom as enseignant_nom, ens.prenom as enseignant_prenom
+             ens.nom as enseignant_nom, ens.prenom as enseignant_prenom,
+             COALESCE(cm.coefficient, 1) as coefficient
       FROM ${NotesSchema.tableName} n
       JOIN matiere m ON n.matiere_id = m.id
       JOIN annee_scolaire a ON n.annee_scolaire_id = a.id
-      LEFT JOIN attribution_enseignant ae ON ae.classe_id = (SELECT classe_id FROM eleve_parcours WHERE eleve_id = n.eleve_id AND annee_scolaire_id = n.annee_scolaire_id) 
-           AND ae.matiere_id = n.matiere_id AND ae.annee_scolaire_id = n.annee_scolaire_id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND n.annee_scolaire_id = ep.annee_scolaire_id
+      LEFT JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id AND cm.classe_id = ep.classe_id
+      LEFT JOIN attribution_enseignant ae ON ae.classe_id = ep.classe_id 
+           AND ae.matiere_id = n.matiere_id
       LEFT JOIN enseignant ens ON ae.enseignant_id = ens.id
       WHERE n.eleve_id = ?
       ORDER BY a.date_debut DESC, n.trimestre ASC, n.sequence ASC

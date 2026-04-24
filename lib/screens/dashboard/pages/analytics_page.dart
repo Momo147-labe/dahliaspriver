@@ -4,6 +4,7 @@ import '../../../core/database/database_helper.dart';
 import '../../../theme/app_theme.dart';
 import '../../../providers/academic_year_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
@@ -22,6 +23,14 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   int? _currentYearId;
   int? _previousYearId;
   int? _lastAnneeId;
+
+  // Additional Analytics Data
+  List<Map<String, dynamic>> _ageDistribution = [];
+  List<Map<String, dynamic>> _geographicDistribution = [];
+  List<Map<String, dynamic>> _genderStatsByCycle = [];
+  List<Map<String, dynamic>> _subjectPerformance = [];
+  List<Map<String, dynamic>> _teacherPerformanceStats = [];
+  List<Map<String, dynamic>> _monthlyCollectionCurve = [];
 
   @override
   void initState() {
@@ -79,6 +88,24 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         _previousYearId,
       );
 
+      // New detailed analytics
+      final ageDistribution = await db.getAgeDistribution(_currentYearId!);
+      final geographicDistribution = await db.getGeographicDistribution(
+        _currentYearId!,
+      );
+      final genderStatsByCycle = await db.getGenderStatsByCycle(
+        _currentYearId!,
+      );
+      final subjectPerformance = await db.getSubjectPerformanceStats(
+        _currentYearId!,
+      );
+      final teacherPerformanceStats = await db.getTeacherPerformanceStats(
+        _currentYearId!,
+      );
+      final monthlyCollectionCurve = await db.getMonthlyCollectionCurve(
+        _currentYearId!,
+      );
+
       if (mounted) {
         setState(() {
           _studentData = studentData;
@@ -86,6 +113,14 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           _academicData = academicData;
           _classData = classData;
           _teacherData = teacherData;
+
+          _ageDistribution = ageDistribution;
+          _geographicDistribution = geographicDistribution;
+          _genderStatsByCycle = genderStatsByCycle;
+          _subjectPerformance = subjectPerformance;
+          _teacherPerformanceStats = teacherPerformanceStats;
+          _monthlyCollectionCurve = monthlyCollectionCurve;
+
           _isLoading = false;
         });
       }
@@ -145,6 +180,32 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           _buildClassSection(isDark),
           const SizedBox(height: 24),
           _buildTeacherSection(isDark),
+          const SizedBox(height: 32),
+          Text(
+            'Analyses Avancées',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildRevenueCurve(isDark),
+          const SizedBox(height: 24),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildAgePyramid(isDark)),
+              const SizedBox(width: 24),
+              Expanded(child: _buildGenderRatioByCycle(isDark)),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildTopFlopSubjects(isDark),
+          const SizedBox(height: 24),
+          _buildGeographicDistribution(isDark),
+          const SizedBox(height: 24),
+          _buildTeacherPerformance(isDark),
+          const SizedBox(height: 64),
         ],
       ),
     );
@@ -291,7 +352,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1F2937) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2), width: 2),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,8 +370,8 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                   ),
                   decoration: BoxDecoration(
                     color: percentChange >= 0
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.red.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -453,7 +514,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         [];
 
     final collected = (current['total_collected'] ?? 0.0) as num;
-    final expected = (current['expected'] ?? 0.0) as num;
+    final expected = (current['total_expected'] ?? 0.0) as num;
     final collectionRate = expected > 0 ? (collected / expected) * 100 : 0.0;
 
     return _buildSection(
@@ -724,7 +785,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1F2937) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2), width: 2),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -800,8 +861,8 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                   ),
                   decoration: BoxDecoration(
                     color: percentChange >= 0
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.red.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
@@ -1021,6 +1082,326 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
               ? (isHeader ? Colors.white70 : Colors.white)
               : (isHeader ? AppTheme.textSecondary : AppTheme.textPrimary),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRevenueCurve(bool isDark) {
+    if (_monthlyCollectionCurve.isEmpty) return const SizedBox.shrink();
+
+    final months = [
+      'Jan',
+      'Fév',
+      'Mar',
+      'Avr',
+      'Mai',
+      'Juin',
+      'Juil',
+      'Août',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Déc',
+    ];
+
+    return _buildSection(
+      title: 'Courbe de Trésorerie Mensuelle',
+      icon: Symbols.show_chart,
+      color: Colors.green,
+      isDark: isDark,
+      child: SizedBox(
+        height: 300,
+        child: LineChart(
+          LineChartData(
+            gridData: const FlGridData(show: false),
+            titlesData: FlTitlesData(
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, meta) {
+                    int index = value.toInt() - 1;
+                    if (index >= 0 && index < months.length) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          months[index],
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark ? Colors.white60 : Colors.black54,
+                          ),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+              leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+            ),
+            borderData: FlBorderData(show: false),
+            lineBarsData: [
+              LineChartBarData(
+                spots: _monthlyCollectionCurve.map((e) {
+                  return FlSpot(
+                    double.parse(e['month'].toString()),
+                    ((e['total'] ?? 0.0) as num).toDouble(),
+                  );
+                }).toList(),
+                isCurved: true,
+                color: Colors.green,
+                barWidth: 4,
+                dotData: const FlDotData(show: true),
+                belowBarData: BarAreaData(
+                  show: true,
+                  color: Colors.green.withOpacity(0.1),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAgePyramid(bool isDark) {
+    if (_ageDistribution.isEmpty) return const SizedBox.shrink();
+
+    return _buildSection(
+      title: 'Pyramide des Âges',
+      icon: Symbols.leaderboard,
+      color: Colors.blue,
+      isDark: isDark,
+      child: Column(
+        children: [
+          SizedBox(
+            height: 200,
+            child: BarChart(
+              BarChartData(
+                gridData: const FlGridData(show: false),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        int index = value.toInt();
+                        if (index >= 0 && index < _ageDistribution.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              _ageDistribution[index]['bracket'],
+                              style: const TextStyle(fontSize: 9),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: List.generate(_ageDistribution.length, (index) {
+                  return BarChartGroupData(
+                    x: index,
+                    barRods: [
+                      BarChartRodData(
+                        toY: ((_ageDistribution[index]['count'] ?? 0) as num)
+                            .toDouble(),
+                        color: Colors.blue,
+                        width: 16,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenderRatioByCycle(bool isDark) {
+    if (_genderStatsByCycle.isEmpty) return const SizedBox.shrink();
+
+    return _buildSection(
+      title: 'Genre par Cycle',
+      icon: Symbols.group,
+      color: Colors.purple,
+      isDark: isDark,
+      child: Column(
+        children: _genderStatsByCycle.map((e) {
+          final maleCount = (e['male_count'] ?? 0) as int;
+          final femaleCount = (e['female_count'] ?? 0) as int;
+          final total = maleCount + femaleCount;
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  e['nom'] ?? 'Cycle Inconnu',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: SizedBox(
+                    height: 8,
+                    child: Row(
+                      children: [
+                        if (total > 0)
+                          Expanded(
+                            flex: maleCount,
+                            child: Container(color: Colors.blue),
+                          ),
+                        if (total > 0)
+                          Expanded(
+                            flex: femaleCount,
+                            child: Container(color: Colors.pink),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('H: $maleCount', style: const TextStyle(fontSize: 9)),
+                    Text(
+                      'F: $femaleCount',
+                      style: const TextStyle(fontSize: 9),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildTopFlopSubjects(bool isDark) {
+    if (_subjectPerformance.isEmpty) return const SizedBox.shrink();
+
+    return _buildSection(
+      title: 'Top/Flop Matières',
+      icon: Symbols.subject,
+      color: Colors.orange,
+      isDark: isDark,
+      child: Column(
+        children: _subjectPerformance.map((e) {
+          final avg = ((e['avg_grade'] ?? 0.0) as num).toDouble();
+          final color = avg >= 10 ? Colors.green : Colors.red;
+
+          return ListTile(
+            dense: true,
+            title: Text(e['nom'] ?? '', style: const TextStyle(fontSize: 12)),
+            trailing: Text(
+              avg.toStringAsFixed(2),
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+            subtitle: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: avg / 20.0,
+                color: color.withOpacity(0.7),
+                backgroundColor: color.withOpacity(0.05),
+                minHeight: 4,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildGeographicDistribution(bool isDark) {
+    if (_geographicDistribution.isEmpty) return const SizedBox.shrink();
+
+    return _buildSection(
+      title: 'Origine Géographique',
+      icon: Symbols.map,
+      color: Colors.teal,
+      isDark: isDark,
+      child: Column(
+        children: _geographicDistribution.map((e) {
+          return ListTile(
+            dense: true,
+            title: Text(
+              e['lieu_naissance'] ?? 'Non spécifié',
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.teal.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                e['count'].toString(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildTeacherPerformance(bool isDark) {
+    if (_teacherPerformanceStats.isEmpty) return const SizedBox.shrink();
+
+    return _buildSection(
+      title: 'Performance Moyenne Enseignants',
+      icon: Symbols.person_pin,
+      color: Colors.indigo,
+      isDark: isDark,
+      child: Column(
+        children: _teacherPerformanceStats.map((e) {
+          final avg = ((e['avg_grade'] ?? 0.0) as num).toDouble();
+          return ListTile(
+            dense: true,
+            title: Text(
+              e['nom_complet'] ?? '',
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: Text(
+              avg.toStringAsFixed(2),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

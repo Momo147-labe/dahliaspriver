@@ -34,6 +34,7 @@ class _PromotionPageState extends State<PromotionPage> {
   double _moyennePassage = 10.0;
   double _noteMax = 20.0;
   bool _isFinalClass = false;
+  bool _isClassAlreadyPromoted = false;
 
   @override
   void initState() {
@@ -170,6 +171,12 @@ class _PromotionPageState extends State<PromotionPage> {
         _noteMax = 20.0;
         _isFinalClass = false;
       }
+
+      // Check if this class promotion has already been logged
+      _isClassAlreadyPromoted = await _dbHelper.hasPromotionBeenLogged(
+        _oldAnneeId!,
+        _oldClasseId!,
+      );
 
       // 2. Get students
       final rawStudents = await _dbHelper.eleveDao.getElevesByClasse(
@@ -330,6 +337,15 @@ class _PromotionPageState extends State<PromotionPage> {
           decision: 'Admis',
           confirmationStatut: 'En attente',
         );
+
+        // LOG THE PROMOTION
+        await _dbHelper.logPromotion(
+          fromAnneeId: _oldAnneeId!,
+          fromClasseId: _oldClasseId!,
+          toAnneeId: _newAnneeId!,
+          toClasseId: _newClasseId!,
+          status: 'Promoted',
+        );
       }
 
       if (mounted) {
@@ -401,6 +417,15 @@ class _PromotionPageState extends State<PromotionPage> {
         newAnneeId: _newAnneeId!,
         decision: 'Redoublant',
         confirmationStatut: 'En attente',
+      );
+
+      // LOG THE PROMOTION (as Redoublement)
+      await _dbHelper.logPromotion(
+        fromAnneeId: _oldAnneeId!,
+        fromClasseId: _oldClasseId!,
+        toAnneeId: _newAnneeId!,
+        toClasseId: _oldClasseId!,
+        status: 'Redoublement',
       );
 
       if (mounted) {
@@ -559,6 +584,10 @@ class _PromotionPageState extends State<PromotionPage> {
                     _buildControls(isDark, isNarrow),
                     const SizedBox(height: 12),
                     _buildPassMarkBanner(isDark),
+                    if (_isClassAlreadyPromoted) ...[
+                      const SizedBox(height: 12),
+                      _buildAlreadyPromotedWarning(isDark),
+                    ],
                     const SizedBox(height: 12),
                     _buildActionButtons(isDark, isNarrow),
                     const SizedBox(height: 12),
@@ -629,6 +658,37 @@ class _PromotionPageState extends State<PromotionPage> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlreadyPromotedWarning(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orange,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Attention : Cette classe a déjà fait l\'objet d\'une opération de promotion ou de redoublement pour cette période.',
+              style: TextStyle(
+                color: isDark ? Colors.orange[200] : Colors.orange[800],
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -716,7 +776,7 @@ class _PromotionPageState extends State<PromotionPage> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -748,7 +808,7 @@ class _PromotionPageState extends State<PromotionPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
@@ -840,7 +900,7 @@ class _PromotionPageState extends State<PromotionPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
@@ -901,9 +961,9 @@ class _PromotionPageState extends State<PromotionPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
+              color: Colors.orange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -1116,8 +1176,8 @@ class _PromotionPageState extends State<PromotionPage> {
                   return Container(
                     color: isSelected
                         ? (isAdmis
-                              ? Colors.green.withOpacity(0.05)
-                              : Colors.red.withOpacity(0.05))
+                              ? Colors.green.withValues(alpha: 0.05)
+                              : Colors.red.withValues(alpha: 0.05))
                         : Colors.transparent,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -1155,8 +1215,8 @@ class _PromotionPageState extends State<PromotionPage> {
                               CircleAvatar(
                                 radius: 16,
                                 backgroundColor: isAdmis
-                                    ? Colors.green.withOpacity(0.15)
-                                    : Colors.red.withOpacity(0.15),
+                                    ? Colors.green.withValues(alpha: 0.15)
+                                    : Colors.red.withValues(alpha: 0.15),
                                 child: Text(
                                   (student['nom']?.toString() ?? '?')[0]
                                       .toUpperCase(),
@@ -1206,8 +1266,8 @@ class _PromotionPageState extends State<PromotionPage> {
                               ),
                               decoration: BoxDecoration(
                                 color: isAdmis
-                                    ? Colors.green.withOpacity(0.12)
-                                    : Colors.red.withOpacity(0.12),
+                                    ? Colors.green.withValues(alpha: 0.12)
+                                    : Colors.red.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -1233,13 +1293,13 @@ class _PromotionPageState extends State<PromotionPage> {
                               ),
                               decoration: BoxDecoration(
                                 color: isAdmis
-                                    ? Colors.green.withOpacity(0.1)
-                                    : Colors.red.withOpacity(0.1),
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.red.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
                                   color: isAdmis
-                                      ? Colors.green.withOpacity(0.3)
-                                      : Colors.red.withOpacity(0.3),
+                                      ? Colors.green.withValues(alpha: 0.3)
+                                      : Colors.red.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(

@@ -228,7 +228,7 @@ class _GradeSheetPageState extends State<GradeSheetPage> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            color: AppTheme.primaryColor.withOpacity(0.1),
+            color: AppTheme.primaryColor.withValues(alpha: 0.1),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -261,7 +261,9 @@ class _GradeSheetPageState extends State<GradeSheetPage> {
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                          side: BorderSide(
+                            color: Colors.grey.withValues(alpha: 0.2),
+                          ),
                         ),
                         margin: const EdgeInsets.only(bottom: 12),
                         child: Padding(
@@ -270,7 +272,7 @@ class _GradeSheetPageState extends State<GradeSheetPage> {
                             children: [
                               CircleAvatar(
                                 backgroundColor: AppTheme.primaryColor
-                                    .withOpacity(0.1),
+                                    .withValues(alpha: 0.1),
                                 child: Text(
                                   student['nom'][0],
                                   style: const TextStyle(
@@ -311,8 +313,9 @@ class _GradeSheetPageState extends State<GradeSheetPage> {
                                         vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.primaryColor
-                                            .withOpacity(0.1),
+                                        color: AppTheme.primaryColor.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
@@ -358,7 +361,9 @@ class _GradeSheetPageState extends State<GradeSheetPage> {
                                             8,
                                           ),
                                           borderSide: BorderSide(
-                                            color: Colors.grey.withOpacity(0.3),
+                                            color: Colors.grey.withValues(
+                                              alpha: 0.3,
+                                            ),
                                           ),
                                         ),
                                       ),

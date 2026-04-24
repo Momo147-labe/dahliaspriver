@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import '../../core/database/database_helper.dart';
+import '../../core/database/daos/config_dao.dart';
 import '../../theme/app_theme.dart';
 import '../auth/login_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -137,7 +138,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.2,
-                    color: const Color(0xFF13DAEC).withOpacity(0.8),
+                    color: const Color(0xFF13DAEC).withValues(alpha: 0.8),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -218,6 +219,8 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
             children: [
               _buildSchoolSummary(isDark),
               const SizedBox(height: 24),
+              _buildTeachingStructure(isDark),
+              const SizedBox(height: 24),
               _buildLicenseSection(isDark),
               const SizedBox(height: 24),
               _buildReadyCard(isDark),
@@ -232,6 +235,8 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
     return Column(
       children: [
         _buildSchoolSummary(isDark),
+        const SizedBox(height: 24),
+        _buildTeachingStructure(isDark),
         const SizedBox(height: 24),
         _buildLicenseSection(isDark),
         const SizedBox(height: 24),
@@ -248,7 +253,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -339,7 +344,21 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      schoolData?['adresse'] ?? "Adresse non spécifiée",
+                      [schoolData?['adresse'], schoolData?['ville']]
+                              .where(
+                                (e) =>
+                                    e != null && e.toString().trim().isNotEmpty,
+                              )
+                              .join(" - ")
+                              .isEmpty
+                          ? "Adresse non spécifiée"
+                          : [schoolData?['adresse'], schoolData?['ville']]
+                                .where(
+                                  (e) =>
+                                      e != null &&
+                                      e.toString().trim().isNotEmpty,
+                                )
+                                .join(" - "),
                       style: TextStyle(
                         fontSize: 14,
                         color: isDark
@@ -435,6 +454,116 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
     );
   }
 
+  Widget _buildTeachingStructure(bool isDark) {
+    bool isTablet = MediaQuery.of(context).size.width > 768;
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(
+          color: isDark ? AppTheme.borderDark : const Color(0xFFDBE5E6),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF13DAEC).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.account_tree,
+                  color: Color(0xFF13DAEC),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Structure d'enseignement",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: isDark
+                          ? AppTheme.textDarkPrimary
+                          : const Color(0xFF111718),
+                    ),
+                  ),
+                  Text(
+                    "Sélectionnez les cycles disponibles",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? AppTheme.textDarkSecondary
+                          : const Color(0xFF618689),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: isTablet ? 2 : 1,
+            childAspectRatio: isTablet ? 4 : 5,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            children: [
+              _buildCycleTile(
+                title: "Préscolaire",
+                subtitle: "Petite, Moyenne et Grande section",
+                icon: Icons.child_care,
+                value: maternelle,
+                onChanged: (val) => setState(() => maternelle = val),
+                isDark: isDark,
+              ),
+              _buildCycleTile(
+                title: "Primaire",
+                subtitle: "De la 1ère à la 6ème année",
+                icon: Icons.backpack,
+                value: primaire,
+                onChanged: (val) => setState(() => primaire = val),
+                isDark: isDark,
+              ),
+              _buildCycleTile(
+                title: "Collège",
+                subtitle: "De la 7ème à la 10ème année",
+                icon: Icons.school_outlined,
+                value: college,
+                onChanged: (val) => setState(() => college = val),
+                isDark: isDark,
+              ),
+              _buildCycleTile(
+                title: "Lycée",
+                subtitle: "11ème, 12ème et Terminale",
+                icon: Icons.account_balance,
+                value: lycee,
+                onChanged: (val) => setState(() => lycee = val),
+                isDark: isDark,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLicenseSection(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -443,7 +572,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -558,13 +687,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                   if (success ||
                       (status['isTrial'] == true && !status['expired'])) {
                     if (mounted) {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginPage(),
-                        ),
-                        (route) => false,
-                      );
+                      await _completeConfiguration();
                     }
                   } else {
                     _showErrorSnackBar(
@@ -631,10 +754,10 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
+                            color: Colors.blue.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: Colors.blue.withOpacity(0.3),
+                              color: Colors.blue.withValues(alpha: 0.3),
                             ),
                           ),
                           child: const Row(
@@ -653,34 +776,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                         );
                       }
 
-                      return SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final success = await TrialService.activateTrial();
-                            if (success) {
-                              setState(() {});
-                              _showSuccessSnackBar("Période d'essai activée !");
-                            } else {
-                              _showErrorSnackBar(
-                                "L'essai a déjà été utilisé sur cet appareil.",
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.timer_outlined),
-                          label: const Text("ESSAYER GRATUITEMENT (7 JOURS)"),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(
-                              color: AppTheme.primaryColor,
-                            ),
-                            foregroundColor: AppTheme.primaryColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      );
+                      return SizedBox();
                     },
                   ),
                   const SizedBox(height: 16),
@@ -689,14 +785,14 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                   children: [
                     _buildSupportBadge(
                       icon: Icons.chat,
-                      label: "WhatsApp",
+                      label: "WhatsApp: 627172530",
                       color: Colors.green,
                       onTap: () => _launchURL("https://wa.me/224627172530"),
                     ),
                     const SizedBox(width: 8),
                     _buildSupportBadge(
                       icon: Icons.phone,
-                      label: "Appel",
+                      label: "Appel: 627172530 / 666761076",
                       color: Colors.orange,
                       onTap: () => _launchURL("tel:224627172530"),
                     ),
@@ -709,10 +805,10 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.deepOrange.withOpacity(0.1),
+                    color: Colors.deepOrange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: Colors.deepOrange.withOpacity(0.2),
+                      color: Colors.deepOrange.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Row(
@@ -725,7 +821,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
-                          "Paiement Orange Money : 674698",
+                          "Paiement Orange Money : *144*6*674698#",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
@@ -771,7 +867,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -846,8 +942,10 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF13DAEC).withOpacity(0.05),
-        border: Border.all(color: const Color(0xFF13DAEC).withOpacity(0.2)),
+        color: const Color(0xFF13DAEC).withValues(alpha: 0.05),
+        border: Border.all(
+          color: const Color(0xFF13DAEC).withValues(alpha: 0.2),
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -855,7 +953,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF13DAEC).withOpacity(0.2),
+              color: const Color(0xFF13DAEC).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.verified_user, color: Color(0xFF13DAEC)),
@@ -904,7 +1002,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: value
-              ? const Color(0xFF13DAEC).withOpacity(0.05)
+              ? const Color(0xFF13DAEC).withValues(alpha: 0.05)
               : Colors.transparent,
           border: Border.all(
             color: value
@@ -923,7 +1021,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
               height: 40,
               decoration: BoxDecoration(
                 color: value
-                    ? const Color(0xFF13DAEC).withOpacity(0.2)
+                    ? const Color(0xFF13DAEC).withValues(alpha: 0.2)
                     : isDark
                     ? AppTheme.surfaceDark
                     : const Color(0xFFF0F4F4),
@@ -1037,7 +1135,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
               borderRadius: BorderRadius.circular(12),
             ),
             elevation: 8,
-            shadowColor: const Color(0xFF13DAEC).withOpacity(0.2),
+            shadowColor: const Color(0xFF13DAEC).withValues(alpha: 0.2),
             textStyle: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -1076,7 +1174,7 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
               elevation: 8,
-              shadowColor: const Color(0xFF13DAEC).withOpacity(0.2),
+              shadowColor: const Color(0xFF13DAEC).withValues(alpha: 0.2),
               textStyle: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -1116,8 +1214,13 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
     }
 
     try {
-      // Simuler la finalisation de la configuration
-      await Future.delayed(const Duration(seconds: 2));
+      final configDao = ConfigDao(await DatabaseHelper.instance.database);
+      await configDao.initializeTeachingStructure(
+        prescolaire: maternelle,
+        primaire: primaire,
+        college: college,
+        lycee: lycee,
+      );
 
       _showSuccessSnackBar("Configuration terminée avec succès !");
 

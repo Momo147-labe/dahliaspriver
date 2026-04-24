@@ -5,8 +5,13 @@ import '../../../theme/app_theme.dart';
 
 class ResultSheetSelectionModal extends StatefulWidget {
   final DatabaseHelper dbHelper;
+  final int anneeId;
 
-  const ResultSheetSelectionModal({super.key, required this.dbHelper});
+  const ResultSheetSelectionModal({
+    super.key,
+    required this.dbHelper,
+    required this.anneeId,
+  });
 
   @override
   State<ResultSheetSelectionModal> createState() =>
@@ -47,22 +52,6 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
   void _generateResultSheet() async {
     if (_selectedClass == null) return;
 
-    // Get Active Year ID
-    final db = await widget.dbHelper.database;
-    final anneeRes = await db.query(
-      'annee_scolaire',
-      where: 'active = 1',
-      limit: 1,
-    );
-    if (anneeRes.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Aucune année scolaire active trouvée")),
-      );
-      return;
-    }
-    final anneeId = anneeRes.first['id'] as int;
-
     if (!mounted) return;
     Navigator.pop(context); // Close modal
     Navigator.push(
@@ -72,7 +61,7 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
           classeId: _selectedClass!['id'] as int,
           trimestre: _selectedTrimestre,
           sequence: 0, // Not used for now or default
-          anneeId: anneeId,
+          anneeId: widget.anneeId,
         ),
       ),
     );
@@ -104,7 +93,7 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -147,7 +136,7 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
               ),
               filled: true,
               fillColor: isDark
-                  ? Colors.white.withOpacity(0.05)
+                  ? Colors.white.withValues(alpha: 0.05)
                   : Colors.grey[50],
             ),
             value: _selectedClass?['id'] as int?,
@@ -190,7 +179,7 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
               ),
               filled: true,
               fillColor: isDark
-                  ? Colors.white.withOpacity(0.05)
+                  ? Colors.white.withValues(alpha: 0.05)
                   : Colors.grey[50],
             ),
             value: _selectedTrimestre,

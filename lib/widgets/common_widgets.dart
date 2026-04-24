@@ -39,18 +39,13 @@ class PrimaryButton extends StatelessWidget {
           : const SizedBox.shrink(),
       label: Text(
         label,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-        ),
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
       ),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.backgroundDark,
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         elevation: 4,
       ),
       onPressed: onPressed,
@@ -63,11 +58,7 @@ class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
 
-  const AppCard({
-    super.key,
-    required this.child,
-    this.padding,
-  });
+  const AppCard({super.key, required this.child, this.padding});
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +74,7 @@ class AppCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -99,11 +90,7 @@ class UserAvatar extends StatelessWidget {
   final String? imageUrl;
   final double size;
 
-  const UserAvatar({
-    super.key,
-    this.imageUrl,
-    this.size = 44,
-  });
+  const UserAvatar({super.key, this.imageUrl, this.size = 44});
 
   @override
   Widget build(BuildContext context) {
@@ -112,14 +99,14 @@ class UserAvatar extends StatelessWidget {
       width: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 2),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.4),
+          width: 2,
+        ),
         image: imageUrl != null
-            ? DecorationImage(
-                image: NetworkImage(imageUrl!),
-                fit: BoxFit.cover,
-              )
+            ? DecorationImage(image: NetworkImage(imageUrl!), fit: BoxFit.cover)
             : null,
-        color: AppColors.primary.withOpacity(0.15),
+        color: AppColors.primary.withValues(alpha: 0.15),
       ),
       child: imageUrl == null
           ? Icon(Icons.person, color: AppColors.primary)
@@ -161,18 +148,12 @@ class SchoolInfoTile extends StatelessWidget {
           children: [
             Text(
               title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textMuted,
-              ),
+              style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
             ),
           ],
         ),
@@ -185,10 +166,7 @@ class SchoolInfoTile extends StatelessWidget {
 class StepProgressBar extends StatelessWidget {
   final double value; // entre 0 et 1
 
-  const StepProgressBar({
-    super.key,
-    required this.value,
-  });
+  const StepProgressBar({super.key, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -231,13 +209,11 @@ class CycleCheckboxCard extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: checked
-                ? AppColors.primary
-                : const Color(0xFFDBE5E6),
+            color: checked ? AppColors.primary : const Color(0xFFDBE5E6),
             width: checked ? 2 : 1,
           ),
           color: checked
-              ? AppColors.primary.withOpacity(0.08)
+              ? AppColors.primary.withValues(alpha: 0.08)
               : Colors.transparent,
         ),
         child: Row(
@@ -247,13 +223,14 @@ class CycleCheckboxCard extends StatelessWidget {
               width: 44,
               decoration: BoxDecoration(
                 color: checked
-                    ? AppColors.primary.withOpacity(0.2)
+                    ? AppColors.primary.withValues(alpha: 0.2)
                     : AppColors.backgroundLight,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon,
-                  color:
-                      checked ? AppColors.primary : AppColors.textMuted),
+              child: Icon(
+                icon,
+                color: checked ? AppColors.primary : AppColors.textMuted,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(

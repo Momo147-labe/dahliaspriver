@@ -5,9 +5,11 @@ class AppTheme {
   static const Color primaryColor = Color(0xFF6366F1); // Indigo moderne
   static const Color primaryLight = Color(0xFF818CF8); // Indigo clair
   static const Color primaryDark = Color(0xFF4F46E5); // Indigo foncé
-  
+
   // Thème clair - Palette moderne et élégante
-  static const Color backgroundLight = Color(0xFFFAFBFC); // Blanc cassé très clair
+  static const Color backgroundLight = Color(
+    0xFFFAFBFC,
+  ); // Blanc cassé très clair
   static const Color surfaceLight = Color(0xFFFFFFFF); // Blanc pur
   static const Color cardLight = Color(0xFFF8FAFC); // Blanc légèrement grisé
   static const Color borderLight = Color(0xFFE2E8F0); // Gris clair moderne
@@ -15,7 +17,7 @@ class AppTheme {
   static const Color textPrimary = Color(0xFF1E293B); // Bleu-gris foncé
   static const Color textSecondary = Color(0xFF64748B); // Gris bleuté
   static const Color textMuted = Color(0xFF94A3B8); // Gris très clair
-  
+
   // Thème sombre - Palette sombre et élégante
   static const Color backgroundDark = Color(0xFF0F172A); // Bleu nuit profond
   static const Color surfaceDark = Color(0xFF1E293B); // Bleu-gris sombre
@@ -24,7 +26,7 @@ class AppTheme {
   static const Color hoverDark = Color(0xFF475569); // Gris bleuté
   static const Color textDarkPrimary = Color(0xFFF8FAFC); // Blanc cassé
   static const Color textDarkSecondary = Color(0xFFCBD5E1); // Gris clair
-  
+
   // Couleurs d'accentuation
   static const Color successColor = Color(0xFF10B981); // Émeraude
   static const Color warningColor = Color(0xFFF59E0B); // Ambre
@@ -54,7 +56,7 @@ class AppTheme {
         foregroundColor: textPrimary,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.black.withOpacity(0.1),
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         titleTextStyle: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
@@ -64,10 +66,10 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: cardLight,
         elevation: 4,
-        shadowColor: Colors.black.withOpacity(0.1),
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: borderLight.withOpacity(0.3), width: 1),
+          side: BorderSide(color: borderLight.withValues(alpha: 0.3), width: 1),
         ),
         margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
       ),
@@ -76,7 +78,7 @@ class AppTheme {
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           elevation: 4,
-          shadowColor: primaryColor.withOpacity(0.3),
+          shadowColor: primaryColor.withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -122,11 +124,11 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: errorColor, width: 1),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        hintStyle: const TextStyle(
-          color: textMuted,
-          fontSize: 14,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
         ),
+        hintStyle: const TextStyle(color: textMuted, fontSize: 14),
         labelStyle: const TextStyle(
           color: textSecondary,
           fontSize: 12,
@@ -217,7 +219,7 @@ class AppTheme {
         foregroundColor: textDarkPrimary,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.black.withOpacity(0.3),
+        shadowColor: Colors.black.withValues(alpha: 0.3),
         titleTextStyle: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
@@ -227,10 +229,10 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: cardDark,
         elevation: 4,
-        shadowColor: Colors.black.withOpacity(0.4),
+        shadowColor: Colors.black.withValues(alpha: 0.4),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: borderDark.withOpacity(0.3), width: 1),
+          side: BorderSide(color: borderDark.withValues(alpha: 0.3), width: 1),
         ),
         margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
       ),
@@ -239,7 +241,7 @@ class AppTheme {
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           elevation: 4,
-          shadowColor: primaryColor.withOpacity(0.4),
+          shadowColor: primaryColor.withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -285,9 +287,12 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: errorColor, width: 1),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         hintStyle: TextStyle(
-          color: textDarkSecondary.withOpacity(0.7),
+          color: textDarkSecondary.withValues(alpha: 0.7),
           fontSize: 14,
         ),
         labelStyle: const TextStyle(

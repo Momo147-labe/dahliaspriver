@@ -5,6 +5,7 @@ import '../../../../core/database/database_helper.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../services/pdf/payment_control_pdf_service.dart';
 import 'paid_students_page.dart';
+import 'new_payment_page.dart';
 
 class PaymentControlPage extends StatefulWidget {
   const PaymentControlPage({super.key});
@@ -71,8 +72,18 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
     for (var student in _filteredData) {
       final double totalPaid =
           (student['total_paye'] as num?)?.toDouble() ?? 0.0;
+
+      final double inscription =
+          (student['inscription'] as num?)?.toDouble() ?? 0.0;
+      final double reinscription =
+          (student['reinscription'] as num?)?.toDouble() ?? 0.0;
+      final double t1 = (student['tranche1'] as num?)?.toDouble() ?? 0.0;
+      final double t2 = (student['tranche2'] as num?)?.toDouble() ?? 0.0;
+      final double t3 = (student['tranche3'] as num?)?.toDouble() ?? 0.0;
+
+      final bool isReinscrit = student['eleve_statut'] == 'reinscrit';
       final double totalDue =
-          (student['montant_total'] as num?)?.toDouble() ?? 0.0;
+          (isReinscrit ? reinscription : inscription) + t1 + t2 + t3;
 
       if (totalDue == 0) continue; // Skip students with no fees defined
 
@@ -327,6 +338,10 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
                 isDark,
                 theme,
                 isPrimary: true,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (c) => const NewPaymentPage()),
+                ),
               ),
             ],
           ),
@@ -397,7 +412,9 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
               hintText: "Rechercher un élève...",
               prefixIcon: const Icon(Symbols.search, size: 20),
               filled: true,
-              fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+              fillColor: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
@@ -426,7 +443,7 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -501,11 +518,11 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isHighlight
-              ? color.withOpacity(0.5)
+              ? color.withValues(alpha: 0.5)
               : (isDark ? Colors.white10 : Colors.grey.shade200),
           width: isHighlight ? 2 : 1,
         ),
@@ -565,7 +582,7 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
   Widget _buildDataTable(bool isDark, ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -604,7 +621,7 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
               Icon(
                 Symbols.search_off,
                 size: 48,
-                color: Colors.grey.withOpacity(0.5),
+                color: Colors.grey.withValues(alpha: 0.5),
               ),
               const SizedBox(height: 16),
               const Text(
@@ -637,7 +654,7 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
           dataRowMinHeight: 60,
           headingRowHeight: 60,
           headingRowColor: WidgetStateProperty.all(
-            isDark ? Colors.white.withOpacity(0.02) : Colors.grey.shade50,
+            isDark ? Colors.white.withValues(alpha: 0.02) : Colors.grey.shade50,
           ),
           columns: const [
             DataColumn(
@@ -730,7 +747,9 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
                     children: [
                       CircleAvatar(
                         radius: 16,
-                        backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                        backgroundColor: AppTheme.primaryColor.withValues(
+                          alpha: 0.1,
+                        ),
                         child: Text(
                           student['nom'][0],
                           style: const TextStyle(
@@ -795,7 +814,7 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.grey.withOpacity(0.1),
+                            color: Colors.grey.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Text(
@@ -810,8 +829,8 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
                       : ElevatedButton(
                           onPressed: () {},
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor.withOpacity(
-                              0.1,
+                            backgroundColor: AppTheme.primaryColor.withValues(
+                              alpha: 0.1,
                             ),
                             foregroundColor: AppTheme.primaryColor,
                             elevation: 0,
@@ -945,7 +964,7 @@ class _PaymentControlPageState extends State<PaymentControlPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

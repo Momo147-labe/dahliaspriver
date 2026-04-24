@@ -8,6 +8,7 @@ class Ecole {
   final String? adresse;
   final String? telephone;
   final String? email;
+  final String? ville;
   final String? createdAt;
   final String? updatedAt;
 
@@ -21,6 +22,7 @@ class Ecole {
     this.adresse,
     this.telephone,
     this.email,
+    this.ville,
     this.createdAt,
     this.updatedAt,
   });
@@ -36,6 +38,7 @@ class Ecole {
       'adresse': adresse,
       'telephone': telephone,
       'email': email,
+      'ville': ville,
     };
   }
 
@@ -50,6 +53,7 @@ class Ecole {
       adresse: map['adresse'],
       telephone: map['telephone'],
       email: map['email'],
+      ville: map['ville'],
       createdAt: map['created_at'],
       updatedAt: map['updated_at'],
     );
@@ -65,6 +69,7 @@ class Ecole {
     String? adresse,
     String? telephone,
     String? email,
+    String? ville,
   }) {
     return Ecole(
       id: id ?? this.id,
@@ -76,6 +81,7 @@ class Ecole {
       adresse: adresse ?? this.adresse,
       telephone: telephone ?? this.telephone,
       email: email ?? this.email,
+      ville: ville ?? this.ville,
     );
   }
 }

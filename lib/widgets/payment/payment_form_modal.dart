@@ -155,7 +155,7 @@ class _PaymentFormModalState extends State<PaymentFormModal> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withOpacity(0.1),
+            color: AppTheme.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
           ),
           child: const Icon(Symbols.add_card, color: AppTheme.primaryColor),
@@ -184,7 +184,7 @@ class _PaymentFormModalState extends State<PaymentFormModal> {
           icon: const Icon(Symbols.close),
           style: IconButton.styleFrom(
             backgroundColor: isDark
-                ? Colors.white.withOpacity(0.05)
+                ? Colors.white.withValues(alpha: 0.05)
                 : Colors.grey.shade100,
           ),
         ),
@@ -213,12 +213,14 @@ class _PaymentFormModalState extends State<PaymentFormModal> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: _selectedEleve == null
                 ? Colors.transparent
-                : AppTheme.primaryColor.withOpacity(0.3),
+                : AppTheme.primaryColor.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -260,9 +262,9 @@ class _PaymentFormModalState extends State<PaymentFormModal> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.primaryColor.withOpacity(0.05),
+        color: AppTheme.primaryColor.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.1)),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -299,7 +301,9 @@ class _PaymentFormModalState extends State<PaymentFormModal> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(16),
       ),
       child: DropdownButtonHideUnderline(
@@ -332,7 +336,7 @@ class _PaymentFormModalState extends State<PaymentFormModal> {
         hintText: '0',
         filled: true,
         fillColor: isDark
-            ? Colors.white.withOpacity(0.05)
+            ? Colors.white.withValues(alpha: 0.05)
             : Colors.grey.shade100,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -366,9 +370,9 @@ class _PaymentFormModalState extends State<PaymentFormModal> {
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppTheme.primaryColor.withOpacity(0.1)
+              ? AppTheme.primaryColor.withValues(alpha: 0.1)
               : (isDark
-                    ? Colors.white.withOpacity(0.05)
+                    ? Colors.white.withValues(alpha: 0.05)
                     : Colors.grey.shade100),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
@@ -405,7 +409,7 @@ class _PaymentFormModalState extends State<PaymentFormModal> {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryColor.withOpacity(0.3),
+            color: AppTheme.primaryColor.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -527,7 +531,7 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.3),
+              color: Colors.grey.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -542,7 +546,7 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
                 prefixIcon: const Icon(Symbols.search),
                 filled: true,
                 fillColor: isDark
-                    ? Colors.white.withOpacity(0.05)
+                    ? Colors.white.withValues(alpha: 0.05)
                     : Colors.grey.shade100,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
@@ -568,8 +572,8 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
                       final eleve = _results[index];
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: AppTheme.primaryColor.withOpacity(
-                            0.1,
+                          backgroundColor: AppTheme.primaryColor.withValues(
+                            alpha: 0.1,
                           ),
                           child: Text(
                             eleve['nom'][0].toUpperCase(),

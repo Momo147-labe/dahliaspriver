@@ -143,19 +143,21 @@ class DashboardDao extends BaseDao {
     final academicStatsResult = await db.rawQuery(
       '''
       SELECT 
-        AVG(student_avg) as average,
+        AVG(normalized_avg) as average,
         COUNT(*) as total,
         SUM(CASE WHEN student_avg >= moyenne_passage THEN 1 ELSE 0 END) as passed
       FROM (
         SELECT
           sub.eleve_id,
           SUM(sub.subj_avg * sub.coef) / NULLIF(SUM(sub.coef), 0) as student_avg,
+          (SUM(sub.subj_avg * sub.coef) / NULLIF(SUM(sub.coef), 0)) * 20.0 / MAX(sub.note_max) as normalized_avg,
           MAX(sub.moyenne_passage) as moyenne_passage
         FROM (
           SELECT n.eleve_id, n.matiere_id,
                  AVG(n.note) as subj_avg,
                  COALESCE(cm.coefficient, 1) as coef,
-                 COALESCE(cy.moyenne_passage, 10.0) as moyenne_passage
+                 COALESCE(cy.moyenne_passage, 10.0) as moyenne_passage,
+                 COALESCE(cy.note_max, 20.0) as note_max
           FROM notes n
           JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND n.annee_scolaire_id = ep.annee_scolaire_id
           JOIN classe c ON ep.classe_id = c.id
@@ -163,7 +165,7 @@ class DashboardDao extends BaseDao {
           LEFT JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id
             AND cm.classe_id = ep.classe_id
           WHERE n.annee_scolaire_id = ?
-          GROUP BY n.eleve_id, n.matiere_id, cm.coefficient, cy.moyenne_passage
+          GROUP BY n.eleve_id, n.matiere_id, cm.coefficient, cy.moyenne_passage, cy.note_max
         ) as sub
         GROUP BY sub.eleve_id
       ) as sub_student

@@ -25,7 +25,9 @@ class _FraisOverviewCardState extends State<FraisOverviewCard> {
     try {
       final activeAnnee = await DatabaseHelper.instance.getActiveAnnee();
       if (activeAnnee != null) {
-        final stats = await DatabaseHelper.instance.getFraisStatistics(activeAnnee['id']);
+        final stats = await DatabaseHelper.instance.getFraisStatistics(
+          activeAnnee['id'],
+        );
         setState(() {
           _fraisStats = stats;
         });
@@ -50,8 +52,8 @@ class _FraisOverviewCardState extends State<FraisOverviewCard> {
           borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
             colors: [
-              AppTheme.primaryColor.withOpacity(0.1),
-              Colors.orange.withOpacity(0.1),
+              AppTheme.primaryColor.withValues(alpha: 0.1),
+              Colors.orange.withValues(alpha: 0.1),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -67,7 +69,7 @@ class _FraisOverviewCardState extends State<FraisOverviewCard> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.2),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -90,10 +92,7 @@ class _FraisOverviewCardState extends State<FraisOverviewCard> {
                         ),
                         Text(
                           'Configuration et gestion',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey,
-                          ),
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
                         ),
                       ],
                     ),
@@ -108,7 +107,9 @@ class _FraisOverviewCardState extends State<FraisOverviewCard> {
                     },
                     icon: const Icon(Symbols.arrow_forward),
                     style: IconButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                      backgroundColor: AppTheme.primaryColor.withValues(
+                        alpha: 0.1,
+                      ),
                     ),
                   ),
                 ],
@@ -130,8 +131,10 @@ class _FraisOverviewCardState extends State<FraisOverviewCard> {
   Widget _buildStatsContent(bool isDark) {
     final classesWithFees = _fraisStats!['classes_with_fees'] as int? ?? 0;
     final totalClasses = _fraisStats!['total_classes'] as int? ?? 0;
-    final averageFees = (_fraisStats!['average_fees'] as num?)?.toDouble() ?? 0.0;
-    final totalExpectedRevenue = (_fraisStats!['total_expected_revenue'] as num?)?.toDouble() ?? 0.0;
+    final averageFees =
+        (_fraisStats!['average_fees'] as num?)?.toDouble() ?? 0.0;
+    final totalExpectedRevenue =
+        (_fraisStats!['total_expected_revenue'] as num?)?.toDouble() ?? 0.0;
 
     return Column(
       children: [
@@ -163,10 +166,10 @@ class _FraisOverviewCardState extends State<FraisOverviewCard> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppTheme.primaryColor.withOpacity(0.2),
+              color: AppTheme.primaryColor.withValues(alpha: 0.2),
             ),
           ),
           child: Column(
@@ -182,10 +185,7 @@ class _FraisOverviewCardState extends State<FraisOverviewCard> {
                   const SizedBox(width: 8),
                   const Text(
                     'Revenus attendus',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -228,15 +228,19 @@ class _FraisOverviewCardState extends State<FraisOverviewCard> {
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color, bool isDark) {
+  Widget _buildStatItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    bool isDark,
+  ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,18 +270,11 @@ class _FraisOverviewCardState extends State<FraisOverviewCard> {
   Widget _buildEmptyState() {
     return Column(
       children: [
-        Icon(
-          Symbols.payments,
-          size: 48,
-          color: Colors.grey.shade400,
-        ),
+        Icon(Symbols.payments, size: 48, color: Colors.grey.shade400),
         const SizedBox(height: 16),
         Text(
           'Aucun frais configuré',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 16),
         SizedBox(

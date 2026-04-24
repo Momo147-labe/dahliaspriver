@@ -398,7 +398,7 @@ class _EvaluationPlanningSettingsPageState
           borderRadius: BorderRadius.circular(12),
           side: isPrimary
               ? BorderSide.none
-              : BorderSide(color: Colors.grey.withOpacity(0.2)),
+              : BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
         ),
       ),
       icon: Icon(icon, size: 20),
@@ -432,7 +432,7 @@ class _EvaluationPlanningSettingsPageState
                   decoration: BoxDecoration(
                     color: trimester == 1
                         ? AppTheme.primaryColor
-                        : Colors.grey.withOpacity(0.3),
+                        : Colors.grey.withValues(alpha: 0.3),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -490,7 +490,7 @@ class _EvaluationPlanningSettingsPageState
           color: isDark ? AppTheme.surfaceDark : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: AppTheme.primaryColor.withOpacity(0.3),
+            color: AppTheme.primaryColor.withValues(alpha: 0.3),
             style: BorderStyle.solid,
             width: 2,
           ),
@@ -527,7 +527,7 @@ class _EvaluationPlanningSettingsPageState
         decoration: BoxDecoration(
           color: isDark ? AppTheme.surfaceDark : Colors.white,
           border: Border.all(
-            color: AppTheme.primaryColor.withOpacity(0.3),
+            color: AppTheme.primaryColor.withValues(alpha: 0.3),
             width: 1,
           ),
           borderRadius: BorderRadius.circular(12),
@@ -563,12 +563,12 @@ class _EvaluationPlanningSettingsPageState
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.grey.withOpacity(0.1),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -666,15 +666,15 @@ class _EvaluationPlanningSettingsPageState
     Color text;
     switch (statut) {
       case 'Ouverte':
-        bg = Colors.green.withOpacity(0.1);
+        bg = Colors.green.withValues(alpha: 0.1);
         text = Colors.green[700]!;
         break;
       case 'Planifiée':
-        bg = Colors.orange.withOpacity(0.1);
+        bg = Colors.orange.withValues(alpha: 0.1);
         text = Colors.orange[700]!;
         break;
       default:
-        bg = Colors.grey.withOpacity(0.1);
+        bg = Colors.grey.withValues(alpha: 0.1);
         text = Colors.grey[700]!;
     }
 
@@ -745,12 +745,14 @@ class _EvaluationPlanningSettingsPageState
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey[50],
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.03)
+                  : Colors.grey[50],
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: _isLocked
-                    ? Colors.grey.withOpacity(0.1)
-                    : AppTheme.primaryColor.withOpacity(0.2),
+                    ? Colors.grey.withValues(alpha: 0.1)
+                    : AppTheme.primaryColor.withValues(alpha: 0.2),
               ),
             ),
             child: Row(
@@ -782,14 +784,14 @@ class _EvaluationPlanningSettingsPageState
       decoration: BoxDecoration(
         color: isDark ? AppTheme.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.1),
+              color: AppTheme.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(Icons.info_outline, color: AppTheme.primaryColor),
@@ -821,7 +823,7 @@ class _EvaluationPlanningSettingsPageState
                 borderRadius: BorderRadius.circular(16),
               ),
               elevation: 4,
-              shadowColor: AppTheme.primaryColor.withOpacity(0.4),
+              shadowColor: AppTheme.primaryColor.withValues(alpha: 0.4),
             ),
             child: const Text(
               'Enregistrer les modifications',

@@ -258,19 +258,23 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   void _updateDisplayStats(Map<String, dynamic> analytics) {
-    final stats = analytics['stats'] as Map<String, dynamic>;
-    _totalEleves = stats['total'] ?? 0;
-    _elevesInscrits = stats['new_students'] ?? 0;
-    _elevesReinscrits = stats['returning_students'] ?? 0;
-    _elevesMasculins = stats['males'] ?? 0;
-    _elevesFeminins = stats['females'] ?? 0;
-    _ageMoyen = (stats['average_age'] ?? 0.0).round();
+    final stats = analytics['current'] as Map<String, dynamic>?;
+    if (stats != null) {
+      _totalEleves = stats['total'] ?? 0;
+      _elevesInscrits = stats['new_students'] ?? 0;
+      _elevesReinscrits = stats['returning_students'] ?? 0;
+      _elevesMasculins = stats['males'] ?? 0;
+      _elevesFeminins = stats['females'] ?? 0;
+      _ageMoyen = (stats['average_age'] ?? 0.0).round();
+    }
 
     _classesStats = {};
     final classDist =
-        analytics['classDistribution'] as List<Map<String, dynamic>>;
-    for (var item in classDist) {
-      _classesStats[item['classe'].toString()] = item['count'] as int;
+        analytics['classDistribution'] as List<Map<String, dynamic>>?;
+    if (classDist != null) {
+      for (var item in classDist) {
+        _classesStats[item['classe'].toString()] = item['count'] as int;
+      }
     }
   }
 
@@ -330,7 +334,7 @@ class _StudentsPageState extends State<StudentsPage> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.blue.withOpacity(0.3),
+                color: Colors.blue.withValues(alpha: 0.3),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -413,7 +417,7 @@ class _StudentsPageState extends State<StudentsPage> {
       );
     } else {
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [titleContent, const SizedBox(height: 16), buttonsContent],
       );
     }
@@ -444,10 +448,12 @@ class _StudentsPageState extends State<StudentsPage> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: MediaQuery.of(context).size.width > 900 ? 4 : 2,
+        crossAxisCount: MediaQuery.of(context).size.width > 900
+            ? 4
+            : (MediaQuery.of(context).size.width > 600 ? 2 : 1),
         crossAxisSpacing: 20,
         mainAxisSpacing: 20,
-        mainAxisExtent: 110,
+        mainAxisExtent: 130,
       ),
       children: [
         _buildStatCard(
@@ -496,12 +502,12 @@ class _StudentsPageState extends State<StudentsPage> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.grey.withOpacity(0.1),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -512,7 +518,7 @@ class _StudentsPageState extends State<StudentsPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 24),
@@ -522,6 +528,7 @@ class _StudentsPageState extends State<StudentsPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   title,
@@ -625,12 +632,12 @@ class _StudentsPageState extends State<StudentsPage> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.grey.withOpacity(0.1),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -683,7 +690,7 @@ class _StudentsPageState extends State<StudentsPage> {
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: percent,
-            backgroundColor: Colors.grey.withOpacity(0.1),
+            backgroundColor: Colors.grey.withValues(alpha: 0.1),
             valueColor: AlwaysStoppedAnimation(color),
             minHeight: 8,
           ),
@@ -697,17 +704,17 @@ class _StudentsPageState extends State<StudentsPage> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: isDark
-            ? const Color(0xFF1F2937).withOpacity(0.8)
-            : Colors.white.withOpacity(0.8),
+            ? const Color(0xFF1F2937).withValues(alpha: 0.8)
+            : Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.grey.withOpacity(0.1),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -767,7 +774,7 @@ class _StudentsPageState extends State<StudentsPage> {
                     : const Color(0xFFF9FAFB),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   style: BorderStyle.none,
                 ),
               ),
@@ -899,12 +906,12 @@ class _StudentsPageState extends State<StudentsPage> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.grey.withOpacity(0.1),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1109,7 +1116,7 @@ class _StudentsPageState extends State<StudentsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -1131,9 +1138,9 @@ class _StudentsPageState extends State<StudentsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1161,11 +1168,11 @@ class _StudentsPageState extends State<StudentsPage> {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: MediaQuery.of(context).size.width > 600 ? 2 : 1,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 500,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 1.3,
+        mainAxisExtent: 380,
       ),
       itemCount: _filteredStudents.length,
       itemBuilder: (context, index) {
@@ -1179,7 +1186,7 @@ class _StudentsPageState extends State<StudentsPage> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -1189,7 +1196,7 @@ class _StudentsPageState extends State<StudentsPage> {
               children: [
                 CircleAvatar(
                   radius: 35,
-                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                   backgroundImage: s.photo.isNotEmpty
                       ? (s.photo.startsWith('/') || s.photo.contains(':\\')
                             ? FileImage(File(s.photo)) as ImageProvider
@@ -1234,8 +1241,10 @@ class _StudentsPageState extends State<StudentsPage> {
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     _buildMobileAction(
                       'Détails',
@@ -1243,21 +1252,18 @@ class _StudentsPageState extends State<StudentsPage> {
                       const Color(0xFF8B5CF6),
                       () => _openDetail(int.parse(s.id)),
                     ),
-                    const SizedBox(width: 8),
                     _buildMobileAction(
                       'Modifier',
                       Icons.edit,
                       Colors.blue,
                       () => _openEditModal(s),
                     ),
-                    const SizedBox(width: 8),
                     _buildMobileAction(
                       'Transfert',
                       Icons.swap_horiz,
                       Colors.orange,
                       () => _showTransferDialog(_filteredStudents[index]),
                     ),
-                    const SizedBox(width: 8),
                     _buildMobileAction(
                       'Supprimer',
                       Icons.delete,
@@ -1285,7 +1291,7 @@ class _StudentsPageState extends State<StudentsPage> {
       icon: Icon(icon, size: 14, color: color),
       label: Text(label, style: TextStyle(color: color, fontSize: 12)),
       style: TextButton.styleFrom(
-        backgroundColor: color.withOpacity(0.1),
+        backgroundColor: color.withValues(alpha: 0.1),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),

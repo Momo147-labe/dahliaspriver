@@ -28,7 +28,7 @@ class RecentReports extends StatelessWidget {
                 'Paiement: ${currencyFormat.format(p['montant'])} • $dateStr',
             'icon': Icons.payments_rounded,
             'iconColor': Colors.green,
-            'iconBackgroundColor': Colors.green.withOpacity(0.1),
+            'iconBackgroundColor': Colors.green.withValues(alpha: 0.1),
           };
         })
         .toList();
@@ -39,7 +39,7 @@ class RecentReports extends StatelessWidget {
         'subtitle': 'Gérez vos paiements pour voir l\'historique',
         'icon': Icons.info_outline_rounded,
         'iconColor': Colors.grey,
-        'iconBackgroundColor': Colors.grey.withOpacity(0.1),
+        'iconBackgroundColor': Colors.grey.withValues(alpha: 0.1),
       });
     }
 
@@ -62,7 +62,7 @@ class RecentReports extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.05),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.05),
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(12),
                       topRight: Radius.circular(12),
@@ -194,7 +194,7 @@ class RecentReports extends StatelessWidget {
                       },
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(
-                          color: AppTheme.primaryColor.withOpacity(0.2),
+                          color: AppTheme.primaryColor.withValues(alpha: 0.2),
                           width: 1,
                         ),
                         shape: RoundedRectangleBorder(
@@ -223,10 +223,10 @@ class RecentReports extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
+              color: Colors.green.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: Colors.green.withOpacity(0.2),
+                color: Colors.green.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -253,7 +253,7 @@ class RecentReports extends StatelessWidget {
                 Text(
                   'Les données de présence sont stockées localement et seront synchronisées dès que la connexion sera rétablie.',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.green.shade700.withOpacity(0.8),
+                    color: Colors.green.shade700.withValues(alpha: 0.8),
                     fontSize: 12,
                     height: 1.4,
                   ),

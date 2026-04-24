@@ -35,7 +35,9 @@ class EmploiDuTemps {
       classeId: map['classe_id'] as int? ?? 0,
       matiereId: map['matiere_id'] as int? ?? 0,
       enseignantId: map['enseignant_id'] as int?,
-      jourSemaine: map['jour_semaine'] as int? ?? 1,
+      jourSemaine: map['jour_semaine'] is String
+          ? int.tryParse(map['jour_semaine'] as String) ?? 1
+          : map['jour_semaine'] as int? ?? 1,
       heureDebut: map['heure_debut'] as String? ?? '',
       heureFin: map['heure_fin'] as String? ?? '',
       salle: map['salle'] as String?,

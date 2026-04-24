@@ -280,7 +280,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
         color: widget.isDark ? AppTheme.surfaceDark : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             offset: const Offset(0, 2),
             blurRadius: 10,
           ),
@@ -301,7 +301,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(
@@ -403,7 +403,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 offset: const Offset(0, 4),
                 blurRadius: 15,
               ),
@@ -419,7 +419,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
                   vertical: 16,
                 ),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(20),
                   ),
@@ -529,7 +529,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
     if (widget.isDark) {
       gradientColors = [
         AppTheme.surfaceDark,
-        AppTheme.surfaceDark.withOpacity(0.9),
+        AppTheme.surfaceDark.withValues(alpha: 0.9),
       ];
     }
 
@@ -558,7 +558,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
             ? []
             : [
                 BoxShadow(
-                  color: badgeColor.withOpacity(0.2),
+                  color: badgeColor.withValues(alpha: 0.2),
                   offset: const Offset(0, 8),
                   blurRadius: 20,
                 ),
@@ -584,7 +584,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                   ),
                 ],
@@ -604,7 +604,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: badgeColor.withOpacity(0.15),
+                    color: badgeColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -665,7 +665,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: badgeColor.withOpacity(0.8),
+                  color: badgeColor.withValues(alpha: 0.8),
                 ),
               ),
               const SizedBox(height: 4),
@@ -690,7 +690,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
                 decoration: BoxDecoration(
                   color: widget.isDark
                       ? AppTheme.cardDark
-                      : Colors.white.withOpacity(0.6),
+                      : Colors.white.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: widget.isDark ? Colors.white12 : Colors.white,
@@ -715,7 +715,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
                         color: badgeColor,
                         shadows: [
                           Shadow(
-                            color: badgeColor.withOpacity(0.3),
+                            color: badgeColor.withValues(alpha: 0.3),
                             blurRadius: 8,
                           ),
                         ],
@@ -754,7 +754,7 @@ class _HonorRollPageState extends State<HonorRollPage> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 10,
                       ),
                     ],

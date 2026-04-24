@@ -48,7 +48,7 @@ class BulletinStudentInfo extends StatelessWidget {
                 border: Border.all(color: Colors.white, width: 4),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                   ),
                 ],
@@ -219,7 +219,7 @@ class BulletinStudentInfo extends StatelessWidget {
             style: TextStyle(
               fontSize: 8,
               fontWeight: FontWeight.w900,
-              color: textCol.withOpacity(0.6),
+              color: textCol.withValues(alpha: 0.6),
               letterSpacing: 1.2,
             ),
           ),
@@ -243,7 +243,7 @@ class BulletinStudentInfo extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: textCol.withOpacity(0.6),
+                    color: textCol.withValues(alpha: 0.6),
                   ),
                 ),
               ],

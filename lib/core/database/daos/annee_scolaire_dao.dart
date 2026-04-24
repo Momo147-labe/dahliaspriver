@@ -72,19 +72,16 @@ class AnneeScolaireDao extends BaseDao {
     if (currentYearId == null)
       return {'currentYearId': null, 'previousYearId': null};
 
-    // Get previous year (the one before the active year by date)
-    final previousYearResult = await db.rawQuery(
-      '''
-      SELECT id FROM ${AnneeScolaireSchema.tableName} 
-      WHERE date_debut < (SELECT date_debut FROM ${AnneeScolaireSchema.tableName} WHERE id = ?)
-      ORDER BY date_debut DESC
-      LIMIT 1
-    ''',
-      [currentYearId],
+    // Get previous year using the explicit annee_precedente_id column
+    final yearResult = await db.query(
+      AnneeScolaireSchema.tableName,
+      columns: ['annee_precedente_id'],
+      where: 'id = ?',
+      whereArgs: [currentYearId],
     );
 
-    final previousYearId = previousYearResult.isNotEmpty
-        ? previousYearResult.first['id'] as int?
+    final previousYearId = yearResult.isNotEmpty
+        ? yearResult.first['annee_precedente_id'] as int?
         : null;
 
     return {'currentYearId': currentYearId, 'previousYearId': previousYearId};

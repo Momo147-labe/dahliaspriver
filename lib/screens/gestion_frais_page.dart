@@ -26,14 +26,19 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final activeAnnee = await DatabaseHelper.instance.getActiveAnnee();
       if (activeAnnee != null) {
-        final classesWithFrais = await DatabaseHelper.instance.getClassesWithFrais(activeAnnee['id']);
-        final allClasses = await DatabaseHelper.instance.getClassesByAnnee(activeAnnee['id']);
-        final fraisStats = await DatabaseHelper.instance.getFraisStatistics(activeAnnee['id']);
-        
+        final classesWithFrais = await DatabaseHelper.instance
+            .getClassesWithFrais(activeAnnee['id']);
+        final allClasses = await DatabaseHelper.instance.getClassesByAnnee(
+          activeAnnee['id'],
+        );
+        final fraisStats = await DatabaseHelper.instance.getFraisStatistics(
+          activeAnnee['id'],
+        );
+
         setState(() {
           _activeAnnee = activeAnnee;
           _classesWithFrais = classesWithFrais;
@@ -145,11 +150,13 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
           selectedClasses,
           _activeAnnee!['id'],
         );
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Frais dupliqués vers ${selectedClasses.length} classe(s)'),
+              content: Text(
+                'Frais dupliqués vers ${selectedClasses.length} classe(s)',
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -158,10 +165,7 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur: $e'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -174,7 +178,9 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: isDark
+          ? const Color(0xFF0F172A)
+          : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
           'Gestion des Frais Scolaires',
@@ -183,10 +189,7 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          IconButton(
-            onPressed: _loadData,
-            icon: const Icon(Icons.refresh),
-          ),
+          IconButton(onPressed: _loadData, icon: const Icon(Icons.refresh)),
         ],
       ),
       body: _isLoading
@@ -242,14 +245,22 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, bool isDark) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+    bool isDark,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.grey.shade200,
         ),
       ),
       child: Column(
@@ -262,7 +273,7 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: color, size: 16),
@@ -341,7 +352,9 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
               }
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('${_allClasses.length} classes trouvées. Voir console.'),
+                  content: Text(
+                    '${_allClasses.length} classes trouvées. Voir console.',
+                  ),
                 ),
               );
             },
@@ -363,18 +376,11 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Symbols.school,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
+            Icon(Symbols.school, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 16),
             Text(
               'Aucune classe trouvée',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
             ),
           ],
         ),
@@ -387,16 +393,18 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
       itemBuilder: (context, index) {
         final classe = _classesWithFrais[index];
         final hasFrais = classe['frais_id'] != null;
-        
+
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: hasFrais 
-                  ? AppTheme.primaryColor.withOpacity(0.3)
-                  : (isDark ? Colors.white.withOpacity(0.1) : Colors.grey.shade200),
+              color: hasFrais
+                  ? AppTheme.primaryColor.withValues(alpha: 0.3)
+                  : (isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.grey.shade200),
             ),
           ),
           child: ListTile(
@@ -404,9 +412,9 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
             leading: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: hasFrais 
-                    ? AppTheme.primaryColor.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.1),
+                color: hasFrais
+                    ? AppTheme.primaryColor.withValues(alpha: 0.1)
+                    : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -463,7 +471,10 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
                           children: [
                             Icon(Symbols.delete, color: Colors.red),
                             SizedBox(width: 8),
-                            Text('Supprimer', style: TextStyle(color: Colors.red)),
+                            Text(
+                              'Supprimer',
+                              style: TextStyle(color: Colors.red),
+                            ),
                           ],
                         ),
                       ),
@@ -506,7 +517,9 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmer la suppression'),
-        content: Text('Voulez-vous supprimer les frais de la classe ${classe['nom']} ?'),
+        content: Text(
+          'Voulez-vous supprimer les frais de la classe ${classe['nom']} ?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -515,7 +528,10 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Supprimer', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Supprimer',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -523,12 +539,10 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
 
     if (confirmed == true) {
       try {
-        await DatabaseHelper.instance.delete(
-          'frais_scolarite',
-          'id = ?',
-          [classe['frais_id']],
-        );
-        
+        await DatabaseHelper.instance.delete('frais_scolarite', 'id = ?', [
+          classe['frais_id'],
+        ]);
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -541,10 +555,7 @@ class _GestionFraisPageState extends State<GestionFraisPage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur: $e'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -556,10 +567,7 @@ class _ClassSelectionDialog extends StatefulWidget {
   final List<Map<String, dynamic>> classes;
   final String title;
 
-  const _ClassSelectionDialog({
-    required this.classes,
-    required this.title,
-  });
+  const _ClassSelectionDialog({required this.classes, required this.title});
 
   @override
   State<_ClassSelectionDialog> createState() => _ClassSelectionDialogState();
@@ -580,7 +588,7 @@ class _ClassSelectionDialogState extends State<_ClassSelectionDialog> {
           itemBuilder: (context, index) {
             final classe = widget.classes[index];
             final isSelected = _selectedIds.contains(classe['id']);
-            
+
             return CheckboxListTile(
               title: Text(classe['nom']),
               subtitle: Text('Niveau: ${classe['niveau'] ?? 'N/A'}'),

@@ -7,8 +7,13 @@ import '../../widgets/reports/grade_blank_sheet_pdf_helper.dart';
 
 class GradeSheetSelectionModal extends StatefulWidget {
   final DatabaseHelper dbHelper;
+  final int anneeId;
 
-  const GradeSheetSelectionModal({super.key, required this.dbHelper});
+  const GradeSheetSelectionModal({
+    super.key,
+    required this.dbHelper,
+    required this.anneeId,
+  });
 
   @override
   State<GradeSheetSelectionModal> createState() =>
@@ -39,17 +44,13 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
       final db = await widget.dbHelper.database;
       final classes = await db.query('classe');
 
-      final anneeId = await widget.dbHelper.ensureActiveAnneeCached();
-      List<int> trimesters = [];
-      if (anneeId != null) {
-        final sequences = await widget.dbHelper.getSequencesPlanification(
-          anneeId,
-        );
-        final Set<int> uniqueTrimesters = sequences
-            .map((s) => s['trimestre'] as int)
-            .toSet();
-        trimesters = uniqueTrimesters.toList()..sort();
-      }
+      final sequences = await widget.dbHelper.getSequencesPlanification(
+        widget.anneeId,
+      );
+      final Set<int> uniqueTrimesters = sequences
+          .map((s) => s['trimestre'] as int)
+          .toSet();
+      final trimesters = uniqueTrimesters.toList()..sort();
 
       setState(() {
         _classes = classes;
@@ -71,16 +72,10 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
       _subjects = [];
     });
     try {
-      final anneeId = await widget.dbHelper.ensureActiveAnneeCached();
-      if (anneeId != null) {
-        final subjects = await widget.dbHelper.getSubjectsByClass(
-          classeId,
-          anneeId,
-        );
-        setState(() {
-          _subjects = subjects;
-        });
-      }
+      final subjects = await widget.dbHelper.getSubjectsByClass(classeId);
+      setState(() {
+        _subjects = subjects;
+      });
     } catch (e) {
       debugPrint("Error loading subjects: $e");
     }
@@ -94,24 +89,31 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
     setState(() => _isGenerating = true);
 
     try {
-      final anneeRes = await widget.dbHelper.getActiveAnneeScolaire();
-      if (anneeRes == null) {
-        throw Exception("Aucune année scolaire active");
+      final db = await widget.dbHelper.database;
+      final anneeRes = await db.query(
+        'annee_scolaire',
+        where: 'id = ?',
+        whereArgs: [widget.anneeId],
+        limit: 1,
+      );
+
+      if (anneeRes.isEmpty) {
+        throw Exception("Année scolaire introuvable");
       }
-      final anneeId = anneeRes['id'] as int;
-      final anneeNom = anneeRes['libelle'] as String;
+
+      final anneeInfo = anneeRes.first;
+      final anneeNom = anneeInfo['libelle'] as String;
 
       // 1. Get students
       final students = await widget.dbHelper.getElevesByClasse(
         _selectedClass!['id'] as int,
-        anneeId,
+        widget.anneeId,
       );
 
       // 2. Get assigned teacher
       final teacher = await widget.dbHelper.getAssignedTeacher(
         _selectedClass!['id'] as int,
         _selectedSubject!['id'] as int,
-        anneeId,
       );
       final teacherName = teacher != null
           ? '${teacher['nom']} ${teacher['prenom']}'
@@ -122,7 +124,7 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
 
       // 4. Get sequences for the trimester
       final allSequences = await widget.dbHelper.getSequencesPlanification(
-        anneeId,
+        widget.anneeId,
       );
       final trimesterSequences = allSequences
           .where((s) => s['trimestre'] == _selectedTrimestre)
@@ -196,7 +198,7 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -333,7 +335,9 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
         borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey),
       ),
       filled: true,
-      fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+      fillColor: isDark
+          ? Colors.white.withValues(alpha: 0.05)
+          : Colors.grey[50],
     );
   }
 }

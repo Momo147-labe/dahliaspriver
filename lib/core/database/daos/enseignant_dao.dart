@@ -46,9 +46,8 @@ class EnseignantDao extends BaseDao {
   }
 
   Future<List<Map<String, dynamic>>> getClassesByTeacher(
-    int enseignantId, [
-    int? anneeId,
-  ]) async {
+    int enseignantId,
+  ) async {
     return await db.rawQuery(
       '''
       SELECT DISTINCT c.nom, cy.nom as cycle, n.nom as niveau
@@ -56,33 +55,31 @@ class EnseignantDao extends BaseDao {
       LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN niveaux n ON c.niveau_id = n.id
       JOIN attribution_enseignant ae ON c.id = ae.classe_id
-      WHERE ae.enseignant_id = ? AND ae.annee_scolaire_id = ?
+      WHERE ae.enseignant_id = ?
       ORDER BY c.nom ASC
     ''',
-      [enseignantId, anneeId],
+      [enseignantId],
     );
   }
 
   Future<Map<String, dynamic>?> getAssignedTeacher(
     int classeId,
     int matiereId,
-    int anneeId,
   ) async {
     final results = await db.rawQuery(
       '''
       SELECT e.*
       FROM attribution_enseignant ae
       JOIN ${EnseignantSchema.tableName} e ON ae.enseignant_id = e.id
-      WHERE ae.classe_id = ? AND ae.matiere_id = ? AND ae.annee_scolaire_id = ?
+      WHERE ae.classe_id = ? AND ae.matiere_id = ?
     ''',
-      [classeId, matiereId, anneeId],
+      [classeId, matiereId],
     );
     return results.isNotEmpty ? results.first : null;
   }
 
   Future<void> saveAllAttributions(
     int classeId,
-    int? anneeId,
     Map<int, int?> assignments,
   ) async {
     await db.transaction((txn) async {
@@ -99,7 +96,6 @@ class EnseignantDao extends BaseDao {
             'classe_id': classeId,
             'matiere_id': entry.key,
             'enseignant_id': entry.value,
-            'annee_scolaire_id': anneeId,
           }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
       }
@@ -115,12 +111,10 @@ class EnseignantDao extends BaseDao {
   }
 
   Future<List<Map<String, dynamic>>> getAttributionsByClass(
-    int classeId, [
-    int? anneeId,
-  ]) async {
-    const String whereClause =
-        'WHERE ae.classe_id = ? AND ae.annee_scolaire_id = ?';
-    final List<dynamic> whereArgs = [classeId, anneeId];
+    int classeId,
+  ) async {
+    const String whereClause = 'WHERE ae.classe_id = ?';
+    final List<dynamic> whereArgs = [classeId];
 
     return await db.rawQuery('''
       SELECT ae.*, e.nom, e.prenom, m.nom as matiere_nom

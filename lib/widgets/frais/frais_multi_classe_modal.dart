@@ -22,7 +22,8 @@ class FraisMultiClasseModal extends StatefulWidget {
 class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _inscriptionController = TextEditingController();
-  final TextEditingController _reinscriptionController = TextEditingController();
+  final TextEditingController _reinscriptionController =
+      TextEditingController();
   final TextEditingController _tranche1Controller = TextEditingController();
   final TextEditingController _tranche2Controller = TextEditingController();
   final TextEditingController _tranche3Controller = TextEditingController();
@@ -50,8 +51,10 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
   Future<void> _loadData() async {
     try {
       final activeAnnee = await DatabaseHelper.instance.getActiveAnnee();
-      final classes = await DatabaseHelper.instance.getClassesByAnnee(activeAnnee?['id'] ?? 0);
-      
+      final classes = await DatabaseHelper.instance.getClassesByAnnee(
+        activeAnnee?['id'] ?? 0,
+      );
+
       setState(() {
         _activeAnnee = activeAnnee;
         _classes = classes;
@@ -116,7 +119,7 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
 
     try {
       final db = DatabaseHelper.instance;
-      
+
       for (int classeId in _selectedClassIds) {
         final frais = FraisScolaire(
           classeId: classeId,
@@ -124,25 +127,31 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
           inscription: double.tryParse(_inscriptionController.text) ?? 0.0,
           reinscription: double.tryParse(_reinscriptionController.text) ?? 0.0,
           tranche1: double.tryParse(_tranche1Controller.text) ?? 0.0,
-          dateLimiteT1: _dateLimite1Controller.text.isEmpty ? null : _dateLimite1Controller.text,
+          dateLimiteT1: _dateLimite1Controller.text.isEmpty
+              ? null
+              : _dateLimite1Controller.text,
           tranche2: double.tryParse(_tranche2Controller.text) ?? 0.0,
-          dateLimiteT2: _dateLimite2Controller.text.isEmpty ? null : _dateLimite2Controller.text,
+          dateLimiteT2: _dateLimite2Controller.text.isEmpty
+              ? null
+              : _dateLimite2Controller.text,
           tranche3: double.tryParse(_tranche3Controller.text) ?? 0.0,
-          dateLimiteT3: _dateLimite3Controller.text.isEmpty ? null : _dateLimite3Controller.text,
+          dateLimiteT3: _dateLimite3Controller.text.isEmpty
+              ? null
+              : _dateLimite3Controller.text,
           montantTotal: _montantTotal,
         );
 
         // Vérifier si des frais existent déjà pour cette classe
-        final existing = await db.getFraisByClasse(classeId, _activeAnnee!['id']);
-        
+        final existing = await db.getFraisByClasse(
+          classeId,
+          _activeAnnee!['id'],
+        );
+
         if (existing != null) {
           // Mettre à jour
-          await db.update(
-            'frais_scolarite',
-            frais.toMap(),
-            'id = ?',
-            [existing['id']],
-          );
+          await db.update('frais_scolarite', frais.toMap(), 'id = ?', [
+            existing['id'],
+          ]);
         } else {
           // Créer nouveau
           await db.insert('frais_scolarite', frais.toMap());
@@ -152,7 +161,9 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Frais configurés pour ${_selectedClassIds.length} classe(s)'),
+            content: Text(
+              'Frais configurés pour ${_selectedClassIds.length} classe(s)',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -161,10 +172,7 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -192,7 +200,7 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -257,11 +265,29 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
                         isDark,
                       ),
                       const SizedBox(height: 16),
-                      _buildTrancheRow(1, _tranche1Controller, _dateLimite1Controller, Colors.blue, isDark),
+                      _buildTrancheRow(
+                        1,
+                        _tranche1Controller,
+                        _dateLimite1Controller,
+                        Colors.blue,
+                        isDark,
+                      ),
                       const SizedBox(height: 12),
-                      _buildTrancheRow(2, _tranche2Controller, _dateLimite2Controller, Colors.green, isDark),
+                      _buildTrancheRow(
+                        2,
+                        _tranche2Controller,
+                        _dateLimite2Controller,
+                        Colors.green,
+                        isDark,
+                      ),
                       const SizedBox(height: 12),
-                      _buildTrancheRow(3, _tranche3Controller, _dateLimite3Controller, Colors.purple, isDark),
+                      _buildTrancheRow(
+                        3,
+                        _tranche3Controller,
+                        _dateLimite3Controller,
+                        Colors.purple,
+                        isDark,
+                      ),
                       const SizedBox(height: 32),
                       _buildTotalSummary(isDark),
                     ],
@@ -290,14 +316,10 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(
-              Symbols.payments,
-              color: Colors.white,
-              size: 28,
-            ),
+            child: const Icon(Symbols.payments, color: Colors.white, size: 28),
           ),
           const SizedBox(width: 20),
           const Expanded(
@@ -314,10 +336,7 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
                 ),
                 Text(
                   'Sélectionnez plusieurs classes avec les mêmes frais',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],
             ),
@@ -326,7 +345,7 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
             onPressed: widget.onClose,
             icon: const Icon(Icons.close_rounded, color: Colors.white),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.2),
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
             ),
           ),
         ],
@@ -338,9 +357,11 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -348,11 +369,15 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
           Row(
             children: [
               Checkbox(
-                value: _selectedClassIds.length == _classes.length && _classes.isNotEmpty,
+                value:
+                    _selectedClassIds.length == _classes.length &&
+                    _classes.isNotEmpty,
                 onChanged: (value) {
                   setState(() {
                     if (value == true) {
-                      _selectedClassIds = _classes.map((c) => c['id'] as int).toList();
+                      _selectedClassIds = _classes
+                          .map((c) => c['id'] as int)
+                          .toList();
                     } else {
                       _selectedClassIds.clear();
                     }
@@ -382,14 +407,19 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
                   });
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    color: isSelected 
-                        ? AppTheme.primaryColor.withOpacity(0.1)
-                        : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+                    color: isSelected
+                        ? AppTheme.primaryColor.withValues(alpha: 0.1)
+                        : (isDark
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : Colors.white),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected 
+                      color: isSelected
                           ? AppTheme.primaryColor
                           : (isDark ? Colors.white10 : Colors.grey.shade200),
                       width: isSelected ? 2 : 1,
@@ -408,7 +438,9 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
                       Text(
                         '${classe['nom']} - ${classe['niveau'] ?? ''}',
                         style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           color: isSelected ? AppTheme.primaryColor : null,
                         ),
                       ),
@@ -423,7 +455,7 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -440,7 +472,12 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon, Color color, bool isDark) {
+  Widget _buildSectionHeader(
+    String title,
+    IconData icon,
+    Color color,
+    bool isDark,
+  ) {
     return Row(
       children: [
         Icon(icon, color: color, size: 20),
@@ -450,7 +487,9 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white.withOpacity(0.9) : Colors.blueGrey.shade800,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.9)
+                : Colors.blueGrey.shade800,
           ),
         ),
       ],
@@ -488,12 +527,17 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
               color: isDark ? Colors.white30 : Colors.grey.shade400,
             ),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+            fillColor: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.grey.shade50,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 16,
+            ),
           ),
         ),
       ],
@@ -510,16 +554,18 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -556,7 +602,10 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
                 InkWell(
                   onTap: () => _selectDate(number),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: isDark ? Colors.white10 : Colors.white,
                       borderRadius: BorderRadius.circular(12),
@@ -573,7 +622,9 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          dateCtrl.text.isEmpty ? 'Sélectionner une date' : dateCtrl.text,
+                          dateCtrl.text.isEmpty
+                              ? 'Sélectionner une date'
+                              : dateCtrl.text,
                           style: TextStyle(
                             color: dateCtrl.text.isEmpty
                                 ? Colors.grey
@@ -598,12 +649,12 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppTheme.primaryColor.withOpacity(0.1),
-            Colors.orange.withOpacity(0.1),
+            AppTheme.primaryColor.withValues(alpha: 0.1),
+            Colors.orange.withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -644,7 +695,9 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.02) : Colors.grey.shade50,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.02)
+            : Colors.grey.shade50,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
       child: Row(
@@ -654,7 +707,9 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
             onPressed: widget.onClose,
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Annuler'),
           ),
@@ -665,14 +720,19 @@ class _FraisMultiClasseModalState extends State<FraisMultiClasseModal> {
               backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               elevation: 4,
             ),
             child: _isLoading
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Text('Enregistrer les Frais'),
           ),

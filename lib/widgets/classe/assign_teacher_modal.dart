@@ -67,7 +67,6 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
     try {
       await _dbHelper.saveAllAttributions(
         widget.classe['id'] as int,
-        null,
         _assignments,
       );
 
@@ -114,7 +113,7 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withOpacity(0.1),
+                      color: Colors.purple.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
@@ -188,7 +187,7 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
                     ),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? Colors.white.withOpacity(0.02)
+                          ? Colors.white.withValues(alpha: 0.02)
                           : Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(

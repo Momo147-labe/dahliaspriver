@@ -6,8 +6,12 @@ class ClasseDao extends BaseDao {
   ClasseDao(Database db) : super(db);
 
   Future<List<Map<String, dynamic>>> getClassesByAnnee([int? anneeId]) async {
-    // Classes sont maintenant globales, on ignore anneeId pour la liste
-    return await db.query(ClasseSchema.tableName, orderBy: 'nom ASC');
+    return await db.rawQuery('''
+      SELECT c.*, cy.nom as cycle_nom
+      FROM ${ClasseSchema.tableName} c
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+      ORDER BY c.nom ASC
+    ''');
   }
 
   Future<List<Map<String, dynamic>>> getClassesByNiveau(int niveauId) async {
@@ -75,10 +79,7 @@ class ClasseDao extends BaseDao {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getSubjectsByClass(
-    int classeId, [
-    int? anneeId,
-  ]) async {
+  Future<List<Map<String, dynamic>>> getSubjectsByClass(int classeId) async {
     return await db.rawQuery(
       '''
       SELECT m.*, cm.coefficient
@@ -93,7 +94,6 @@ class ClasseDao extends BaseDao {
 
   Future<void> saveClassSubjects(
     int classeId,
-    int? anneeId,
     List<Map<String, dynamic>> subjectsData,
   ) async {
     await db.transaction((txn) async {

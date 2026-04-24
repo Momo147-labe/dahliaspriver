@@ -88,13 +88,13 @@ class _TrialCountdownState extends State<TrialCountdown> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isCritical
-            ? AppTheme.errorColor.withOpacity(0.1)
-            : Colors.orange.withOpacity(0.1),
+            ? AppTheme.errorColor.withValues(alpha: 0.1)
+            : Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isCritical
-              ? AppTheme.errorColor.withOpacity(0.3)
-              : Colors.orange.withOpacity(0.3),
+              ? AppTheme.errorColor.withValues(alpha: 0.3)
+              : Colors.orange.withValues(alpha: 0.3),
           width: 1,
         ),
       ),

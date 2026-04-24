@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../theme/app_theme.dart';
-import '../../grades/grade_sheet_page.dart';
 import '../../grades/result_sheet_selection_modal.dart';
 import '../../grades/grade_sheet_selection_modal.dart';
 import 'global_ranking_page.dart';
@@ -191,7 +190,7 @@ class _GradesPageState extends State<GradesPage> {
       }
 
       if (_classes.isNotEmpty) {
-        await _loadSubjectsForSelectedClass(anneeId);
+        await _loadSubjectsForSelectedClass();
       } else {
         setState(() => _isLoading = false);
         _showError('Veuillez d\'abord ajouter des classes.');
@@ -247,12 +246,11 @@ class _GradesPageState extends State<GradesPage> {
     });
   }
 
-  Future<void> _loadSubjectsForSelectedClass(int anneeId) async {
+  Future<void> _loadSubjectsForSelectedClass() async {
     if (_selectedClass == null) return;
     try {
       final subjects = await _dbHelper.getSubjectsByClass(
         _selectedClass!['id'],
-        anneeId,
       );
       setState(() {
         _subjects = subjects;
@@ -296,7 +294,6 @@ class _GradesPageState extends State<GradesPage> {
       final teacher = await _dbHelper.getAssignedTeacher(
         _selectedClass!['id'],
         _selectedSubject!['id'],
-        anneeId,
       );
 
       final Map<String, dynamic> finalStats = Map<String, dynamic>.from(stats);
@@ -522,7 +519,7 @@ class _GradesPageState extends State<GradesPage> {
                 icon: const Icon(Icons.military_tech_rounded, size: 20),
                 label: const Text("Vue Globale"),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                   foregroundColor: AppTheme.primaryColor,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(
@@ -562,7 +559,7 @@ class _GradesPageState extends State<GradesPage> {
                   backgroundColor: AppTheme.primaryColor,
                   foregroundColor: Colors.white,
                   elevation: 4,
-                  shadowColor: AppTheme.primaryColor.withOpacity(0.4),
+                  shadowColor: AppTheme.primaryColor.withValues(alpha: 0.4),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 16,
@@ -580,20 +577,34 @@ class _GradesPageState extends State<GradesPage> {
   }
 
   void _showGradeSheetSelectionModal() {
+    final anneeId = Provider.of<AcademicYearProvider>(
+      context,
+      listen: false,
+    ).selectedAnneeId;
+    if (anneeId == null) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => GradeSheetSelectionModal(dbHelper: _dbHelper),
+      builder: (context) =>
+          GradeSheetSelectionModal(dbHelper: _dbHelper, anneeId: anneeId),
     );
   }
 
   void _showResultSheetSelectionModal() {
+    final anneeId = Provider.of<AcademicYearProvider>(
+      context,
+      listen: false,
+    ).selectedAnneeId;
+    if (anneeId == null) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ResultSheetSelectionModal(dbHelper: _dbHelper),
+      builder: (context) =>
+          ResultSheetSelectionModal(dbHelper: _dbHelper, anneeId: anneeId),
     );
   }
 
@@ -704,7 +715,7 @@ class _GradesPageState extends State<GradesPage> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
       itemCount: _overviewGrades.length,
       itemBuilder: (context, index) {
         final g = _overviewGrades[index];
@@ -823,13 +834,13 @@ class _GradesPageState extends State<GradesPage> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor.withOpacity(
-                                    0.05,
+                                  color: AppTheme.primaryColor.withValues(
+                                    alpha: 0.05,
                                   ),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: AppTheme.primaryColor.withOpacity(
-                                      0.2,
+                                    color: AppTheme.primaryColor.withValues(
+                                      alpha: 0.2,
                                     ),
                                   ),
                                 ),
@@ -906,7 +917,7 @@ class _GradesPageState extends State<GradesPage> {
 
       if (_lastLoadedAnneeId != null) {
         // 2. Charger les matières pour la classe sélectionnée
-        await _loadSubjectsForSelectedClass(_lastLoadedAnneeId!);
+        await _loadSubjectsForSelectedClass();
 
         if (!mounted) return;
 
@@ -940,6 +951,7 @@ class _GradesPageState extends State<GradesPage> {
           _buildStatsGrid(isDark),
           const SizedBox(height: 32),
           _buildGradesTable(isDark),
+          const SizedBox(height: 100),
         ],
       ),
     );
@@ -953,7 +965,7 @@ class _GradesPageState extends State<GradesPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -975,9 +987,9 @@ class _GradesPageState extends State<GradesPage> {
               _updateCycleConfig();
 
               if (_lastLoadedAnneeId != null) {
-                _loadSubjectsForSelectedClass(
-                  _lastLoadedAnneeId!,
-                ).then((_) => _loadGrades(_lastLoadedAnneeId!));
+                _loadSubjectsForSelectedClass().then(
+                  (_) => _loadGrades(_lastLoadedAnneeId!),
+                );
               }
             },
             isDark,
@@ -1241,10 +1253,10 @@ class _GradesPageState extends State<GradesPage> {
       decoration: BoxDecoration(
         color: isDark ? AppTheme.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.05),
+            color: color.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1259,7 +1271,7 @@ class _GradesPageState extends State<GradesPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 20),
@@ -1304,7 +1316,7 @@ class _GradesPageState extends State<GradesPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1352,7 +1364,9 @@ class _GradesPageState extends State<GradesPage> {
           // Table Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey[50],
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.03)
+                : Colors.grey[50],
             child: Row(
               children: [
                 const Expanded(
@@ -1478,7 +1492,7 @@ class _GradesPageState extends State<GradesPage> {
                                   (noteValueNum != -1.0 &&
                                       (noteValueNum < _currentCycleMin ||
                                           noteValueNum > _currentCycleMax))
-                                  ? Colors.red.withOpacity(0.1)
+                                  ? Colors.red.withValues(alpha: 0.1)
                                   : (isDark
                                         ? AppTheme.cardDark
                                         : const Color(0xFFF3F4F6)),
@@ -1506,7 +1520,7 @@ class _GradesPageState extends State<GradesPage> {
                           margin: const EdgeInsets.only(left: 8),
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
+                            color: Colors.orange.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -1537,7 +1551,7 @@ class _GradesPageState extends State<GradesPage> {
       }
     }
     return CircleAvatar(
-      backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+      backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
       child: Text(
         initial.toUpperCase(),
         style: const TextStyle(
@@ -1556,13 +1570,13 @@ class _GradesPageState extends State<GradesPage> {
         gradient: LinearGradient(
           colors: [
             AppTheme.primaryColor,
-            AppTheme.primaryColor.withOpacity(0.6),
+            AppTheme.primaryColor.withValues(alpha: 0.6),
           ],
         ),
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryColor.withOpacity(0.3),
+            color: AppTheme.primaryColor.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

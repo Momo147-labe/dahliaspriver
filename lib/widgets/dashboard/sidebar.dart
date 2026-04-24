@@ -82,8 +82,8 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
             boxShadow: [
               BoxShadow(
                 color: isDark
-                    ? Colors.black.withOpacity(0.2)
-                    : Colors.black.withOpacity(0.08),
+                    ? Colors.black.withValues(alpha: 0.2)
+                    : Colors.black.withValues(alpha: 0.08),
                 blurRadius: 10,
                 offset: const Offset(2, 0),
               ),
@@ -225,13 +225,13 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: isDark
-                    ? Colors.white.withOpacity(0.05)
-                    : Colors.black.withOpacity(0.04),
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: isDark
-                      ? Colors.white.withOpacity(0.1)
-                      : Colors.black.withOpacity(0.1),
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.black.withValues(alpha: 0.1),
                   width: 1,
                 ),
               ),
@@ -278,7 +278,7 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.primaryColor.withOpacity(0.3),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.3),
                       blurRadius: 6,
                       offset: const Offset(0, 3),
                     ),
@@ -359,12 +359,12 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
         color: isSelected
-            ? AppTheme.primaryColor.withOpacity(0.2)
+            ? AppTheme.primaryColor.withValues(alpha: 0.2)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         border: isSelected
             ? Border.all(
-                color: AppTheme.primaryColor.withOpacity(0.3),
+                color: AppTheme.primaryColor.withValues(alpha: 0.3),
                 width: 1,
               )
             : null,
@@ -447,7 +447,7 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
                             borderRadius: BorderRadius.circular(2),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.white.withOpacity(0.4),
+                                color: Colors.white.withValues(alpha: 0.4),
                                 blurRadius: 4,
                                 offset: const Offset(0, 1),
                               ),
@@ -497,10 +497,10 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
                 vertical: 12,
               ),
               decoration: BoxDecoration(
-                color: AppTheme.errorColor.withOpacity(0.1),
+                color: AppTheme.errorColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppTheme.errorColor.withOpacity(0.3),
+                  color: AppTheme.errorColor.withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),

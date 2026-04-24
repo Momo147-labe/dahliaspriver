@@ -350,7 +350,7 @@ class _AddScheduleModalState extends State<AddScheduleModal> {
                               label: const Text('Ajouter'),
                               style: FilledButton.styleFrom(
                                 backgroundColor: AppTheme.primaryColor
-                                    .withOpacity(0.1),
+                                    .withValues(alpha: 0.1),
                                 foregroundColor: AppTheme.primaryColor,
                               ),
                             ),
@@ -406,6 +406,33 @@ class _AddScheduleModalState extends State<AddScheduleModal> {
                       ),
                     ),
                   ),
+                  if (widget.entry != null) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _delete,
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                        ),
+                        label: const Text(
+                          'Supprimer ce cours',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          side: const BorderSide(color: Colors.red),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                 ],
               ),
@@ -420,10 +447,14 @@ class _AddScheduleModalState extends State<AddScheduleModal> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.grey.shade200,
         ),
       ),
       child: Column(
@@ -438,7 +469,7 @@ class _AddScheduleModalState extends State<AddScheduleModal> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -456,7 +487,7 @@ class _AddScheduleModalState extends State<AddScheduleModal> {
                     onPressed: () => _duplicateEntry(index),
                     icon: Icon(
                       Icons.copy_all_outlined,
-                      color: AppTheme.primaryColor.withOpacity(0.7),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.7),
                       size: 20,
                     ),
                     tooltip: 'Dupliquer ce créneau',
@@ -503,11 +534,7 @@ class _AddScheduleModalState extends State<AddScheduleModal> {
                       final teacherRecord = await DatabaseHelper
                           .instance
                           .enseignantDao
-                          .getAssignedTeacher(
-                            widget.classeId,
-                            val,
-                            DatabaseHelper.activeAnneeId!,
-                          );
+                          .getAssignedTeacher(widget.classeId, val);
                       if (teacherRecord != null && mounted) {
                         setState(() {
                           entryData.enseignantId = teacherRecord['id'] as int;
@@ -626,7 +653,9 @@ class _AddScheduleModalState extends State<AddScheduleModal> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.2) : Colors.grey.shade400,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.2)
+              : Colors.grey.shade400,
         ),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -649,11 +678,11 @@ class _AddScheduleModalState extends State<AddScheduleModal> {
       padding: const EdgeInsets.only(left: 16, right: 4),
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark
-            ? Colors.white.withOpacity(0.05)
+            ? Colors.white.withValues(alpha: 0.05)
             : Colors.white,
         border: Border.all(
           color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white.withOpacity(0.2)
+              ? Colors.white.withValues(alpha: 0.2)
               : Colors.grey.shade300,
         ),
         borderRadius: BorderRadius.circular(12),

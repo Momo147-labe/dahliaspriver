@@ -6,6 +6,15 @@ import '../../../theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/academic_year_provider.dart';
 import '../../../services/pdf/master_schedule_pdf_service.dart';
+import '../../../models/emploi_du_temps.dart';
+import '../../../widgets/schedule/add_schedule_modal.dart';
+
+int _toInt(dynamic value, [int defaultValue = 0]) {
+  if (value == null) return defaultValue;
+  if (value is int) return value;
+  if (value is String) return int.tryParse(value) ?? defaultValue;
+  return defaultValue;
+}
 
 class MasterSchedulePage extends StatefulWidget {
   const MasterSchedulePage({super.key});
@@ -21,10 +30,12 @@ Map<String, dynamic> _buildMatrixIsolate(List<dynamic> args) {
   final Map<int, Map<String, Map<int, List<int>>>> teacherConflicts = {};
 
   for (var course in schedule) {
-    final jour = course['jour_semaine'] as int;
+    final jour = _toInt(course['jour_semaine'], 1);
     final timeSlot = '${course['heure_debut']} - ${course['heure_fin']}';
-    final classeId = course['classe_id'] as int;
-    final enseignantId = course['enseignant_id'] as int?;
+    final classeId = _toInt(course['classe_id']);
+    final enseignantId = course['enseignant_id'] != null
+        ? _toInt(course['enseignant_id'])
+        : null;
 
     matrix.putIfAbsent(jour, () => {});
     matrix[jour]!.putIfAbsent(timeSlot, () => {});
@@ -153,6 +164,19 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
         );
       }
     }
+  }
+
+  void _openEditModal(Map<String, dynamic> courseData, int classeId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AddScheduleModal(
+        classeId: classeId,
+        entry: EmploiDuTemps.fromMap(courseData),
+        onSuccess: _loadData,
+      ),
+    );
   }
 
   void _scrollToToday() {
@@ -375,7 +399,7 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
 
               bool hasConflict = false;
               if (course != null && course['enseignant_id'] != null) {
-                final profId = course['enseignant_id'] as int;
+                final profId = _toInt(course['enseignant_id']);
                 if (_teacherConflicts[day] != null &&
                     _teacherConflicts[day]![slot] != null &&
                     _teacherConflicts[day]![slot]![profId] != null &&
@@ -398,7 +422,13 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
                     ),
                   ),
                 ),
-                child: _buildCell(course, isDark, hasConflict),
+                child: InkWell(
+                  onTap: course != null
+                      ? () => _openEditModal(course, _toInt(c['id']))
+                      : null,
+                  borderRadius: BorderRadius.circular(12),
+                  child: _buildCell(course, isDark, hasConflict),
+                ),
               );
             }).toList(),
           ),
@@ -418,7 +448,7 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
             color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -533,16 +563,16 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
     Color subjectColor = AppTheme.primaryColor;
 
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       margin: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: hasConflict
-            ? Colors.red.withOpacity(0.1)
-            : subjectColor.withOpacity(0.1),
+            ? Colors.red.withValues(alpha: 0.1)
+            : subjectColor.withValues(alpha: 0.1),
         border: Border.all(
           color: hasConflict
-              ? Colors.red.withOpacity(0.8)
-              : subjectColor.withOpacity(0.3),
+              ? Colors.red.withValues(alpha: 0.8)
+              : subjectColor.withValues(alpha: 0.3),
           width: hasConflict ? 2.0 : 1.0,
         ),
         borderRadius: BorderRadius.circular(8),
@@ -556,12 +586,12 @@ class _MasterSchedulePageState extends State<MasterSchedulePage> {
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 13,
-              color: subjectColor.withOpacity(isDark ? 0.9 : 1.0),
+              color: subjectColor.withValues(alpha: isDark ? 0.9 : 1.0),
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Row(
             children: [
               Icon(

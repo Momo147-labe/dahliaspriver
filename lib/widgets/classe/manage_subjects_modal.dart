@@ -60,7 +60,7 @@ class _ManageClassSubjectsModalState extends State<ManageClassSubjectsModal> {
         return {'id': e.key, 'coefficient': e.value};
       }).toList();
 
-      await _dbHelper.saveClassSubjects(widget.classe['id'], null, data);
+      await _dbHelper.saveClassSubjects(widget.classe['id'], data);
 
       widget.onSuccess();
       if (mounted) Navigator.pop(context);
@@ -102,7 +102,7 @@ class _ManageClassSubjectsModalState extends State<ManageClassSubjectsModal> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
@@ -163,12 +163,12 @@ class _ManageClassSubjectsModalState extends State<ManageClassSubjectsModal> {
                     ),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? Colors.white.withOpacity(0.02)
+                          ? Colors.white.withValues(alpha: 0.02)
                           : Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isSelected
-                            ? AppTheme.primaryColor.withOpacity(0.3)
+                            ? AppTheme.primaryColor.withValues(alpha: 0.3)
                             : Colors.transparent,
                       ),
                     ),

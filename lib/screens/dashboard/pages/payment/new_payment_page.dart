@@ -113,6 +113,54 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           _totalPaid = paid;
           _lastPaymentInfo = lastInfo;
         });
+
+        if (mounted && fees != null) {
+          final double inscription =
+              (fees['inscription'] as num?)?.toDouble() ?? 0.0;
+          final double reinscription =
+              (fees['reinscription'] as num?)?.toDouble() ?? 0.0;
+          final double t1 = (fees['tranche1'] as num?)?.toDouble() ?? 0.0;
+          final double t2 = (fees['tranche2'] as num?)?.toDouble() ?? 0.0;
+          final double t3 = (fees['tranche3'] as num?)?.toDouble() ?? 0.0;
+
+          final bool isReinscrit =
+              eleve['statut'] == 'reinscrit' ||
+              eleve['eleve_statut'] == 'reinscrit';
+          final double totalDue =
+              (isReinscrit ? reinscription : inscription) + t1 + t2 + t3;
+          final double remaining = totalDue - paid;
+
+          if (remaining <= 0 && totalDue > 0) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                final anneeLabel =
+                    context
+                        .read<AcademicYearProvider>()
+                        .selectedAnnee?['libelle'] ??
+                    'cette année';
+                final nom = '${eleve['prenom']} ${eleve['nom']}';
+                final matricule = eleve['matricule'] ?? '';
+                final classe = eleve['classe_nom'] ?? '';
+
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Information'),
+                    content: Text(
+                      "L'élève $nom de matricule $matricule de la classe de $classe a déjà tout payé pour l'année scolaire $anneeLabel.",
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            });
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error loading student financials: $e');
@@ -125,6 +173,86 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
 
     final montant = double.tryParse(_montantController.text.trim()) ?? 0;
     if (montant <= 0) return;
+
+    if (_fraisClasse != null) {
+      final double inscription =
+          (_fraisClasse!['inscription'] as num?)?.toDouble() ?? 0.0;
+      final double reinscription =
+          (_fraisClasse!['reinscription'] as num?)?.toDouble() ?? 0.0;
+      final double t1 = (_fraisClasse!['tranche1'] as num?)?.toDouble() ?? 0.0;
+      final double t2 = (_fraisClasse!['tranche2'] as num?)?.toDouble() ?? 0.0;
+      final double t3 = (_fraisClasse!['tranche3'] as num?)?.toDouble() ?? 0.0;
+
+      final bool isReinscrit =
+          _selectedEleve!['statut'] == 'reinscrit' ||
+          _selectedEleve!['eleve_statut'] == 'reinscrit';
+      final double totalDue =
+          (isReinscrit ? reinscription : inscription) + t1 + t2 + t3;
+
+      final double remaining = totalDue - _totalPaid;
+
+      if (remaining <= 0) {
+        if (mounted) {
+          final anneeLabel =
+              context.read<AcademicYearProvider>().selectedAnnee?['libelle'] ??
+              'cette année';
+          final nom = '${_selectedEleve!['prenom']} ${_selectedEleve!['nom']}';
+          final matricule = _selectedEleve!['matricule'] ?? '';
+          final classe = _selectedEleve!['classe_nom'] ?? '';
+
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Information'),
+              content: Text(
+                "L'élève $nom de matricule $matricule de la classe de $classe a déjà tout payé pour l'année scolaire $anneeLabel.",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Compris'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      } else if (montant > remaining) {
+        if (mounted) {
+          final formattedRemaining = NumberFormat.currency(
+            locale: 'fr_FR',
+            symbol: 'GNF',
+            decimalDigits: 0,
+          ).format(remaining > 0 ? remaining : 0);
+          final formattedSaisi = NumberFormat.currency(
+            locale: 'fr_FR',
+            symbol: 'GNF',
+            decimalDigits: 0,
+          ).format(montant);
+          final nom = '${_selectedEleve!['prenom']} ${_selectedEleve!['nom']}';
+
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text(
+                'Montant incorrect',
+                style: TextStyle(color: Color(0xFFEF4444)),
+              ),
+              content: Text(
+                "Il reste à payer $formattedRemaining pour l'élève $nom, et non $formattedSaisi.",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Compris'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+    }
 
     setState(() => _isSaving = true);
     try {
@@ -145,6 +273,16 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           'observation': _refController.text.trim(),
           'created_by_id': userId,
         });
+
+        // Update confirmation status to 'Confirmé' if it's the first payment and currently 'En attente'
+        if (_totalPaid == 0 &&
+            _selectedEleve!['confirmation_statut'] == 'En attente') {
+          await dbHelper.updateEleveParcoursStatut(
+            _selectedEleve!['id'],
+            _selectedAnneeId!,
+            'Confirmé',
+          );
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -242,7 +380,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
       pinned: true,
       backgroundColor: isDark ? AppTheme.backgroundDark : AppTheme.surfaceLight,
       elevation: 1,
-      shadowColor: Colors.black.withOpacity(0.08),
+      shadowColor: Colors.black.withValues(alpha: 0.08),
       centerTitle: false,
       leading: IconButton(
         icon: Icon(
@@ -280,7 +418,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           radius: 18,
           backgroundColor: isDark
               ? AppTheme.cardDark
-              : AppTheme.primaryColor.withOpacity(0.1),
+              : AppTheme.primaryColor.withValues(alpha: 0.1),
           child: Icon(
             Icons.person,
             size: 18,
@@ -323,12 +461,12 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark
-              ? AppTheme.borderDark.withOpacity(0.3)
+              ? AppTheme.borderDark.withValues(alpha: 0.3)
               : AppTheme.borderLight,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
             blurRadius: 10,
           ),
         ],
@@ -414,7 +552,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
         color: isDark ? AppTheme.backgroundDark : AppTheme.backgroundLight,
         borderRadius: BorderRadius.circular(6),
         border: isDark
-            ? Border.all(color: AppTheme.borderDark.withOpacity(0.2))
+            ? Border.all(color: AppTheme.borderDark.withValues(alpha: 0.2))
             : null,
       ),
       child: Row(
@@ -478,7 +616,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark
-              ? AppTheme.borderDark.withOpacity(0.3)
+              ? AppTheme.borderDark.withValues(alpha: 0.3)
               : AppTheme.borderLight,
         ),
       ),
@@ -638,14 +776,14 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? primaryColor.withOpacity(0.1)
+              ? primaryColor.withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
                 ? primaryColor
                 : (isDark
-                      ? AppTheme.borderDark.withOpacity(0.3)
+                      ? AppTheme.borderDark.withValues(alpha: 0.3)
                       : AppTheme.borderLight),
             width: isSelected ? 2 : 1,
           ),
@@ -711,7 +849,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(
           color: isDark
-              ? AppTheme.borderDark.withOpacity(0.3)
+              ? AppTheme.borderDark.withValues(alpha: 0.3)
               : AppTheme.borderLight,
         ),
       ),
@@ -719,7 +857,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(
           color: isDark
-              ? AppTheme.borderDark.withOpacity(0.3)
+              ? AppTheme.borderDark.withValues(alpha: 0.3)
               : AppTheme.borderLight,
         ),
       ),
@@ -733,7 +871,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
       ),
       hintStyle: TextStyle(
         color: isDark
-            ? AppTheme.textDarkSecondary.withOpacity(0.5)
+            ? AppTheme.textDarkSecondary.withValues(alpha: 0.5)
             : AppTheme.textMuted,
       ),
     );
@@ -743,9 +881,9 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: primaryColor.withOpacity(0.05),
+        color: primaryColor.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: primaryColor.withOpacity(0.1)),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -834,7 +972,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark
-              ? AppTheme.borderDark.withOpacity(0.3)
+              ? AppTheme.borderDark.withValues(alpha: 0.3)
               : AppTheme.borderLight,
         ),
       ),
@@ -847,9 +985,9 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
                 child: const Row(
                   children: [
@@ -904,12 +1042,12 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: isDark
-                  ? AppTheme.warningColor.withOpacity(0.1)
+                  ? AppTheme.warningColor.withValues(alpha: 0.1)
                   : const Color(0xFFFFF7ED),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isDark
-                    ? AppTheme.warningColor.withOpacity(0.3)
+                    ? AppTheme.warningColor.withValues(alpha: 0.3)
                     : const Color(0xFFFFEDD5),
               ),
             ),
@@ -940,7 +1078,7 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           Divider(
             height: 1,
             color: isDark
-                ? AppTheme.borderDark.withOpacity(0.3)
+                ? AppTheme.borderDark.withValues(alpha: 0.3)
                 : AppTheme.borderLight,
           ),
           const SizedBox(height: 12),
@@ -1031,12 +1169,12 @@ class _NewPaymentPageState extends State<NewPaymentPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            primaryColor.withOpacity(0.05),
-            primaryColor.withOpacity(0.15),
+            primaryColor.withValues(alpha: 0.05),
+            primaryColor.withValues(alpha: 0.15),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: primaryColor.withOpacity(0.1)),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
@@ -1173,7 +1311,7 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.3),
+              color: Colors.grey.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -1207,8 +1345,8 @@ class _StudentSearchModalState extends State<_StudentSearchModal> {
                       final eleve = _results[index];
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: AppTheme.primaryColor.withOpacity(
-                            0.1,
+                          backgroundColor: AppTheme.primaryColor.withValues(
+                            alpha: 0.1,
                           ),
                           child: Text(
                             eleve['nom'][0],

@@ -28,7 +28,7 @@ class FraisCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -73,7 +73,7 @@ class FraisCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withOpacity(0.1),
+            color: AppTheme.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Icon(Symbols.school, color: AppTheme.primaryColor, size: 28),
@@ -107,7 +107,7 @@ class FraisCard extends StatelessWidget {
               onPressed: onEdit,
               icon: const Icon(Symbols.edit, size: 18),
               style: IconButton.styleFrom(
-                backgroundColor: Colors.blue.withOpacity(0.1),
+                backgroundColor: Colors.blue.withValues(alpha: 0.1),
                 foregroundColor: Colors.blue,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -119,7 +119,7 @@ class FraisCard extends StatelessWidget {
               onPressed: onDelete,
               icon: const Icon(Symbols.delete, size: 18),
               style: IconButton.styleFrom(
-                backgroundColor: Colors.red.withOpacity(0.1),
+                backgroundColor: Colors.red.withValues(alpha: 0.1),
                 foregroundColor: Colors.red,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -168,9 +168,9 @@ class FraisCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.1)),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
@@ -267,7 +267,9 @@ class FraisCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.03)
+              : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -312,8 +314,8 @@ class FraisCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppTheme.primaryColor.withOpacity(0.1),
-            Colors.orange.withOpacity(0.05),
+            AppTheme.primaryColor.withValues(alpha: 0.1),
+            Colors.orange.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(20),

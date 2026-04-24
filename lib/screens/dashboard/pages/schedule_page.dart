@@ -4,6 +4,8 @@ import '../../../core/database/database_helper.dart';
 import '../../../models/emploi_du_temps.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/schedule/add_schedule_modal.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/academic_year_provider.dart';
 import 'package:printing/printing.dart';
 import '../../../services/pdf/timetable_pdf_service.dart';
 import 'master_schedule_page.dart';
@@ -157,11 +159,15 @@ class _SchedulePageState extends State<SchedulePage>
   }
 
   Widget _buildHeader(bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 16,
+      runSpacing: 16,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'Emploi du temps',
@@ -187,7 +193,9 @@ class _SchedulePageState extends State<SchedulePage>
             ),
           ],
         ),
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
             OutlinedButton.icon(
               onPressed: () {
@@ -208,7 +216,6 @@ class _SchedulePageState extends State<SchedulePage>
                 ),
               ),
             ),
-            const SizedBox(width: 16),
             ElevatedButton.icon(
               onPressed: () => _openAddModal(),
               icon: const Icon(Icons.add_rounded),
@@ -225,6 +232,23 @@ class _SchedulePageState extends State<SchedulePage>
                 ),
               ),
             ),
+            TextButton.icon(
+              onPressed: _clearSchedule,
+              icon: const Icon(
+                Icons.delete_sweep_rounded,
+                color: Colors.orange,
+              ),
+              label: const Text(
+                'Vider le planning',
+                style: TextStyle(color: Colors.orange),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 24,
+                ),
+              ),
+            ),
           ],
         ),
       ],
@@ -236,8 +260,8 @@ class _SchedulePageState extends State<SchedulePage>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.8),
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -253,7 +277,7 @@ class _SchedulePageState extends State<SchedulePage>
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.05)
+                  ? Colors.white.withValues(alpha: 0.05)
                   : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(12),
             ),
@@ -311,7 +335,9 @@ class _SchedulePageState extends State<SchedulePage>
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.02) : Colors.grey.shade50,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.02)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -323,7 +349,7 @@ class _SchedulePageState extends State<SchedulePage>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.1),
+              color: AppTheme.primaryColor.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
               ),
@@ -362,21 +388,40 @@ class _SchedulePageState extends State<SchedulePage>
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
           ],
-          border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+          border: Border.all(
+            color: AppTheme.primaryColor.withValues(alpha: 0.2),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              entry.matiereNom ?? 'Matière',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    entry.matiereNom ?? 'Matière',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _confirmDelete(entry),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4.0),
+                    child: Icon(Icons.close, size: 16, color: Colors.red),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Row(
@@ -466,5 +511,76 @@ class _SchedulePageState extends State<SchedulePage>
         onSuccess: _loadSchedule,
       ),
     );
+  }
+
+  Future<void> _confirmDelete(EmploiDuTemps entry) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer ce cours ?'),
+        content: Text(
+          'Voulez-vous vraiment supprimer le cours de ${entry.matiereNom} ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await DatabaseHelper.instance.timetableDao.deleteTimetableEntry(
+        entry.id!,
+      );
+      _loadSchedule();
+    }
+  }
+
+  Future<void> _clearSchedule() async {
+    if (_selectedClasseId == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Vider l\'emploi du temps ?'),
+        content: const Text(
+          'Cette action supprimera TOUS les cours de cette classe pour l\'année en cours. '
+          'Cette action est irréversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Tout Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      if (!mounted) return;
+      final anneeId = Provider.of<AcademicYearProvider>(
+        context,
+        listen: false,
+      ).selectedAnneeId;
+      if (anneeId != null) {
+        await DatabaseHelper.instance.timetableDao.deleteTimetableByClass(
+          _selectedClasseId!,
+          anneeId,
+        );
+        _loadSchedule();
+      }
+    }
   }
 }

@@ -74,15 +74,11 @@ class _TeachersPageState extends State<TeachersPage>
       final db = DatabaseHelper.instance;
       final teachersData = await db.getEnseignants();
       final stats = await db.getEnseignantsStats();
-      final anneeId = await db.ensureActiveAnneeCached();
 
       // Charger les classes pour chaque enseignant
       Map<int, List<Map<String, dynamic>>> teacherClasses = {};
       for (var teacherData in teachersData) {
-        final classes = await db.getClassesByTeacher(
-          teacherData['id'],
-          anneeId,
-        );
+        final classes = await db.getClassesByTeacher(teacherData['id']);
         teacherClasses[teacherData['id']] = classes;
       }
 
@@ -201,7 +197,7 @@ class _TeachersPageState extends State<TeachersPage>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withOpacity(0.3),
+                        color: Colors.blue.withValues(alpha: 0.3),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -408,7 +404,7 @@ class _TeachersPageState extends State<TeachersPage>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -461,7 +457,7 @@ class _TeachersPageState extends State<TeachersPage>
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: percent,
-            backgroundColor: color.withOpacity(0.1),
+            backgroundColor: color.withValues(alpha: 0.1),
             valueColor: AlwaysStoppedAnimation(color),
             minHeight: 8,
           ),
@@ -488,7 +484,7 @@ class _TeachersPageState extends State<TeachersPage>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: colors[0].withOpacity(0.3),
+            color: colors[0].withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -534,8 +530,8 @@ class _TeachersPageState extends State<TeachersPage>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.8),
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade200,
@@ -560,7 +556,7 @@ class _TeachersPageState extends State<TeachersPage>
                 ),
                 filled: true,
                 fillColor: isDark
-                    ? Colors.white.withOpacity(0.05)
+                    ? Colors.white.withValues(alpha: 0.05)
                     : Colors.grey.shade100,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -574,7 +570,7 @@ class _TeachersPageState extends State<TeachersPage>
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.1)
+                  ? Colors.white.withValues(alpha: 0.1)
                   : Colors.grey.shade200,
               borderRadius: BorderRadius.circular(16),
             ),
@@ -661,7 +657,7 @@ class _TeachersPageState extends State<TeachersPage>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -679,7 +675,7 @@ class _TeachersPageState extends State<TeachersPage>
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundColor: color.withOpacity(0.1),
+                      backgroundColor: color.withValues(alpha: 0.1),
                       backgroundImage:
                           (teacher.photo != null && teacher.photo!.isNotEmpty)
                           ? (teacher.photo!.startsWith('/') ||
@@ -736,7 +732,7 @@ class _TeachersPageState extends State<TeachersPage>
                       onPressed: () => _openEditModal(teacher),
                       icon: const Icon(Icons.edit_rounded, color: Colors.blue),
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.blue.withOpacity(0.1),
+                        backgroundColor: Colors.blue.withValues(alpha: 0.1),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -744,7 +740,7 @@ class _TeachersPageState extends State<TeachersPage>
                       onPressed: () => _handleDelete(teacher),
                       icon: const Icon(Icons.delete_rounded, color: Colors.red),
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.red.withOpacity(0.1),
+                        backgroundColor: Colors.red.withValues(alpha: 0.1),
                       ),
                     ),
                   ],
@@ -792,10 +788,10 @@ class _TeachersPageState extends State<TeachersPage>
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
+                          color: color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: color.withOpacity(0.3),
+                            color: color.withValues(alpha: 0.3),
                             width: 0.5,
                           ),
                         ),
@@ -884,7 +880,7 @@ class _TeachersPageState extends State<TeachersPage>
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: color.withOpacity(0.1),
+            backgroundColor: color.withValues(alpha: 0.1),
             backgroundImage:
                 (teacher.photo != null && teacher.photo!.isNotEmpty)
                 ? (teacher.photo!.startsWith('/') ||

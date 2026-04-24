@@ -1066,14 +1066,88 @@ class DatabaseMigrations {
       }
     }
 
-    if (oldVersion < 59) {
+    if (oldVersion < 60) {
       try {
-        await addColumnSafely(db, 'paiement_detail', 'mois', 'TEXT');
+        // 1. Create promotion_log table
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS promotion_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_annee_depart INTEGER NOT NULL,
+            classe_depart_id INTEGER NOT NULL,
+            id_annee_arriver INTEGER NOT NULL,
+            classe_arriver_id INTEGER NOT NULL,
+            cread_date TEXT DEFAULT CURRENT_TIMESTAMP,
+            status TEXT,
+            FOREIGN KEY (id_annee_depart) REFERENCES annee_scolaire(id),
+            FOREIGN KEY (classe_depart_id) REFERENCES classe(id),
+            FOREIGN KEY (id_annee_arriver) REFERENCES annee_scolaire(id),
+            FOREIGN KEY (classe_arriver_id) REFERENCES classe(id)
+          )
+        ''');
+
+        // 2. Globalize classe_matiere: remove annee_scolaire_id and keep unique(classe_id, matiere_id)
+        await db.execute(
+          'ALTER TABLE classe_matiere RENAME TO classe_matiere_old',
+        );
+        await db.execute('''
+          CREATE TABLE classe_matiere (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            classe_id INTEGER NOT NULL,
+            matiere_id INTEGER NOT NULL,
+            coefficient REAL DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (classe_id) REFERENCES classe(id),
+            FOREIGN KEY (matiere_id) REFERENCES matiere(id),
+            UNIQUE(classe_id, matiere_id)
+          )
+        ''');
+        await db.execute('''
+          INSERT OR IGNORE INTO classe_matiere (id, classe_id, matiere_id, coefficient, created_at, updated_at)
+          SELECT id, classe_id, matiere_id, coefficient, created_at, updated_at FROM classe_matiere_old
+        ''');
+        await db.execute('DROP TABLE classe_matiere_old');
+
+        // 3. Globalize attribution_enseignant: remove annee_scolaire_id and keep unique(classe_id, matiere_id)
+        await db.execute(
+          'ALTER TABLE attribution_enseignant RENAME TO attribution_enseignant_old',
+        );
+        await db.execute('''
+          CREATE TABLE attribution_enseignant (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            enseignant_id INTEGER NOT NULL,
+            classe_id INTEGER NOT NULL,
+            matiere_id INTEGER NOT NULL,
+            is_titulaire INTEGER DEFAULT 0,
+            volume_horaire REAL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (enseignant_id) REFERENCES enseignant(id),
+            FOREIGN KEY (classe_id) REFERENCES classe(id),
+            FOREIGN KEY (matiere_id) REFERENCES matiere(id),
+            UNIQUE(classe_id, matiere_id)
+          )
+        ''');
+        await db.execute('''
+          INSERT OR IGNORE INTO attribution_enseignant (id, enseignant_id, classe_id, matiere_id, is_titulaire, volume_horaire, created_at, updated_at)
+          SELECT id, enseignant_id, classe_id, matiere_id, is_titulaire, volume_horaire, created_at, updated_at FROM attribution_enseignant_old
+        ''');
+        await db.execute('DROP TABLE attribution_enseignant_old');
+
         debugPrint(
-          'Migration v59: Colonne mois ajoutée à la table paiement_detail.',
+          'Migration vers la version 60 (globalisation et log promotion) terminée.',
         );
       } catch (e) {
-        debugPrint('Erreur migration v59: $e');
+        debugPrint('Erreur migration v60: $e');
+      }
+    }
+
+    if (oldVersion < 61) {
+      try {
+        await addColumnSafely(db, 'ecole', 'ville', 'TEXT');
+        debugPrint('Migration v61: colonne ville ajoutée à la table ecole.');
+      } catch (e) {
+        debugPrint('Erreur migration v61: $e');
       }
     }
   }

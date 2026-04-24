@@ -281,7 +281,7 @@ class _ClassesPageState extends State<ClassesPage> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.blue.withOpacity(0.3),
+                    color: Colors.blue.withValues(alpha: 0.3),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -334,7 +334,7 @@ class _ClassesPageState extends State<ClassesPage> {
               borderRadius: BorderRadius.circular(16),
             ),
             elevation: 8,
-            shadowColor: Colors.blue.withOpacity(0.3),
+            shadowColor: Colors.blue.withValues(alpha: 0.3),
           ),
         ),
       ],
@@ -395,7 +395,7 @@ class _ClassesPageState extends State<ClassesPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: colors.last.withOpacity(0.3),
+            color: colors.last.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -429,7 +429,7 @@ class _ClassesPageState extends State<ClassesPage> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: Colors.white, size: 28),
@@ -485,12 +485,12 @@ class _ClassesPageState extends State<ClassesPage> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.grey.withOpacity(0.1),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -539,11 +539,13 @@ class _ClassesPageState extends State<ClassesPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1F2937).withOpacity(0.8) : Colors.white,
+        color: isDark
+            ? const Color(0xFF1F2937).withValues(alpha: 0.8)
+            : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -692,11 +694,16 @@ class _ClassesPageState extends State<ClassesPage> {
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: active
-              ? (isDark ? Colors.blue.withOpacity(0.2) : Colors.white)
+              ? (isDark ? Colors.blue.withValues(alpha: 0.2) : Colors.white)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           boxShadow: active && !isDark
-              ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)]
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                  ),
+                ]
               : null,
         ),
         child: Icon(icon, color: active ? Colors.blue : Colors.grey, size: 20),
@@ -794,7 +801,7 @@ class _ClassesPageState extends State<ClassesPage> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -810,7 +817,7 @@ class _ClassesPageState extends State<ClassesPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(Icons.school, color: color, size: 24),
@@ -921,7 +928,7 @@ class _ClassesPageState extends State<ClassesPage> {
           borderRadius: BorderRadius.circular(8),
           child: LinearProgressIndicator(
             value: percent,
-            backgroundColor: Colors.grey.withOpacity(0.1),
+            backgroundColor: Colors.grey.withValues(alpha: 0.1),
             valueColor: AlwaysStoppedAnimation(barColor),
             minHeight: 8,
           ),
@@ -934,7 +941,9 @@ class _ClassesPageState extends State<ClassesPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800]!.withOpacity(0.5) : Colors.grey[100],
+        color: isDark
+            ? Colors.grey[800]!.withValues(alpha: 0.5)
+            : Colors.grey[100],
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -974,7 +983,7 @@ class _ClassesPageState extends State<ClassesPage> {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: color, size: 18),
@@ -989,7 +998,7 @@ class _ClassesPageState extends State<ClassesPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1000,7 +1009,7 @@ class _ClassesPageState extends State<ClassesPage> {
         physics: const NeverScrollableScrollPhysics(),
         itemCount: classes.length,
         separatorBuilder: (_, __) =>
-            Divider(height: 1, color: Colors.grey.withOpacity(0.1)),
+            Divider(height: 1, color: Colors.grey.withValues(alpha: 0.1)),
         itemBuilder: (context, i) {
           final c = classes[i];
           return ListTile(
@@ -1008,7 +1017,7 @@ class _ClassesPageState extends State<ClassesPage> {
             leading: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.school, color: Colors.blue),

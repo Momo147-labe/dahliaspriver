@@ -36,6 +36,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   double _totalAverage = 0.0;
   double _totalBalance = 0.0;
   Map<int, double> _yearlyAverages = {};
+  int? _activeAnneeId;
 
   @override
   void initState() {
@@ -57,6 +58,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
       final parcours = await _dbHelper.getStudentParcours(widget.studentId);
       final payments = await _dbHelper.getStudentPayments(widget.studentId);
       final results = await _dbHelper.getStudentResults(widget.studentId);
+      final activeAnnee = await _dbHelper.getActiveAnnee();
 
       // Fetch payment details for each aggregate payment
       List<Map<String, dynamic>> updatedPayments = [];
@@ -75,6 +77,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         _parcours = parcours;
         _payments = updatedPayments;
         _results = results;
+        _activeAnneeId = activeAnnee?['id'] as int?;
         _calculateStats();
         _isLoading = false;
       });
@@ -90,33 +93,80 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   }
 
   void _calculateStats() {
-    double balance = 0.0;
-    for (var p in _payments) {
-      balance +=
-          (p['montant_total'] as num? ?? 0.0) -
-          (p['montant_paye'] as num? ?? 0.0);
-    }
-    _totalBalance = balance;
+    // Compute balance for active year only
+    final activePayments = _activeAnneeId != null
+        ? _payments
+              .where((p) => p['annee_scolaire_id'] == _activeAnneeId)
+              .toList()
+        : _payments;
 
-    if (_results.isNotEmpty) {
-      double sum = 0;
-      for (var r in _results) sum += (r['note'] as num? ?? 0.0).toDouble();
-      _totalAverage = sum / _results.length;
+    double totalPaid = 0.0;
+    double totalDue = 0.0;
+    bool counted = false;
+    for (var p in activePayments) {
+      for (var d in (p['details'] as List? ?? [])) {
+        totalPaid += (d['montant'] as num? ?? 0.0);
+      }
+      if (!counted) {
+        totalDue = (p['montant_total'] as num?)?.toDouble() ?? 0.0;
+        counted = true;
+      }
     }
+    _totalBalance = totalDue - totalPaid;
 
     _yearlyAverages = {};
     for (var p in _parcours) {
-      int? anneeId = p['annee_id'];
+      int? anneeId = p['annee_scolaire_id'];
       if (anneeId == null) continue;
+
       var yearGrades = _results
           .where((r) => r['annee_scolaire_id'] == anneeId)
           .toList();
+
       if (yearGrades.isNotEmpty) {
-        double yearSum = 0;
-        for (var g in yearGrades)
-          yearSum += (g['note'] as num? ?? 0.0).toDouble();
-        _yearlyAverages[anneeId] = yearSum / yearGrades.length;
+        // Correct Weighted Average Calculation
+        Map<int, List<Map<String, dynamic>>> byMatiere = {};
+        for (var g in yearGrades) {
+          byMatiere.putIfAbsent(g['matiere_id'], () => []).add(g);
+        }
+
+        double totalPoints = 0;
+        double totalCoeff = 0;
+
+        byMatiere.forEach((matiereId, matNotes) {
+          double matiereSum = 0;
+          for (var n in matNotes) matiereSum += (n['note'] as num).toDouble();
+          double matiereAvg = matiereSum / matNotes.length;
+          double coeff = (matNotes.first['coefficient'] as num? ?? 1.0)
+              .toDouble();
+          totalPoints += matiereAvg * coeff;
+          totalCoeff += coeff;
+        });
+
+        _yearlyAverages[anneeId] = totalCoeff > 0
+            ? totalPoints / totalCoeff
+            : 0.0;
       }
+    }
+
+    // Overall Average (Weighted across all subjects recorded)
+    if (_results.isNotEmpty) {
+      Map<int, List<Map<String, dynamic>>> byMatiere = {};
+      for (var g in _results) {
+        byMatiere.putIfAbsent(g['matiere_id'], () => []).add(g);
+      }
+      double totalPoints = 0;
+      double totalCoeff = 0;
+      byMatiere.forEach((matiereId, matNotes) {
+        double matiereSum = 0;
+        for (var n in matNotes) matiereSum += (n['note'] as num).toDouble();
+        double matiereAvg = matiereSum / matNotes.length;
+        double coeff = (matNotes.first['coefficient'] as num? ?? 1.0)
+            .toDouble();
+        totalPoints += matiereAvg * coeff;
+        totalCoeff += coeff;
+      });
+      _totalAverage = totalCoeff > 0 ? totalPoints / totalCoeff : 0.0;
     }
   }
 
@@ -196,7 +246,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
             child: _buildSummaryItem(
               Icons.analytics,
               'Moyenne',
-              '${_totalAverage.toStringAsFixed(2)}/20',
+              '${_totalAverage.toStringAsFixed(2)}/${_parcours.isNotEmpty ? _parcours.first['note_max'] ?? 20 : 20}',
               isDark,
               _primaryColor,
             ),
@@ -205,7 +255,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
           Expanded(
             child: _buildSummaryItem(
               Icons.account_balance_wallet,
-              'Solde',
+              'Reste à payer',
               _formatCurrency(_totalBalance),
               isDark,
               _totalBalance > 0 ? Colors.red : Colors.green,
@@ -230,12 +280,14 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark
-              ? AppTheme.borderDark.withOpacity(0.2)
+              ? AppTheme.borderDark.withValues(alpha: 0.2)
               : Colors.grey[100]!,
         ),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.04),
+            color: isDark
+                ? Colors.black26
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -247,7 +299,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 18),
@@ -310,7 +362,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                       top: -50,
                       child: CircleAvatar(
                         radius: 100,
-                        backgroundColor: Colors.white.withOpacity(0.05),
+                        backgroundColor: Colors.white.withValues(alpha: 0.05),
                       ),
                     ),
                     SafeArea(
@@ -325,7 +377,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                           children: [
                             Container(
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 shape: BoxShape.circle,
                               ),
                               child: IconButton(
@@ -377,7 +429,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withValues(alpha: 0.15),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -466,7 +518,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                       borderRadius: BorderRadius.circular(15),
                     ),
                     elevation: 5,
-                    shadowColor: AppTheme.primaryColor.withOpacity(0.3),
+                    shadowColor: AppTheme.primaryColor.withValues(alpha: 0.3),
                   ),
                 ),
               ],
@@ -499,7 +551,9 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         ),
       ),
       style: TextButton.styleFrom(
-        backgroundColor: isWhite ? Colors.white : Colors.white.withOpacity(0.2),
+        backgroundColor: isWhite
+            ? Colors.white
+            : Colors.white.withValues(alpha: 0.2),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -543,7 +597,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: _accentColor.withOpacity(0.12),
+        color: _accentColor.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -565,7 +619,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         border: Border(
           bottom: BorderSide(
             color: isDark
-                ? AppTheme.borderDark.withOpacity(0.1)
+                ? AppTheme.borderDark.withValues(alpha: 0.1)
                 : Colors.grey[200]!,
           ),
         ),
@@ -675,12 +729,12 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark
-              ? AppTheme.borderDark.withOpacity(0.2)
+              ? AppTheme.borderDark.withValues(alpha: 0.2)
               : Colors.grey[100]!,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -740,12 +794,12 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark
-              ? AppTheme.borderDark.withOpacity(0.2)
+              ? AppTheme.borderDark.withValues(alpha: 0.2)
               : Colors.grey[100]!,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -811,7 +865,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.08),
+              color: AppTheme.primaryColor.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, size: 20, color: AppTheme.primaryColor),
@@ -924,14 +978,14 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isFirst
-                              ? AppTheme.primaryColor.withOpacity(0.06)
+                              ? AppTheme.primaryColor.withValues(alpha: 0.06)
                               : (isDark
                                     ? AppTheme.cardDark
                                     : AppTheme.backgroundLight),
                           borderRadius: BorderRadius.circular(15),
                           border: Border.all(
                             color: isFirst
-                                ? AppTheme.primaryColor.withOpacity(0.1)
+                                ? AppTheme.primaryColor.withValues(alpha: 0.1)
                                 : (isDark
                                       ? AppTheme.borderDark
                                       : Colors.grey[200]!),
@@ -1007,7 +1061,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -1032,7 +1086,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.person, color: Colors.white),
@@ -1091,11 +1145,25 @@ class _StudentDetailPageState extends State<StudentDetailPage>
   }
 
   Widget _buildFinancialSummary(bool isDark) {
-    double totalDue = 0;
+    // Only show data for the active year
+    final activePayments = _activeAnneeId != null
+        ? _payments
+              .where((p) => p['annee_scolaire_id'] == _activeAnneeId)
+              .toList()
+        : _payments;
+
     double totalPaid = 0;
-    for (var p in _payments) {
-      totalDue += (p['montant_total'] as num?)?.toDouble() ?? 0.0;
-      totalPaid += (p['montant_paye'] as num?)?.toDouble() ?? 0.0;
+    double totalDue = 0;
+    bool counted = false;
+    for (var p in activePayments) {
+      for (var d in (p['details'] as List? ?? [])) {
+        totalPaid += (d['montant'] as num?)?.toDouble() ?? 0.0;
+      }
+      // Count totalDue only once (same year → same montant_total)
+      if (!counted) {
+        totalDue = (p['montant_total'] as num?)?.toDouble() ?? 0.0;
+        counted = true;
+      }
     }
     double remaining = totalDue - totalPaid;
 
@@ -1164,6 +1232,33 @@ class _StudentDetailPageState extends State<StudentDetailPage>
       Container(width: 1, height: 40, color: Colors.grey[100]);
 
   Widget _buildPaymentsTable(bool isDark) {
+    // Group payments by annee_scolaire
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (var p in _payments) {
+      final anneeLabel = (p['annee_nom'] ?? 'Année inconnue') as String;
+      final details = (p['details'] as List? ?? [])
+          .cast<Map<String, dynamic>>();
+      if (details.isEmpty) continue;
+      grouped.putIfAbsent(anneeLabel, () => []).addAll(details);
+    }
+
+    if (grouped.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[100]!),
+        ),
+        child: Center(
+          child: Text(
+            'Aucun paiement enregistré',
+            style: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -1181,48 +1276,108 @@ class _StudentDetailPageState extends State<StudentDetailPage>
             ),
           ),
           const Divider(height: 1),
-          Table(
-            columnWidths: const {
-              0: FlexColumnWidth(1.5),
-              1: FlexColumnWidth(2),
-              2: FlexColumnWidth(1.5),
-              3: FlexColumnWidth(1),
-            },
-            children: [
-              TableRow(
-                decoration: BoxDecoration(
+          ...grouped.entries.map((entry) {
+            final anneeLabel = entry.key;
+            final details = entry.value;
+            final anneeTotal = details.fold<double>(
+              0,
+              (sum, d) => sum + ((d['montant'] as num?)?.toDouble() ?? 0),
+            );
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Year header
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                   color: isDark
-                      ? Colors.white.withOpacity(0.05)
+                      ? Colors.white.withValues(alpha: 0.04)
                       : Colors.grey[50],
-                ),
-                children: [
-                  _buildCell('DATE', isDark: isDark, isHeader: true),
-                  _buildCell('LIBELLÉ', isDark: isDark, isHeader: true),
-                  _buildCell('MONTANT', isDark: isDark, isHeader: true),
-                  _buildCell('STATUT', isDark: isDark, isHeader: true),
-                ],
-              ),
-              ..._payments.expand(
-                (p) => (p['details'] as List? ?? []).map(
-                  (d) => TableRow(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildCell(
-                        _formatDate(d['date_paiement']),
-                        isDark: isDark,
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 14,
+                            color: AppTheme.primaryColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            anneeLabel,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                        ],
                       ),
-                      _buildCell(d['type_frais'] ?? 'Paiement', isDark: isDark),
-                      _buildCell(
-                        _formatCurrency(d['montant']),
-                        isBold: true,
-                        isDark: isDark,
+                      Text(
+                        _formatCurrency(anneeTotal),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Colors.green[600],
+                        ),
                       ),
-                      _buildCellBadge('Payé', Colors.green),
                     ],
                   ),
                 ),
-              ),
-            ],
-          ),
+                // Table header
+                Table(
+                  columnWidths: const {
+                    0: FlexColumnWidth(1.5),
+                    1: FlexColumnWidth(2),
+                    2: FlexColumnWidth(1.5),
+                    3: FlexColumnWidth(1),
+                  },
+                  children: [
+                    TableRow(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: isDark ? Colors.white12 : Colors.grey[200]!,
+                          ),
+                        ),
+                      ),
+                      children: [
+                        _buildCell('DATE', isDark: isDark, isHeader: true),
+                        _buildCell('LIBELLÉ', isDark: isDark, isHeader: true),
+                        _buildCell('MONTANT', isDark: isDark, isHeader: true),
+                        _buildCell('STATUT', isDark: isDark, isHeader: true),
+                      ],
+                    ),
+                    ...details.map(
+                      (d) => TableRow(
+                        children: [
+                          _buildCell(
+                            _formatDate(d['date_paiement']),
+                            isDark: isDark,
+                          ),
+                          _buildCell(
+                            d['type_frais'] ?? 'Paiement',
+                            isDark: isDark,
+                          ),
+                          _buildCell(
+                            _formatCurrency(d['montant']),
+                            isBold: true,
+                            isDark: isDark,
+                          ),
+                          _buildCellBadge('Payé', Colors.green),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 1),
+              ],
+            );
+          }),
         ],
       ),
     );
@@ -1232,25 +1387,150 @@ class _StudentDetailPageState extends State<StudentDetailPage>
     if (_results.isEmpty)
       return _buildEmptyState('Aucune note enregistrée', isDark);
 
-    final Map<int, List<Map<String, dynamic>>> grouped = {};
+    // Group by year
+    final Map<int, Map<String, dynamic>> yearMeta = {};
+    final Map<int, Map<int, List<Map<String, dynamic>>>> byYearTrimestre = {};
+
     for (var r in _results) {
-      final t = r['trimestre'] ?? 1;
-      grouped.putIfAbsent(t, () => []).add(r);
+      final anneeId = r['annee_scolaire_id'] as int? ?? 0;
+      final anneeNom = r['annee_nom'] as String? ?? 'Année inconnue';
+      final trimestre = r['trimestre'] as int? ?? 1;
+
+      yearMeta[anneeId] ??= {'nom': anneeNom, 'id': anneeId};
+      byYearTrimestre.putIfAbsent(anneeId, () => {});
+      byYearTrimestre[anneeId]!.putIfAbsent(trimestre, () => []).add(r);
     }
 
-    final sortedT = grouped.keys.toList()..sort();
+    // Sort years descending (most recent first)
+    final sortedYears = yearMeta.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
-        children: sortedT
-            .map(
-              (t) => Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: _buildTrimesterCard(t, grouped[t]!, isDark),
+        children: sortedYears.map((anneeId) {
+          final anneeNom = yearMeta[anneeId]!['nom'] as String;
+          final trimestreMap = byYearTrimestre[anneeId]!;
+          final sortedT = trimestreMap.keys.toList()..sort();
+
+          // Compute year average
+          Map<int, List<Map<String, dynamic>>> byMatiere = {};
+          for (var r in _results.where(
+            (r) => r['annee_scolaire_id'] == anneeId,
+          )) {
+            byMatiere.putIfAbsent(r['matiere_id'] as int, () => []).add(r);
+          }
+          double totalPts = 0, totalCoeff = 0;
+          byMatiere.forEach((_, notes) {
+            double s = 0;
+            for (var n in notes) s += (n['note'] as num).toDouble();
+            double coeff = (notes.first['coefficient'] as num? ?? 1).toDouble();
+            totalPts += (s / notes.length) * coeff;
+            totalCoeff += coeff;
+          });
+          final yearAvg = totalCoeff > 0 ? totalPts / totalCoeff : 0.0;
+
+          final isActiveYear = anneeId == _activeAnneeId;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Year header
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isActiveYear
+                        ? [
+                            AppTheme.primaryColor.withValues(alpha: 0.15),
+                            AppTheme.primaryColor.withValues(alpha: 0.05),
+                          ]
+                        : [
+                            Colors.grey.withValues(alpha: 0.1),
+                            Colors.grey.withValues(alpha: 0.03),
+                          ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isActiveYear
+                        ? AppTheme.primaryColor.withValues(alpha: 0.4)
+                        : Colors.grey.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.school_outlined,
+                          size: 18,
+                          color: isActiveYear
+                              ? AppTheme.primaryColor
+                              : Colors.grey,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          anneeNom,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: isActiveYear
+                                ? AppTheme.primaryColor
+                                : (isDark ? Colors.white70 : Colors.grey[700]),
+                          ),
+                        ),
+                        if (isActiveYear) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'Active',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      'Moy. ${yearAvg.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: isActiveYear
+                            ? AppTheme.primaryColor
+                            : (isDark ? Colors.white60 : Colors.grey[600]),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            )
-            .toList(),
+              // Trimester cards
+              ...sortedT.map(
+                (t) => Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _buildTrimesterCard(t, trimestreMap[t]!, isDark),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -1260,11 +1540,27 @@ class _StudentDetailPageState extends State<StudentDetailPage>
     List<Map<String, dynamic>> notes,
     bool isDark,
   ) {
-    double sum = 0;
+    // Proper Weighted Average calculation per trimester
+    Map<int, List<Map<String, dynamic>>> byMatiere = {};
     for (var n in notes) {
-      sum += (n['note'] as num? ?? 0.0).toDouble();
+      byMatiere.putIfAbsent(n['matiere_id'], () => []).add(n);
     }
-    double avg = sum / notes.length;
+
+    double totalPoints = 0;
+    double totalCoeff = 0;
+
+    byMatiere.forEach((matiereId, matNotes) {
+      double matiereSum = 0;
+      for (var n in matNotes) {
+        matiereSum += (n['note'] as num).toDouble();
+      }
+      double matiereAvg = matiereSum / matNotes.length;
+      double coeff = (matNotes.first['coefficient'] as num? ?? 1.0).toDouble();
+      totalPoints += matiereAvg * coeff;
+      totalCoeff += coeff;
+    });
+
+    double avg = totalCoeff > 0 ? totalPoints / totalCoeff : 0.0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
@@ -1272,7 +1568,9 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey[100]!,
         ),
       ),
       child: Column(
@@ -1287,7 +1585,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                   '$trimester${trimester == 1 ? "er" : "ème"} Trimestre',
                 ),
                 Text(
-                  'Moyenne: ${avg.toStringAsFixed(2)}/20',
+                  'Moyenne: ${avg.toStringAsFixed(2)}/${notes.first['note_max'] ?? 20}',
                   style: TextStyle(
                     color: AppTheme.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -1309,7 +1607,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
               TableRow(
                 decoration: BoxDecoration(
                   color: isDark
-                      ? Colors.white.withOpacity(0.02)
+                      ? Colors.white.withValues(alpha: 0.02)
                       : Colors.grey[50],
                 ),
                 children: [
@@ -1340,7 +1638,27 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                   ),
                 ],
               ),
-              ...notes.map((r) {
+              ...byMatiere.entries.map((entry) {
+                final matNotes = entry.value;
+                final r = matNotes.first;
+
+                // Group by sequence for this subject
+                double? seq1 = matNotes
+                    .where((n) => n['sequence'] == 1)
+                    .map((n) => (n['note'] as num).toDouble())
+                    .fold<double?>(null, (p, c) => c);
+                double? seq2 = matNotes
+                    .where((n) => n['sequence'] == 2)
+                    .map((n) => (n['note'] as num).toDouble())
+                    .fold<double?>(null, (p, c) => c);
+
+                double matiereMoy = 0;
+                if (matNotes.isNotEmpty) {
+                  double mSum = 0;
+                  for (var n in matNotes) mSum += (n['note'] as num).toDouble();
+                  matiereMoy = mSum / matNotes.length;
+                }
+
                 return TableRow(
                   children: [
                     _buildCell(
@@ -1348,19 +1666,23 @@ class _StudentDetailPageState extends State<StudentDetailPage>
                       isBold: true,
                       isDark: isDark,
                     ),
-                    _buildCell('4', alignCenter: true, isDark: isDark),
                     _buildCell(
-                      r['sequence'] == 1 ? r['note'].toString() : '--',
+                      r['coefficient']?.toString() ?? '1',
                       alignCenter: true,
                       isDark: isDark,
                     ),
                     _buildCell(
-                      r['sequence'] == 2 ? r['note'].toString() : '--',
+                      seq1?.toString() ?? '--',
                       alignCenter: true,
                       isDark: isDark,
                     ),
                     _buildCell(
-                      r['note']?.toString() ?? '--',
+                      seq2?.toString() ?? '--',
+                      alignCenter: true,
+                      isDark: isDark,
+                    ),
+                    _buildCell(
+                      matiereMoy.toStringAsFixed(2),
                       isDark: isDark,
                       alignRight: true,
                       color: AppTheme.primaryColor,
@@ -1410,7 +1732,7 @@ class _StudentDetailPageState extends State<StudentDetailPage>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(

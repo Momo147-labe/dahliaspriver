@@ -35,12 +35,16 @@ class _CustomAppBarState extends State<CustomAppBar> {
   Future<void> _loadTopBarData() async {
     try {
       final db = await DatabaseHelper.instance.database;
-      
+
       // Charger les informations de l'école
       final ecoles = await db.query('ecole');
-      final annees = await db.query('annee_scolaire', orderBy: 'created_at DESC', limit: 1);
+      final annees = await db.query(
+        'annee_scolaire',
+        orderBy: 'created_at DESC',
+        limit: 1,
+      );
       final users = await db.query('user');
-      
+
       setState(() {
         _ecoleInfo = ecoles.isNotEmpty ? ecoles.first : null;
         _anneeScolaire = annees.isNotEmpty ? annees.first : null;
@@ -60,13 +64,13 @@ class _CustomAppBarState extends State<CustomAppBar> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppTheme.primaryColor.withOpacity(0.8),
+            AppTheme.primaryColor.withValues(alpha: 0.8),
             AppTheme.primaryColor,
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -93,13 +97,14 @@ class _CustomAppBarState extends State<CustomAppBar> {
                             borderRadius: BorderRadius.circular(8),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
+                                color: Colors.black.withValues(alpha: 0.1),
                                 blurRadius: 4,
                                 offset: const Offset(0, 2),
                               ),
                             ],
                           ),
-                          child: _ecoleInfo != null && _ecoleInfo!['logo'] != null
+                          child:
+                              _ecoleInfo != null && _ecoleInfo!['logo'] != null
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
                                   child: Image.asset(
@@ -107,11 +112,18 @@ class _CustomAppBarState extends State<CustomAppBar> {
                                     width: 40,
                                     height: 40,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        const Icon(Icons.school, color: AppTheme.primaryColor),
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const Icon(
+                                              Icons.school,
+                                              color: AppTheme.primaryColor,
+                                            ),
                                   ),
                                 )
-                              : const Icon(Icons.school, color: AppTheme.primaryColor),
+                              : const Icon(
+                                  Icons.school,
+                                  color: AppTheme.primaryColor,
+                                ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -129,7 +141,7 @@ class _CustomAppBarState extends State<CustomAppBar> {
                               Text(
                                 'Année: ${_anneeScolaire?['libelle'] ?? 'Non définie'}',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: Colors.white.withValues(alpha: 0.9),
                                   fontSize: 14,
                                 ),
                               ),
@@ -139,26 +151,29 @@ class _CustomAppBarState extends State<CustomAppBar> {
                       ],
                     ),
                   ),
-                  
+
                   // Actions à droite
                   Row(
                     children: [
                       if (widget.onRefreshPressed != null)
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: IconButton(
                             onPressed: widget.onRefreshPressed,
-                            icon: const Icon(Icons.refresh, color: Colors.white),
+                            icon: const Icon(
+                              Icons.refresh,
+                              color: Colors.white,
+                            ),
                             tooltip: 'Actualiser',
                           ),
                         ),
                       const SizedBox(width: 8),
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: IconButton(
@@ -171,9 +186,9 @@ class _CustomAppBarState extends State<CustomAppBar> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Ligne inférieure avec les 4 informations
               Row(
                 children: [
@@ -218,9 +233,9 @@ class _CustomAppBarState extends State<CustomAppBar> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withOpacity(0.3)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

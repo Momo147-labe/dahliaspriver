@@ -248,7 +248,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 30,
                   offset: const Offset(0, 15),
                 ),
@@ -261,7 +261,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.05),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.05),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(28),
                     ),
@@ -271,7 +271,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          color: AppTheme.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Icon(
@@ -623,7 +623,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                 Icon(
                   icon,
                   size: 18,
-                  color: AppTheme.primaryColor.withOpacity(0.7),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -671,7 +671,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
             prefixIcon: Icon(
               icon,
               size: 20,
-              color: AppTheme.primaryColor.withOpacity(0.5),
+              color: AppTheme.primaryColor.withValues(alpha: 0.5),
             ),
             filled: true,
             fillColor: isDark ? Colors.grey[900] : Colors.grey[50],
@@ -721,9 +721,9 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(
         statut,
@@ -776,7 +776,9 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                 icon: const Icon(Icons.add_circle_outline, size: 18),
                 label: const Text('NOUVELLE ANNÉE'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor.withOpacity(0.15),
+                  backgroundColor: AppTheme.primaryColor.withValues(
+                    alpha: 0.15,
+                  ),
                   foregroundColor: AppTheme.primaryColor,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(
@@ -802,7 +804,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -818,7 +820,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          color: AppTheme.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -847,7 +849,7 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                     columnSpacing: 40,
                     headingRowColor: MaterialStateProperty.all(
                       isDark
-                          ? Colors.grey[900]!.withOpacity(0.3)
+                          ? Colors.grey[900]!.withValues(alpha: 0.3)
                           : Colors.grey[50]!,
                     ),
                     columns: const [
@@ -869,8 +871,8 @@ class _AcademicYearSettingsPageState extends State<AcademicYearSettingsPage> {
                               ),
                               decoration: BoxDecoration(
                                 color: isActive
-                                    ? Colors.green.withOpacity(0.1)
-                                    : Colors.grey.withOpacity(0.1),
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.grey.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(

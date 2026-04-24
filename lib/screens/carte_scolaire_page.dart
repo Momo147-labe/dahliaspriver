@@ -152,10 +152,12 @@ class _CarteScolairePageState extends State<CarteScolairePage> {
               decoration: BoxDecoration(
                 color: Theme.of(
                   context,
-                ).colorScheme.surfaceVariant.withOpacity(0.5),
+                ).colorScheme.surfaceVariant.withValues(alpha: 0.5),
                 border: Border(
                   bottom: BorderSide(
-                    color: Theme.of(context).dividerColor.withOpacity(0.1),
+                    color: Theme.of(
+                      context,
+                    ).dividerColor.withValues(alpha: 0.1),
                   ),
                 ),
               ),
