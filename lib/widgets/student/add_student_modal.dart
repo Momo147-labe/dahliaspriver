@@ -501,7 +501,9 @@ class _AddStudentModalState extends State<AddStudentModal> {
         'type_paiement': _selectedTypePaiement == 'inscription'
             ? 'inscription'
             : 'reinscription',
-        'statut': montantRestant <= 0 ? 'complet' : 'partiel',
+        'statut': montantRestant <= 0
+            ? 'Réglé'
+            : (montantPaye > 0 ? 'Partiel' : 'Impayé'),
         'created_at': DateTime.now().toIso8601String(),
         'annee_scolaire_id': anneeScolaireId,
       });

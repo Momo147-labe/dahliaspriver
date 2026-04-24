@@ -73,7 +73,7 @@ class _ReportsPageState extends State<ReportsPage> {
 
   void _showClassSearch() async {
     final Map<String, dynamic>? selected =
-        await showSearch<Map<String, dynamic>>(
+        await showSearch<Map<String, dynamic>?>(
           context: context,
           delegate: ClasseSearchDelegate(_classes),
         );
@@ -1373,7 +1373,7 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 }
 
-class ClasseSearchDelegate extends SearchDelegate<Map<String, dynamic>> {
+class ClasseSearchDelegate extends SearchDelegate<Map<String, dynamic>?> {
   final List<Map<String, dynamic>> classes;
 
   ClasseSearchDelegate(this.classes);
@@ -1396,7 +1396,7 @@ class ClasseSearchDelegate extends SearchDelegate<Map<String, dynamic>> {
     return IconButton(
       icon: const Icon(Icons.arrow_back),
       onPressed: () {
-        close(context, null as dynamic);
+        close(context, null);
       },
     );
   }

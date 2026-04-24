@@ -50,9 +50,14 @@ class _DashboardOverviewState extends State<DashboardOverview> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final anneeId = context.watch<AcademicYearProvider>().selectedAnneeId;
+    // Use Provider.of instead of context.watch inside lifecycle methods
+    final provider = Provider.of<AcademicYearProvider>(context);
+    final anneeId = provider.selectedAnneeId;
+
     if (anneeId != null && anneeId != _lastLoadedAnneeId) {
       _lastLoadedAnneeId = anneeId;
+      // Use microtask to avoid calling setState during build/dependency change if needed,
+      // though _loadDashboardData is async and starts with setState which is generally safe here.
       _loadDashboardData(anneeId);
     }
   }

@@ -88,7 +88,9 @@ class _PaymentModalState extends State<PaymentModal> {
       'observation': _observationCtrl.text,
       'date_paiement': DateTime.now().toIso8601String(),
       'type_paiement': _typePaiement,
-      'statut': montantPaye == montantTotal ? 'complet' : 'partiel',
+      'statut': montantPaye == montantTotal
+          ? 'Réglé'
+          : (montantPaye > 0 ? 'Partiel' : 'Impayé'),
     };
 
     await DatabaseHelper.instance.addPaiement(paiement);

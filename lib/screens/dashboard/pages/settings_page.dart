@@ -19,6 +19,9 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   int _selectedIndex = 0;
 
+  // Notifier incrémenté à chaque changement d'onglet pour forcer le rechargement
+  final _reloadNotifier = ValueNotifier<int>(0);
+
   final List<Map<String, dynamic>> _menuItems = [
     {'icon': Icons.arrow_back, 'label': 'Retour', 'isAction': true},
     {'icon': Icons.school, 'label': 'École', 'isAction': false},
@@ -43,11 +46,17 @@ class _SettingsPageState extends State<SettingsPage> {
       const SchoolSettingsPage(),
       const AcademicYearSettingsPage(),
       const CycleLevelSettingsPage(),
-      const GradingSettingsPage(),
+      GradingSettingsPage(reloadNotifier: _reloadNotifier),
       const EvaluationPlanningSettingsPage(),
       const AppreciationSettingsPage(),
       const UserSettingsPage(),
     ];
+  }
+
+  @override
+  void dispose() {
+    _reloadNotifier.dispose();
+    super.dispose();
   }
 
   @override
@@ -126,6 +135,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                 }
                               } else {
                                 setState(() => _selectedIndex = pageIndex);
+                                // Notifier les pages qui doivent se recharger
+                                _reloadNotifier.value++;
                               }
                             },
                             leading: Icon(

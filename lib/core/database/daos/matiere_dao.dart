@@ -50,10 +50,10 @@ class MatiereDao extends BaseDao {
       SELECT m.*, cm.coefficient
       FROM ${MatiereSchema.tableName} m
       JOIN classe_matiere cm ON m.id = cm.matiere_id
-      WHERE cm.classe_id = ?
+      WHERE cm.classe_id = ? AND cm.annee_scolaire_id = ?
       ORDER BY m.nom ASC
     ''',
-      [classeId],
+      [classeId, anneeId],
     );
   }
 
@@ -64,23 +64,16 @@ class MatiereDao extends BaseDao {
   ]) async {
     final result = await db.query(
       'classe_matiere',
-      where: 'classe_id = ? AND matiere_id = ?',
-      whereArgs: [classeId, matiereId],
+      where: 'classe_id = ? AND matiere_id = ? AND annee_scolaire_id = ?',
+      whereArgs: [classeId, matiereId, anneeId],
     );
     return result.isNotEmpty;
   }
 
   Future<List<Matiere>> getMatieresByAnnee(int anneeId) async {
-    final result = await db.rawQuery(
-      '''
-      SELECT DISTINCT m.*, cm.coefficient
-      FROM ${MatiereSchema.tableName} m
-      JOIN classe_matiere cm ON m.id = cm.matiere_id
-      WHERE cm.annee_scolaire_id = ?
-      ORDER BY m.nom ASC
-    ''',
-      [anneeId],
-    );
+    // Retourne toutes les matières (pas seulement celles assignées à une classe)
+    // pour que les matières nouvellement créées soient visibles immédiatement.
+    final result = await db.query(MatiereSchema.tableName, orderBy: 'nom ASC');
     return result.map((m) => Matiere.fromMap(m)).toList();
   }
 

@@ -11,6 +11,8 @@ class EnseignantSchema {
       telephone TEXT,
       email TEXT,
       specialite TEXT,
+      sexe TEXT CHECK (sexe IN ('M','F')),
+      date_naissance TEXT,
       date_embauche TEXT,
       photo TEXT,
       statut TEXT DEFAULT 'Actif',

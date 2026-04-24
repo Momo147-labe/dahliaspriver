@@ -177,17 +177,30 @@ class _PromotionPageState extends State<PromotionPage> {
         _oldAnneeId!,
       );
 
-      // 3. Calculate average for each student
+      // 3. Calculate average for each student and check if already promoted
       final studentsWithAvg = <Map<String, dynamic>>[];
       for (var student in rawStudents) {
         final moyenne = await _dbHelper.notesDao.calculerMoyenneGenerale(
           student['id'] as int,
           _oldAnneeId!,
         );
+
+        // Check if student is already in the new academic year
+        bool isAlreadyPromoted = false;
+        if (_newAnneeId != null) {
+          final existing = await db.query(
+            'eleve_parcours',
+            where: 'eleve_id = ? AND annee_scolaire_id = ?',
+            whereArgs: [student['id'], _newAnneeId],
+          );
+          isAlreadyPromoted = existing.isNotEmpty;
+        }
+
         studentsWithAvg.add({
           ...student,
           'moyenne': moyenne,
           'isAdmis': moyenne >= _moyennePassage,
+          'isAlreadyPromoted': isAlreadyPromoted,
         });
       }
 
@@ -199,12 +212,15 @@ class _PromotionPageState extends State<PromotionPage> {
       _students = studentsWithAvg;
 
       // Auto-select: admis go to promotion, redoublants go to redoublement
+      // Skip students already promoted
       _selectedAdmisIds = _students
-          .where((s) => s['isAdmis'] == true)
+          .where((s) => s['isAdmis'] == true && s['isAlreadyPromoted'] == false)
           .map((s) => s['id'] as int)
           .toSet();
       _selectedRedoublantIds = _students
-          .where((s) => s['isAdmis'] == false)
+          .where(
+            (s) => s['isAdmis'] == false && s['isAlreadyPromoted'] == false,
+          )
           .map((s) => s['id'] as int)
           .toSet();
     } catch (e) {
@@ -1255,27 +1271,40 @@ class _PromotionPageState extends State<PromotionPage> {
                         ),
                         SizedBox(
                           width: 40,
-                          child: Checkbox(
-                            value: isSelected,
-                            activeColor: isAdmis ? Colors.green : Colors.red,
-                            onChanged: (val) {
-                              setState(() {
-                                if (isAdmis) {
-                                  if (val == true) {
-                                    _selectedAdmisIds.add(studentId);
-                                  } else {
-                                    _selectedAdmisIds.remove(studentId);
-                                  }
-                                } else {
-                                  if (val == true) {
-                                    _selectedRedoublantIds.add(studentId);
-                                  } else {
-                                    _selectedRedoublantIds.remove(studentId);
-                                  }
-                                }
-                              });
-                            },
-                          ),
+                          child: student['isAlreadyPromoted'] == true
+                              ? Tooltip(
+                                  message: 'Déjà promu pour cette période',
+                                  child: Icon(
+                                    Icons.verified_user_rounded,
+                                    color: Colors.blue[400],
+                                    size: 20,
+                                  ),
+                                )
+                              : Checkbox(
+                                  value: isSelected,
+                                  activeColor: isAdmis
+                                      ? Colors.green
+                                      : Colors.red,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (isAdmis) {
+                                        if (val == true) {
+                                          _selectedAdmisIds.add(studentId);
+                                        } else {
+                                          _selectedAdmisIds.remove(studentId);
+                                        }
+                                      } else {
+                                        if (val == true) {
+                                          _selectedRedoublantIds.add(studentId);
+                                        } else {
+                                          _selectedRedoublantIds.remove(
+                                            studentId,
+                                          );
+                                        }
+                                      }
+                                    });
+                                  },
+                                ),
                         ),
                       ],
                     ),

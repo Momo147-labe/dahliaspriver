@@ -14,10 +14,13 @@ class PaiementDetailSchema {
       annee_scolaire_id INTEGER NOT NULL,
       classe_id INTEGER,
       frais_id INTEGER,
+      mois TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      created_by_id INTEGER,
       FOREIGN KEY (eleve_id) REFERENCES eleve(id),
-      FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
+      FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
+      FOREIGN KEY (created_by_id) REFERENCES user(id)
     )
   ''';
 }

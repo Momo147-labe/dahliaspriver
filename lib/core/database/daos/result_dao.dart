@@ -11,8 +11,8 @@ class ResultDao extends BaseDao {
       FROM (
         SELECT n.note, COALESCE(cm.coefficient, 1) as coef
         FROM notes n
-        JOIN eleve e ON n.eleve_id = e.id
-        LEFT JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id AND cm.classe_id = e.classe_id
+        JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+        LEFT JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id AND cm.classe_id = ep.classe_id
         WHERE n.eleve_id = ? AND n.annee_scolaire_id = ?
       )
     ''',
@@ -38,11 +38,11 @@ class ResultDao extends BaseDao {
         cy.note_max
       FROM notes n
       JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND n.annee_scolaire_id = ep.annee_scolaire_id
+      JOIN classe c ON ep.classe_id = c.id
       LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
+           AND cm.classe_id = ep.classe_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
       GROUP BY cy.moyenne_passage, cy.note_min, cy.note_max
     ''',
@@ -134,128 +134,80 @@ class ResultDao extends BaseDao {
       }
     }
 
-    // 1. Get all grades for the year
-    final allGrades = await db.rawQuery(
+    // 1. Get all grades for the student for the pivot
+    final studentGrades = await db.rawQuery(
       '''
-      SELECT n.note, n.trimestre, 
-             m.id as matiere_id, m.nom as matiere_nom, 
-             COALESCE(cm.coefficient, 1) as coefficient
+      SELECT n.note, n.trimestre, m.id as matiere_id
       FROM notes n
       JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
-      LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = ep.classe_id
       WHERE n.eleve_id = ? AND n.annee_scolaire_id = ?
-      ORDER BY m.nom
     ''',
       [studentId, anneeId],
     );
 
-    // 2. Pivot and calculate averages per subject
-    Map<int, Map<String, dynamic>> subjectStats = {};
-
-    for (var row in allGrades) {
-      int matId = row['matiere_id'] as int;
-      String matNom = row['matiere_nom'] as String;
-      double coeff = (row['coefficient'] as num).toDouble();
-      double note = (row['note'] as num).toDouble();
-      int tri = row['trimestre'] as int;
-
-      if (!subjectStats.containsKey(matId)) {
-        subjectStats[matId] = {
-          'matiere_id': matId,
-          'matiere_nom': matNom,
-          'coefficient': coeff,
-          'notes': <int, double?>{},
-        };
-      }
-      (subjectStats[matId]!['notes'] as Map<int, double?>)[tri] = note;
-    }
-
-    // 3. Calculate annual averages and subject ranks
-    List<Map<String, dynamic>> results = [];
-    for (var stat in subjectStats.values) {
-      final notesMap = stat['notes'] as Map<int, double?>;
-
-      int count = 0;
-      double sum = 0;
-      notesMap.forEach((triId, val) {
-        if (val != null) {
-          sum += val;
-          count++;
-        }
-      });
-
-      double moyAnnuelle = count > 0 ? sum / count : 0.0;
-
-      int rank = 0;
-      if (effectiveClassId != null) {
-        rank = await _getAnnualSubjectRank(
-          stat['matiere_id'],
-          moyAnnuelle,
-          effectiveClassId,
-          anneeId,
-        );
-      }
-
-      results.add({
-        'matiere_id': stat['matiere_id'],
-        'matiere': stat['matiere_nom'],
-        'coefficient': stat['coefficient'],
-        'coeff': stat['coefficient'],
-        'notes_par_trimestre': notesMap,
-        'moy_annuelle': moyAnnuelle,
-        'note': moyAnnuelle,
-        'total': moyAnnuelle * (stat['coefficient'] ?? 1.0),
-        'rang': rank,
-        'appreciation': appreciationAutomatique(moyAnnuelle),
-      });
-    }
-
-    return results;
-  }
-
-  Future<int> _getAnnualSubjectRank(
-    int matiereId,
-    double targetAvg,
-    int classeId,
-    int anneeId,
-  ) async {
-    // Get annual averages for this subject for all students in the class
-    final allGrades = await db.rawQuery(
+    // 2. Get annual averages and ranks for all subjects using a single window function query
+    final subjectStatsResult = await db.rawQuery(
       '''
-      SELECT n.eleve_id, n.note, n.trimestre
-      FROM notes n
-      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
-      WHERE n.matiere_id = ? 
-        AND n.annee_scolaire_id = ?
-        AND ep.classe_id = ?
-    ''',
-      [matiereId, anneeId, classeId],
+      WITH SubjectAverages AS (
+          SELECT 
+              n.eleve_id,
+              n.matiere_id,
+              AVG(n.note) as moy_annuelle
+          FROM notes n
+          JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+          WHERE ep.classe_id = ? AND n.annee_scolaire_id = ?
+          GROUP BY n.eleve_id, n.matiere_id
+      ),
+      SubjectRanks AS (
+          SELECT 
+              eleve_id,
+              matiere_id,
+              moy_annuelle,
+              RANK() OVER (PARTITION BY matiere_id ORDER BY moy_annuelle DESC) as rang
+          FROM SubjectAverages
+      )
+      SELECT 
+          sr.*,
+          m.nom as matiere_nom,
+          COALESCE(cm.coefficient, 1) as coefficient
+      FROM SubjectRanks sr
+      JOIN matiere m ON sr.matiere_id = m.id
+      LEFT JOIN classe_matiere cm ON cm.matiere_id = sr.matiere_id AND cm.classe_id = ?
+      WHERE sr.eleve_id = ?
+      ORDER BY m.nom
+      ''',
+      [effectiveClassId, anneeId, effectiveClassId, studentId],
     );
 
-    // Pivot in memory to get annual avg per student
-    Map<int, List<double>> studentGrades = {};
-    for (var row in allGrades) {
-      int sId = row['eleve_id'] as int;
+    // 3. Prepare notes map for each subject
+    Map<int, Map<int, double?>> notesPerSubject = {};
+    for (var row in studentGrades) {
+      int matId = row['matiere_id'] as int;
+      int tri = row['trimestre'] as int;
       double note = (row['note'] as num).toDouble();
-      if (!studentGrades.containsKey(sId)) {
-        studentGrades[sId] = [];
-      }
-      studentGrades[sId]!.add(note);
+
+      notesPerSubject.putIfAbsent(matId, () => <int, double?>{})[tri] = note;
     }
 
-    List<double> annualAvgs = [];
-    for (var grades in studentGrades.values) {
-      if (grades.isNotEmpty) {
-        double avg = grades.reduce((a, b) => a + b) / grades.length;
-        annualAvgs.add(avg);
-      }
-    }
+    // 4. Build final results
+    return subjectStatsResult.map((row) {
+      int matId = row['matiere_id'] as int;
+      double moyAnnuelle = (row['moy_annuelle'] as num).toDouble();
+      double coeff = (row['coefficient'] as num).toDouble();
 
-    annualAvgs.sort((a, b) => b.compareTo(a)); // Descending
-    int rank = annualAvgs.indexOf(targetAvg) + 1;
-    return rank > 0 ? rank : annualAvgs.length + 1; // Fallback
+      return {
+        'matiere_id': matId,
+        'matiere': row['matiere_nom'],
+        'coefficient': coeff,
+        'coeff': coeff,
+        'notes_par_trimestre': notesPerSubject[matId] ?? {},
+        'moy_annuelle': moyAnnuelle,
+        'note': moyAnnuelle,
+        'total': moyAnnuelle * coeff,
+        'rang': row['rang'],
+        'appreciation': appreciationAutomatique(moyAnnuelle),
+      };
+    }).toList();
   }
 
   Future<Map<String, dynamic>> getAnnualStats(
@@ -278,29 +230,51 @@ class ResultDao extends BaseDao {
 
     double annualAvg = totalCoeff > 0 ? totalPoints / totalCoeff : 0.0;
 
-    // Calculate Rank
-    final allStudents = await getStudentsByClasse(classId);
-    List<double> allAverages = [];
+    // Calculate Rank via SQL to avoid N+1 queries
+    final classAvgsResult = await db.rawQuery(
+      '''
+      SELECT 
+        eleve_id,
+        SUM(moy_annuelle * coef) / SUM(coef) as annual_average
+      FROM (
+        SELECT 
+          n.eleve_id,
+          n.matiere_id,
+          AVG(n.note) as moy_annuelle,
+          MAX(COALESCE(cm.coefficient, 1)) as coef
+        FROM notes n
+        JOIN eleve_parcours ep ON ep.eleve_id = n.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+        LEFT JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id AND cm.classe_id = ep.classe_id
+        WHERE ep.classe_id = ? AND n.annee_scolaire_id = ?
+        GROUP BY n.eleve_id, n.matiere_id
+      ) subquery
+      GROUP BY eleve_id
+      ORDER BY annual_average DESC
+      ''',
+      [classId, anneeId],
+    );
 
-    for (var s in allStudents) {
-      final sGrades = await getAnnualGradesForStudent(s['id'] as int, anneeId);
-      double sTotalPoints = 0;
-      double sTotalCoeff = 0;
-      for (var g in sGrades) {
-        double sMoy = (g['moy_annuelle'] as num?)?.toDouble() ?? 0.0;
-        double sCoeff = (g['coefficient'] as num?)?.toDouble() ?? 1.0;
-        sTotalPoints += sMoy * sCoeff;
-        sTotalCoeff += sCoeff;
-      }
-      allAverages.add(sTotalCoeff > 0 ? sTotalPoints / sTotalCoeff : 0.0);
+    int rank = 0;
+    double classTotalAvg = 0;
+    int index = 1;
+    for (var row in classAvgsResult) {
+      double avg = (row['annual_average'] as num?)?.toDouble() ?? 0.0;
+      classTotalAvg += avg;
+      if (row['eleve_id'] == studentId) rank = index;
+      index++;
     }
 
-    allAverages.sort((a, b) => b.compareTo(a)); // Descending
-    int rank = allAverages.indexOf(annualAvg) + 1;
+    if (classAvgsResult.isNotEmpty) {
+      classTotalAvg = classTotalAvg / classAvgsResult.length;
+    }
 
-    double classTotalAvg = allAverages.isNotEmpty
-        ? allAverages.reduce((a, b) => a + b) / allAverages.length
-        : 0.0;
+    final allStudents = await getStudentsByClasse(
+      classId,
+    ); // We still need the count if the query doesn't yield all students
+
+    if (rank == 0 && allStudents.any((s) => s['id'] == studentId)) {
+      rank = classAvgsResult.length + 1;
+    }
 
     final cycleResult = await db.rawQuery(
       'SELECT cy.moyenne_passage, cy.note_min, cy.note_max FROM classe c JOIN cycles_scolaires cy ON c.cycle_id = cy.id WHERE c.id = ?',
@@ -337,17 +311,18 @@ class ResultDao extends BaseDao {
       SELECT e.id as eleve_id, e.nom, e.prenom, e.matricule, e.photo, n.note, n.id as note_id,
              COALESCE(cm.coefficient, 1) as coefficient
       FROM eleve e
+      JOIN eleve_parcours ep ON e.id = ep.eleve_id AND ep.annee_scolaire_id = ?
       LEFT JOIN notes n ON n.eleve_id = e.id 
           AND n.matiere_id = ? 
           AND n.trimestre = ? 
           AND n.sequence = ?
           AND n.annee_scolaire_id = ?
       LEFT JOIN classe_matiere cm ON cm.matiere_id = ? 
-          AND cm.classe_id = e.classe_id
-      WHERE e.classe_id = ?
+          AND cm.classe_id = ep.classe_id
+      WHERE ep.classe_id = ?
       ORDER BY e.nom ASC, e.prenom ASC
     ''',
-      [subjectId, trimestre, sequence, anneeId, subjectId, classId],
+      [anneeId, subjectId, trimestre, sequence, anneeId, subjectId, classId],
     );
   }
 
@@ -388,14 +363,15 @@ class ResultDao extends BaseDao {
     final result = await db.rawQuery(
       '''
       SELECT 
-        AVG(note) as average,
-        MAX(note) as maxNote,
-        MIN(note) as minNote,
-        COUNT(id) as total,
-        SUM(CASE WHEN note >= ? THEN 1 ELSE 0 END) as passed
-      FROM notes
-      WHERE matiere_id = ? AND trimestre = ? AND sequence = ? AND annee_scolaire_id = ?
-      AND eleve_id IN (SELECT id FROM eleve WHERE classe_id = ?)
+        AVG(n.note) as average,
+        MAX(n.note) as maxNote,
+        MIN(n.note) as minNote,
+        COUNT(n.id) as total,
+        SUM(CASE WHEN n.note >= ? THEN 1 ELSE 0 END) as passed
+      FROM notes n
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+      WHERE n.matiere_id = ? AND n.trimestre = ? AND n.sequence = ? AND n.annee_scolaire_id = ?
+      AND ep.classe_id = ?
     ''',
       [passingGrade, subjectId, trimestre, sequence, anneeId, classId],
     );
@@ -435,7 +411,7 @@ class ResultDao extends BaseDao {
         COUNT(DISTINCT n.eleve_id) as students_graded,
         COUNT(n.id) as total_grades
       FROM notes n
-      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
       WHERE ep.annee_scolaire_id = ?
     ''',
       [currentYearId],
@@ -449,7 +425,7 @@ class ResultDao extends BaseDao {
         AVG(n.note) as average,
         COUNT(DISTINCT n.eleve_id) as students
       FROM notes n
-      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
       WHERE ep.annee_scolaire_id = ?
       GROUP BY n.trimestre
       ORDER BY n.trimestre
@@ -466,7 +442,7 @@ class ResultDao extends BaseDao {
         AVG(n.note) as average,
         COUNT(DISTINCT n.eleve_id) as students
       FROM notes n
-      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
       JOIN classe c ON ep.classe_id = c.id
       JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       WHERE ep.annee_scolaire_id = ?
@@ -484,9 +460,43 @@ class ResultDao extends BaseDao {
   }
 
   Future<void> calculerRangsClasse(int classeId, int anneeId) async {
-    // Note: Rankin logic often involves multiple queries or complex window functions
-    // For now, mirroring what might be in DatabaseHelper or providing a placeholder
-    // if the logic was previously inlined.
+    final classAvgsResult = await db.rawQuery(
+      '''
+      SELECT 
+        eleve_id,
+        SUM(moy_annuelle * coef) / SUM(coef) as annual_average
+      FROM (
+        SELECT 
+          n.eleve_id,
+          n.matiere_id,
+          AVG(n.note) as moy_annuelle,
+          MAX(COALESCE(cm.coefficient, 1)) as coef
+        FROM notes n
+        JOIN eleve_parcours ep ON ep.eleve_id = n.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+        LEFT JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id AND cm.classe_id = ep.classe_id
+        WHERE ep.classe_id = ? AND n.annee_scolaire_id = ?
+        GROUP BY n.eleve_id, n.matiere_id
+      ) subquery
+      GROUP BY eleve_id
+      ORDER BY annual_average DESC
+      ''',
+      [classeId, anneeId],
+    );
+
+    final batch = db.batch();
+    for (int i = 0; i < classAvgsResult.length; i++) {
+      batch.update(
+        'eleve_parcours',
+        {
+          'rang': i + 1,
+          'moyenne': classAvgsResult[i]['annual_average'],
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'eleve_id = ? AND annee_scolaire_id = ?',
+        whereArgs: [classAvgsResult[i]['eleve_id'], anneeId],
+      );
+    }
+    await batch.commit(noResult: true);
   }
 
   Future<void> passerEleves(
@@ -501,13 +511,7 @@ class ResultDao extends BaseDao {
         'classe_id': nouvelleClasseId,
         'annee_scolaire_id': nouvelleAnneeId,
         'date_inscription': DateTime.now().toIso8601String(),
-      });
-      batch.update(
-        'eleve',
-        {'classe_id': nouvelleClasseId},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
   }

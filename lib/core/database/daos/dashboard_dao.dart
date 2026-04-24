@@ -9,9 +9,9 @@ class DashboardDao extends BaseDao {
   DashboardDao(Database db) : super(db);
 
   Future<Map<String, dynamic>> getDashboardData(int anneeId) async {
-    // 1. Student Count
+    // 1. Student Count (from eleve_parcours for year isolation)
     final studentResult = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM eleve WHERE annee_scolaire_id = ?',
+      'SELECT COUNT(*) as count FROM eleve_parcours WHERE annee_scolaire_id = ?',
       [anneeId],
     );
 
@@ -29,9 +29,9 @@ class DashboardDao extends BaseDao {
     final expectedResult = await db.rawQuery(
       '''
       SELECT SUM(fs.montant_total) as total
-      FROM eleve e
-      JOIN frais_scolarite fs ON e.classe_id = fs.classe_id AND e.annee_scolaire_id = fs.annee_scolaire_id
-      WHERE e.annee_scolaire_id = ?
+      FROM eleve_parcours ep
+      JOIN frais_scolarite fs ON ep.classe_id = fs.classe_id AND ep.annee_scolaire_id = fs.annee_scolaire_id
+      WHERE ep.annee_scolaire_id = ?
     ''',
       [anneeId],
     );
@@ -65,7 +65,8 @@ class DashboardDao extends BaseDao {
       SELECT pd.*, e.nom, e.prenom, c.nom as classe_nom
       FROM ${PaiementDetailSchema.tableName} pd
       JOIN eleve e ON pd.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
+      JOIN eleve_parcours ep ON ep.eleve_id = e.id AND ep.annee_scolaire_id = pd.annee_scolaire_id
+      JOIN classe c ON ep.classe_id = c.id
       WHERE pd.annee_scolaire_id = ?
       ORDER BY pd.date_paiement DESC
       LIMIT 5
@@ -76,11 +77,11 @@ class DashboardDao extends BaseDao {
     // 6. Level Stats
     final levelStats = await db.rawQuery(
       '''
-      SELECT n.nom, COUNT(e.id) as count 
-      FROM eleve e 
-      JOIN classe c ON e.classe_id = c.id 
+      SELECT n.nom, COUNT(ep.eleve_id) as count 
+      FROM eleve_parcours ep 
+      JOIN classe c ON ep.classe_id = c.id 
       JOIN niveaux n ON c.niveau_id = n.id
-      WHERE e.annee_scolaire_id = ? 
+      WHERE ep.annee_scolaire_id = ? 
       GROUP BY n.nom
       ''',
       [anneeId],
@@ -88,18 +89,24 @@ class DashboardDao extends BaseDao {
 
     // 7. Gender Stats
     final genderStats = await db.rawQuery(
-      'SELECT sexe, COUNT(*) as count FROM eleve WHERE annee_scolaire_id = ? GROUP BY sexe',
+      '''
+      SELECT e.sexe, COUNT(*) as count 
+      FROM eleve_parcours ep
+      JOIN eleve e ON ep.eleve_id = e.id
+      WHERE ep.annee_scolaire_id = ? 
+      GROUP BY e.sexe
+      ''',
       [anneeId],
     );
 
     // 8. Cycle Stats
     final cycleStats = await db.rawQuery(
       '''
-      SELECT cy.nom as cycle, COUNT(e.id) as count 
-      FROM eleve e 
-      JOIN classe c ON e.classe_id = c.id 
+      SELECT cy.nom as cycle, COUNT(ep.eleve_id) as count 
+      FROM eleve_parcours ep 
+      JOIN classe c ON ep.classe_id = c.id 
       JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      WHERE e.annee_scolaire_id = ? 
+      WHERE ep.annee_scolaire_id = ? 
       GROUP BY cy.nom
       ''',
       [anneeId],
@@ -108,10 +115,10 @@ class DashboardDao extends BaseDao {
     // 9. Class Stats
     final classStats = await db.rawQuery(
       '''
-      SELECT c.nom, COUNT(e.id) as count 
-      FROM eleve e 
-      JOIN classe c ON e.classe_id = c.id 
-      WHERE e.annee_scolaire_id = ? 
+      SELECT c.nom, COUNT(ep.eleve_id) as count 
+      FROM eleve_parcours ep 
+      JOIN classe c ON ep.classe_id = c.id 
+      WHERE ep.annee_scolaire_id = ? 
       GROUP BY c.nom
       ORDER BY count DESC
       LIMIT 10
@@ -150,11 +157,11 @@ class DashboardDao extends BaseDao {
                  COALESCE(cm.coefficient, 1) as coef,
                  COALESCE(cy.moyenne_passage, 10.0) as moyenne_passage
           FROM notes n
-          JOIN eleve e ON n.eleve_id = e.id
-          JOIN classe c ON e.classe_id = c.id
+          JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND n.annee_scolaire_id = ep.annee_scolaire_id
+          JOIN classe c ON ep.classe_id = c.id
           LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
           LEFT JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id
-            AND cm.classe_id = e.classe_id
+            AND cm.classe_id = ep.classe_id
           WHERE n.annee_scolaire_id = ?
           GROUP BY n.eleve_id, n.matiere_id, cm.coefficient, cy.moyenne_passage
         ) as sub
@@ -185,12 +192,13 @@ class DashboardDao extends BaseDao {
                    COALESCE(cm.coefficient, 1) as coef,
                    COALESCE(cy.moyenne_passage, 10.0) as moyenne_passage
             FROM notes n
-            JOIN eleve e ON n.eleve_id = e.id
-            JOIN classe c ON e.classe_id = c.id
+            JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND n.annee_scolaire_id = ep.annee_scolaire_id
+            JOIN eleve e ON ep.eleve_id = e.id
+            JOIN classe c ON ep.classe_id = c.id
             LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
             LEFT JOIN classe_matiere cm
               ON cm.matiere_id = n.matiere_id
-              AND cm.classe_id = e.classe_id
+              AND cm.classe_id = ep.classe_id
             WHERE n.annee_scolaire_id = ? AND e.sexe = ?
             GROUP BY n.eleve_id, n.matiere_id, cm.coefficient, cy.moyenne_passage
           ) as sub
@@ -275,17 +283,23 @@ class DashboardDao extends BaseDao {
 
   Future<Map<String, dynamic>> getStudentAnalytics(int anneeId) async {
     final genderStats = await db.rawQuery(
-      'SELECT sexe, COUNT(*) as count FROM eleve WHERE annee_scolaire_id = ? GROUP BY sexe',
+      '''
+      SELECT e.sexe, COUNT(*) as count 
+      FROM eleve_parcours ep
+      JOIN eleve e ON ep.eleve_id = e.id
+      WHERE ep.annee_scolaire_id = ? 
+      GROUP BY e.sexe
+      ''',
       [anneeId],
     );
 
     final levelStats = await db.rawQuery(
       '''
-      SELECT n.nom, COUNT(e.id) as count 
-      FROM eleve e 
-      JOIN classe c ON e.classe_id = c.id 
+      SELECT n.nom, COUNT(ep.eleve_id) as count 
+      FROM eleve_parcours ep 
+      JOIN classe c ON ep.classe_id = c.id 
       JOIN niveaux n ON c.niveau_id = n.id
-      WHERE e.annee_scolaire_id = ? 
+      WHERE ep.annee_scolaire_id = ? 
       GROUP BY n.nom
       ''',
       [anneeId],
@@ -293,10 +307,10 @@ class DashboardDao extends BaseDao {
 
     final classStats = await db.rawQuery(
       '''
-      SELECT c.nom, COUNT(e.id) as count 
-      FROM eleve e 
-      JOIN classe c ON e.classe_id = c.id 
-      WHERE e.annee_scolaire_id = ? 
+      SELECT c.nom, COUNT(ep.eleve_id) as count 
+      FROM eleve_parcours ep 
+      JOIN classe c ON ep.classe_id = c.id 
+      WHERE ep.annee_scolaire_id = ? 
       GROUP BY c.nom
       ORDER BY count DESC
       ''',

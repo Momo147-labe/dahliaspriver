@@ -29,19 +29,20 @@ class TimetableDao extends BaseDao {
     int? enseignantId,
     int? classeId,
     int? excludeId,
+    int? anneeId,
     Transaction? txn,
   }) async {
     String queryStr =
         '''
       SELECT COUNT(*) as count FROM ${EmploiDuTempsSchema.tableName}
-      WHERE jour_semaine = ? 
+      WHERE jour_semaine = ? AND annee_scolaire_id = ?
       AND (
         (heure_debut < ? AND heure_fin > ?) OR
         (heure_debut < ? AND heure_fin > ?) OR
         (heure_debut >= ? AND heure_fin <= ?)
       )
     ''';
-    List<dynamic> args = [jour, fin, debut, fin, debut, debut, fin];
+    List<dynamic> args = [jour, anneeId, fin, debut, fin, debut, debut, fin];
 
     if (enseignantId != null && classeId != null) {
       queryStr += ' AND (enseignant_id = ? OR classe_id = ?)';

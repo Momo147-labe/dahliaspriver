@@ -3,7 +3,8 @@ import '../../../../../theme/app_theme.dart';
 import '../../../../../core/database/database_helper.dart';
 
 class GradingSettingsPage extends StatefulWidget {
-  const GradingSettingsPage({super.key});
+  final ValueNotifier<int>? reloadNotifier;
+  const GradingSettingsPage({super.key, this.reloadNotifier});
 
   @override
   State<GradingSettingsPage> createState() => _GradingSettingsPageState();
@@ -23,6 +24,13 @@ class _GradingSettingsPageState extends State<GradingSettingsPage> {
   void initState() {
     super.initState();
     _loadData();
+    widget.reloadNotifier?.addListener(_loadData);
+  }
+
+  @override
+  void dispose() {
+    widget.reloadNotifier?.removeListener(_loadData);
+    super.dispose();
   }
 
   Future<void> _loadData() async {

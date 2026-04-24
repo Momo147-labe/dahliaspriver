@@ -153,7 +153,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 54,
+      version: 59,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -402,10 +402,7 @@ class DatabaseHelper {
     int studentId,
     int trimestre,
     int anneeId,
-  ) => reportsDao.getStudentNotesForBulletin(
-    studentId,
-    anneeId,
-  ); // Trimestre usage might need DAO update
+  ) => reportsDao.getStudentNotesForBulletin(studentId, trimestre, anneeId);
 
   Future<Map<String, dynamic>> getBulletinStats(
     int studentId,

@@ -60,11 +60,9 @@ class NotesDao extends BaseDao {
 
   Future<void> saveGrade(Map<String, dynamic> noteData) async {
     // 1. Validation : Vérifier si un enseignant est affecté
-    final eleveResult = await db.query(
-      'eleve',
-      columns: ['classe_id'],
-      where: 'id = ?',
-      whereArgs: [noteData['eleve_id']],
+    final eleveResult = await db.rawQuery(
+      'SELECT classe_id FROM eleve_parcours WHERE eleve_id = ? AND annee_scolaire_id = ?',
+      [noteData['eleve_id'], noteData['annee_scolaire_id']],
     );
 
     if (eleveResult.isEmpty) {
@@ -130,9 +128,9 @@ class NotesDao extends BaseDao {
         SUM(CASE WHEN note >= ? THEN 1 ELSE 0 END) as passed
       FROM ${NotesSchema.tableName}
       WHERE matiere_id = ? AND trimestre = ? AND sequence = ? AND annee_scolaire_id = ?
-      AND eleve_id IN (SELECT id FROM eleve WHERE classe_id = ?)
+      AND eleve_id IN (SELECT eleve_id FROM eleve_parcours WHERE classe_id = ? AND annee_scolaire_id = ?)
     ''',
-      [passingGrade, subjectId, trimestre, sequence, anneeId, classId],
+      [passingGrade, subjectId, trimestre, sequence, anneeId, classId, anneeId],
     );
 
     if (result.isEmpty || result.first['total'] == 0) {
@@ -177,11 +175,11 @@ class NotesDao extends BaseDao {
         SELECT eleve_id, AVG(note) as student_avg
         FROM ${NotesSchema.tableName}
         WHERE matiere_id = ? AND trimestre = ? AND annee_scolaire_id = ?
-        AND eleve_id IN (SELECT id FROM eleve WHERE classe_id = ?)
+        AND eleve_id IN (SELECT eleve_id FROM eleve_parcours WHERE classe_id = ? AND annee_scolaire_id = ?)
         GROUP BY eleve_id
       ) as student_averages
     ''',
-      [passingGrade, subjectId, trimestre, anneeId, classId],
+      [passingGrade, subjectId, trimestre, anneeId, classId, anneeId],
     );
 
     if (result.isEmpty || result.first['total'] == 0) {
@@ -243,9 +241,9 @@ class NotesDao extends BaseDao {
       SELECT n.*, m.nom as matiere_nom, COALESCE(cm.coefficient, 1) as coefficient
       FROM ${NotesSchema.tableName} n
       JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
+           AND cm.classe_id = ep.classe_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
     ''',
       [studentId, trimestre, anneeId],
@@ -268,11 +266,11 @@ class NotesDao extends BaseDao {
         cy.note_max
       FROM ${NotesSchema.tableName} n
       JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+      JOIN classe c ON ep.classe_id = c.id
       LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
+           AND cm.classe_id = ep.classe_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
       GROUP BY cy.moyenne_passage, cy.note_min, cy.note_max
     ''',
@@ -291,14 +289,14 @@ class NotesDao extends BaseDao {
     // 2. Get averages for all students in the class to calculate rank and class average
     final allAvgsResult = await db.rawQuery(
       '''
-      SELECT e.id, SUM(note * COALESCE(cm.coefficient, 1)) / SUM(COALESCE(cm.coefficient, 1)) as average
-      FROM eleve e
-      JOIN ${NotesSchema.tableName} n ON n.eleve_id = e.id
+      SELECT ep.eleve_id as id, SUM(note * COALESCE(cm.coefficient, 1)) / SUM(COALESCE(cm.coefficient, 1)) as average
+      FROM eleve_parcours ep
+      JOIN ${NotesSchema.tableName} n ON n.eleve_id = ep.eleve_id AND n.annee_scolaire_id = ep.annee_scolaire_id
       JOIN matiere m ON n.matiere_id = m.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
-      WHERE e.classe_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
-      GROUP BY e.id
+           AND cm.classe_id = ep.classe_id
+      WHERE ep.classe_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
+      GROUP BY ep.eleve_id
       ORDER BY average DESC
     ''',
       [classId, trimestre, anneeId],
@@ -323,9 +321,9 @@ class NotesDao extends BaseDao {
       SELECT SUM(note * COALESCE(cm.coefficient, 1)) as total_points
       FROM ${NotesSchema.tableName} n
       JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
+           AND cm.classe_id = ep.classe_id
       WHERE n.eleve_id = ? AND n.trimestre = ? AND n.annee_scolaire_id = ?
     ''',
       [studentId, trimestre, anneeId],
@@ -356,9 +354,9 @@ class NotesDao extends BaseDao {
              COALESCE(cm.coefficient, 1) as coefficient
       FROM ${NotesSchema.tableName} n
       JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id 
-           AND cm.classe_id = e.classe_id
+           AND cm.classe_id = ep.classe_id
       WHERE n.eleve_id = ? AND n.annee_scolaire_id = ?
       ORDER BY m.nom
     ''',
@@ -464,10 +462,10 @@ class NotesDao extends BaseDao {
       '''
       SELECT n.eleve_id, n.note, n.trimestre
       FROM ${NotesSchema.tableName} n
-      JOIN eleve e ON n.eleve_id = e.id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
       WHERE n.matiere_id = ? 
         AND n.annee_scolaire_id = ?
-        AND e.classe_id = ?
+        AND ep.classe_id = ?
     ''',
       [matiereId, anneeId, classeId],
     );
@@ -565,19 +563,19 @@ class NotesDao extends BaseDao {
 
   Future<void> calculerRangsClasse(int classeId, int anneeId) async {
     final eleves = await db.query(
-      'eleve',
-      where: 'classe_id = ?',
-      whereArgs: [classeId],
+      'eleve_parcours',
+      where: 'classe_id = ? AND annee_scolaire_id = ?',
+      whereArgs: [classeId, anneeId],
     );
 
     List<Map<String, dynamic>> resultats = [];
 
     for (var eleve in eleves) {
       double moyenne = await calculerMoyenneGenerale(
-        eleve['id'] as int,
+        eleve['eleve_id'] as int,
         anneeId,
       );
-      resultats.add({'eleve_id': eleve['id'], 'moyenne': moyenne});
+      resultats.add({'eleve_id': eleve['eleve_id'], 'moyenne': moyenne});
     }
 
     resultats.sort(
@@ -613,7 +611,8 @@ class NotesDao extends BaseDao {
     int anneeId, {
     int limit = 5,
   }) async {
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT n.*, e.nom as eleve_nom, e.prenom as eleve_prenom, m.nom as matiere_nom
       FROM ${NotesSchema.tableName} n
       JOIN eleve e ON n.eleve_id = e.id
@@ -621,7 +620,9 @@ class NotesDao extends BaseDao {
       WHERE n.annee_scolaire_id = ?
       ORDER BY n.id DESC
       LIMIT ?
-    ''');
+    ''',
+      [anneeId, limit],
+    );
   }
 
   Future<List<Map<String, dynamic>>> getStudentResults(int id) async {
@@ -632,7 +633,7 @@ class NotesDao extends BaseDao {
       FROM ${NotesSchema.tableName} n
       JOIN matiere m ON n.matiere_id = m.id
       JOIN annee_scolaire a ON n.annee_scolaire_id = a.id
-      LEFT JOIN attribution_enseignant ae ON ae.classe_id = (SELECT classe_id FROM eleve WHERE id = n.eleve_id) 
+      LEFT JOIN attribution_enseignant ae ON ae.classe_id = (SELECT classe_id FROM eleve_parcours WHERE eleve_id = n.eleve_id AND annee_scolaire_id = n.annee_scolaire_id) 
            AND ae.matiere_id = n.matiere_id AND ae.annee_scolaire_id = n.annee_scolaire_id
       LEFT JOIN enseignant ens ON ae.enseignant_id = ens.id
       WHERE n.eleve_id = ?
@@ -690,8 +691,8 @@ class NotesDao extends BaseDao {
         COUNT(DISTINCT n.eleve_id) as students_graded,
         COUNT(n.id) as total_grades
       FROM ${NotesSchema.tableName} n
-      JOIN eleve e ON n.eleve_id = e.id
-      WHERE e.annee_scolaire_id = ?
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+      WHERE ep.annee_scolaire_id = ?
     ''',
       [currentYearId],
     );
@@ -706,8 +707,8 @@ class NotesDao extends BaseDao {
           COUNT(DISTINCT n.eleve_id) as students_graded,
           COUNT(n.id) as total_grades
         FROM ${NotesSchema.tableName} n
-        JOIN eleve e ON n.eleve_id = e.id
-        WHERE e.annee_scolaire_id = ?
+        JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+        WHERE ep.annee_scolaire_id = ?
       ''',
         [previousYearId],
       );
@@ -722,8 +723,8 @@ class NotesDao extends BaseDao {
         AVG(n.note) as average,
         COUNT(DISTINCT n.eleve_id) as students
       FROM ${NotesSchema.tableName} n
-      JOIN eleve e ON n.eleve_id = e.id
-      WHERE e.annee_scolaire_id = ?
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+      WHERE ep.annee_scolaire_id = ?
       GROUP BY n.trimestre
       ORDER BY n.trimestre
     ''',
@@ -739,10 +740,10 @@ class NotesDao extends BaseDao {
         AVG(n.note) as average,
         COUNT(DISTINCT n.eleve_id) as students
       FROM ${NotesSchema.tableName} n
-      JOIN eleve e ON n.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+      JOIN classe c ON ep.classe_id = c.id
       JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      WHERE e.annee_scolaire_id = ?
+      WHERE ep.annee_scolaire_id = ?
       GROUP BY c.id
       ORDER BY cy.nom, c.nom
     ''',
@@ -772,8 +773,8 @@ class NotesDao extends BaseDao {
         AVG(n.note) as average
       FROM notes n
       JOIN matiere m ON n.matiere_id = m.id
-      JOIN eleve e ON n.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
+      JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND ep.annee_scolaire_id = n.annee_scolaire_id
+      JOIN classe c ON ep.classe_id = c.id
       LEFT JOIN classe_matiere cm ON cm.matiere_id = m.id AND cm.classe_id = c.id
       WHERE n.annee_scolaire_id = ?
       GROUP BY m.id, c.id, n.trimestre, n.sequence, cm.coefficient
@@ -805,12 +806,13 @@ class NotesDao extends BaseDao {
         n.sequence,
         n.note
       FROM eleve e
-      JOIN classe_matiere cm ON e.classe_id = cm.classe_id
+      JOIN eleve_parcours ep ON e.id = ep.eleve_id AND ep.annee_scolaire_id = ?
+      JOIN classe_matiere cm ON ep.classe_id = cm.classe_id
       JOIN matiere m ON cm.matiere_id = m.id
       LEFT JOIN notes n ON e.id = n.eleve_id 
                         AND n.matiere_id = cm.matiere_id 
-                        AND n.annee_scolaire_id = ?
-      WHERE e.classe_id = ?
+                        AND n.annee_scolaire_id = ep.annee_scolaire_id
+      WHERE ep.classe_id = ?
       ORDER BY e.nom, e.prenom, m.nom, n.trimestre, n.sequence
     ''',
       [anneeId, classeId],
@@ -826,15 +828,16 @@ class NotesDao extends BaseDao {
       '''
       SELECT e.id as eleve_id,
              (SELECT COUNT(*) FROM classe_matiere cm 
-              WHERE cm.classe_id = e.classe_id) as total_subjects,
+              WHERE cm.classe_id = ep.classe_id) as total_subjects,
              (SELECT COUNT(DISTINCT n.matiere_id) FROM notes n 
               WHERE n.eleve_id = e.id 
               AND n.trimestre = ? 
               AND n.annee_scolaire_id = ?) as subjects_with_notes
       FROM eleve e
-      WHERE e.classe_id = ?
+      JOIN eleve_parcours ep ON e.id = ep.eleve_id AND ep.annee_scolaire_id = ?
+      WHERE ep.classe_id = ?
     ''',
-      [trimestre, anneeId, classId],
+      [trimestre, anneeId, anneeId, classId],
     );
   }
 }

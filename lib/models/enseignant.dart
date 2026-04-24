@@ -1,5 +1,6 @@
 class Enseignant {
   final int? id;
+  final String? matricule;
   final String nom;
   final String prenom;
   final String? telephone;
@@ -11,6 +12,7 @@ class Enseignant {
 
   Enseignant({
     this.id,
+    this.matricule,
     required this.nom,
     required this.prenom,
     this.telephone,
@@ -24,6 +26,7 @@ class Enseignant {
   factory Enseignant.fromMap(Map<String, dynamic> map) {
     return Enseignant(
       id: map['id'] as int?,
+      matricule: map['matricule'] as String?,
       nom: map['nom'] as String? ?? '',
       prenom: map['prenom'] as String? ?? '',
       telephone: map['telephone'] as String?,
@@ -38,6 +41,7 @@ class Enseignant {
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
+      'matricule': matricule,
       'nom': nom,
       'prenom': prenom,
       'telephone': telephone,
@@ -53,6 +57,7 @@ class Enseignant {
 
   Enseignant copyWith({
     int? id,
+    String? matricule,
     String? nom,
     String? prenom,
     String? telephone,
@@ -64,6 +69,7 @@ class Enseignant {
   }) {
     return Enseignant(
       id: id ?? this.id,
+      matricule: matricule ?? this.matricule,
       nom: nom ?? this.nom,
       prenom: prenom ?? this.prenom,
       telephone: telephone ?? this.telephone,

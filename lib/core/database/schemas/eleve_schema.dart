@@ -1,8 +1,9 @@
 class EleveSchema {
   static const String tableName = 'eleve';
 
-  static const String createTable = '''
-    CREATE TABLE IF NOT EXISTS \$tableName (
+  static const String createTable =
+      '''
+    CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       matricule TEXT UNIQUE NOT NULL,
       nom TEXT NOT NULL,

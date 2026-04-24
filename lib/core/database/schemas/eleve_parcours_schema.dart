@@ -8,6 +8,8 @@ class EleveParcoursSchema {
       eleve_id INTEGER NOT NULL,
       classe_id INTEGER NOT NULL,
       annee_scolaire_id INTEGER NOT NULL,
+      type_inscription TEXT,
+      date_inscription TEXT,
       decision TEXT, -- 'Admis', 'Redoublant', 'Sorti'
       moyenne REAL,
       rang INTEGER,

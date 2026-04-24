@@ -56,10 +56,10 @@ class EnseignantDao extends BaseDao {
       LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN niveaux n ON c.niveau_id = n.id
       JOIN attribution_enseignant ae ON c.id = ae.classe_id
-      WHERE ae.enseignant_id = ?
+      WHERE ae.enseignant_id = ? AND ae.annee_scolaire_id = ?
       ORDER BY c.nom ASC
     ''',
-      [enseignantId],
+      [enseignantId, anneeId],
     );
   }
 
@@ -73,9 +73,9 @@ class EnseignantDao extends BaseDao {
       SELECT e.*
       FROM attribution_enseignant ae
       JOIN ${EnseignantSchema.tableName} e ON ae.enseignant_id = e.id
-      WHERE ae.classe_id = ? AND ae.matiere_id = ?
+      WHERE ae.classe_id = ? AND ae.matiere_id = ? AND ae.annee_scolaire_id = ?
     ''',
-      [classeId, matiereId],
+      [classeId, matiereId, anneeId],
     );
     return results.isNotEmpty ? results.first : null;
   }
@@ -99,6 +99,7 @@ class EnseignantDao extends BaseDao {
             'classe_id': classeId,
             'matiere_id': entry.key,
             'enseignant_id': entry.value,
+            'annee_scolaire_id': anneeId,
           }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
       }
@@ -117,8 +118,9 @@ class EnseignantDao extends BaseDao {
     int classeId, [
     int? anneeId,
   ]) async {
-    const String whereClause = 'WHERE ae.classe_id = ?';
-    final List<dynamic> whereArgs = [classeId];
+    const String whereClause =
+        'WHERE ae.classe_id = ? AND ae.annee_scolaire_id = ?';
+    final List<dynamic> whereArgs = [classeId, anneeId];
 
     return await db.rawQuery('''
       SELECT ae.*, e.nom, e.prenom, m.nom as matiere_nom
@@ -138,7 +140,7 @@ class EnseignantDao extends BaseDao {
 
     // Get student count for current year
     final currentStudentCountResult = await db.rawQuery(
-      'SELECT COUNT(*) as total FROM eleve WHERE annee_scolaire_id = ?',
+      'SELECT COUNT(*) as total FROM eleve_parcours WHERE annee_scolaire_id = ?',
       [currentYearId],
     );
     final currentStudents =
@@ -148,7 +150,7 @@ class EnseignantDao extends BaseDao {
     int previousStudents = 0;
     if (previousYearId != null) {
       final prevResult = await db.rawQuery(
-        'SELECT COUNT(*) as total FROM eleve WHERE annee_scolaire_id = ?',
+        'SELECT COUNT(*) as total FROM eleve_parcours WHERE annee_scolaire_id = ?',
         [previousYearId],
       );
       previousStudents = Sqflite.firstIntValue(prevResult) ?? 0;

@@ -63,13 +63,16 @@ class ClasseDao extends BaseDao {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getClassesForReports() async {
-    return await db.rawQuery('''
+  Future<List<Map<String, dynamic>>> getClassesForReports(int anneeId) async {
+    return await db.rawQuery(
+      '''
       SELECT c.*, 
-             (SELECT COUNT(*) FROM eleve WHERE classe_id = c.id) as student_count
+             (SELECT COUNT(*) FROM eleve_parcours WHERE classe_id = c.id AND annee_scolaire_id = ?) as student_count
       FROM ${ClasseSchema.tableName} c
       ORDER BY c.nom
-    ''');
+    ''',
+      [anneeId],
+    );
   }
 
   Future<List<Map<String, dynamic>>> getSubjectsByClass(
@@ -134,7 +137,7 @@ class ClasseDao extends BaseDao {
       FROM ${ClasseSchema.tableName} c
       LEFT JOIN (
         SELECT classe_id, COUNT(*) as count
-        FROM eleve
+        FROM eleve_parcours
         WHERE annee_scolaire_id = ?
         GROUP BY classe_id
       ) student_counts ON c.id = student_counts.classe_id
@@ -153,7 +156,7 @@ class ClasseDao extends BaseDao {
         FROM ${ClasseSchema.tableName} c
         LEFT JOIN (
           SELECT classe_id, COUNT(*) as count
-          FROM eleve
+          FROM eleve_parcours
           WHERE annee_scolaire_id = ?
           GROUP BY classe_id
         ) student_counts ON c.id = student_counts.classe_id
@@ -169,10 +172,10 @@ class ClasseDao extends BaseDao {
       SELECT 
         cy.nom as cycle,
         COUNT(DISTINCT c.id) as class_count,
-        COUNT(e.id) as student_count
+        COUNT(ep.eleve_id) as student_count
       FROM ${ClasseSchema.tableName} c
       JOIN cycles_scolaires cy ON c.cycle_id = cy.id
-      LEFT JOIN eleve e ON c.id = e.classe_id AND e.annee_scolaire_id = ?
+      LEFT JOIN eleve_parcours ep ON c.id = ep.classe_id AND ep.annee_scolaire_id = ?
       GROUP BY cy.nom
     ''',
       [currentYearId],
@@ -184,10 +187,10 @@ class ClasseDao extends BaseDao {
       SELECT 
         n.nom as niveau,
         COUNT(DISTINCT c.id) as class_count,
-        COUNT(e.id) as student_count
+        COUNT(ep.eleve_id) as student_count
       FROM ${ClasseSchema.tableName} c
       JOIN niveaux n ON c.niveau_id = n.id
-      LEFT JOIN eleve e ON c.id = e.classe_id AND e.annee_scolaire_id = ?
+      LEFT JOIN eleve_parcours ep ON c.id = ep.classe_id AND ep.annee_scolaire_id = ?
       GROUP BY n.nom
       ORDER BY n.ordre
     ''',
@@ -224,7 +227,7 @@ class ClasseDao extends BaseDao {
         nv.nom as niveau_nom,
         e.nom as prof_principal_nom,
         e.prenom as prof_principal_prenom,
-        (SELECT COUNT(*) FROM eleve WHERE classe_id = c.id AND annee_scolaire_id = ?) as eleve_count
+        (SELECT COUNT(*) FROM eleve_parcours WHERE classe_id = c.id AND annee_scolaire_id = ?) as eleve_count
       FROM ${ClasseSchema.tableName} c
       LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
       LEFT JOIN niveaux nv ON c.niveau_id = nv.id

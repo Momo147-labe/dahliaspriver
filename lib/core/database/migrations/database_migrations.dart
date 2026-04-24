@@ -71,25 +71,12 @@ class DatabaseMigrations {
       };
 
       for (var entry in columns.entries) {
-        try {
-          await db.execute(
-            'ALTER TABLE enseignant ADD COLUMN ${entry.key} ${entry.value}',
-          );
-          debugPrint('Colonne ${entry.key} ajoutée avec succès.');
-        } catch (e) {
-          debugPrint('La colonne ${entry.key} existe probablement déjà : $e');
-        }
+        await addColumnSafely(db, 'enseignant', entry.key, entry.value);
       }
     }
 
     if (oldVersion < 15) {
-      try {
-        await db.execute(
-          'ALTER TABLE notes ADD COLUMN sequence INTEGER DEFAULT 1',
-        );
-      } catch (e) {
-        debugPrint('La colonne sequence existe probablement déjà : $e');
-      }
+      await addColumnSafely(db, 'notes', 'sequence', 'INTEGER DEFAULT 1');
     }
 
     if (oldVersion < 16) {
@@ -197,107 +184,33 @@ class DatabaseMigrations {
     }
 
     if (oldVersion < 21) {
-      try {
-        await db.execute(
-          'ALTER TABLE paiement_detail ADD COLUMN observation TEXT',
-        );
-      } catch (e) {
-        debugPrint('Column observation may already exist: $e');
-      }
+      await addColumnSafely(db, 'paiement_detail', 'observation', 'TEXT');
     }
 
     if (oldVersion < 22) {
       // Ensuring observation column exists because version 21 upgrade might have been skipped for some users
-      try {
-        final List<Map<String, dynamic>> columns = await db.rawQuery(
-          'PRAGMA table_info(paiement_detail)',
-        );
-        final bool hasObservation = columns.any(
-          (column) => column['name'] == 'observation',
-        );
-        if (!hasObservation) {
-          await db.execute(
-            'ALTER TABLE paiement_detail ADD COLUMN observation TEXT',
-          );
-        }
-      } catch (e) {
-        debugPrint('Error checking column observation: $e');
-      }
+      await addColumnSafely(db, 'paiement_detail', 'observation', 'TEXT');
     }
 
     if (oldVersion < 24) {
-      try {
-        final List<Map<String, dynamic>> columns = await db.rawQuery(
-          'PRAGMA table_info(paiement_detail)',
-        );
-
-        final bool hasClasseId = columns.any(
-          (column) => column['name'] == 'classe_id',
-        );
-        if (!hasClasseId) {
-          await db.execute(
-            'ALTER TABLE paiement_detail ADD COLUMN classe_id INTEGER',
-          );
-        }
-
-        final bool hasFraisId = columns.any(
-          (column) => column['name'] == 'frais_id',
-        );
-        if (!hasFraisId) {
-          await db.execute(
-            'ALTER TABLE paiement_detail ADD COLUMN frais_id INTEGER',
-          );
-        }
-      } catch (e) {
-        debugPrint('Error during v24 migration: $e');
-      }
+      await addColumnSafely(db, 'paiement_detail', 'classe_id', 'INTEGER');
+      await addColumnSafely(db, 'paiement_detail', 'frais_id', 'INTEGER');
     }
 
     if (oldVersion < 25) {
       // Ensure 'eleve' table has all necessary columns
-      try {
-        final List<Map<String, dynamic>> columns = await db.rawQuery(
-          'PRAGMA table_info(eleve)',
-        );
-
-        final List<String> requiredColumns = [
-          'annee_scolaire_id',
-          'frais_id',
-          'photo',
-          'statut',
-        ];
-
-        for (var col in requiredColumns) {
-          final bool exists = columns.any((column) => column['name'] == col);
-          if (!exists) {
-            String type = col == 'photo' || col == 'statut'
-                ? 'TEXT'
-                : 'INTEGER';
-            await db.execute('ALTER TABLE eleve ADD COLUMN $col $type');
-            debugPrint('Column $col added to table eleve');
-          }
-        }
-      } catch (e) {
-        debugPrint('Error during v25 migration for table eleve: $e');
-      }
+      await addColumnSafely(db, 'eleve', 'annee_scolaire_id', 'INTEGER');
+      await addColumnSafely(db, 'eleve', 'frais_id', 'INTEGER');
+      await addColumnSafely(db, 'eleve', 'photo', 'TEXT');
+      await addColumnSafely(db, 'eleve', 'statut', 'TEXT');
 
       // Ensure 'paiement_detail' has 'annee_scolaire_id'
-      try {
-        final List<Map<String, dynamic>> columns = await db.rawQuery(
-          'PRAGMA table_info(paiement_detail)',
-        );
-        final bool hasAnnee = columns.any(
-          (column) => column['name'] == 'annee_scolaire_id',
-        );
-        if (!hasAnnee) {
-          await db.execute(
-            'ALTER TABLE paiement_detail ADD COLUMN annee_scolaire_id INTEGER',
-          );
-          debugPrint('Column annee_scolaire_id added to table paiement_detail');
-        }
-      } catch (e) {
-        debugPrint('Error during v25 migration for table paiement_detail: $e');
-      }
+      await addColumnSafely(
+        db,
+        'paiement_detail',
+        'annee_scolaire_id',
+        'INTEGER',
+      );
     }
 
     if (oldVersion < 26) {
@@ -335,23 +248,16 @@ class DatabaseMigrations {
     }
 
     if (oldVersion < 28) {
-      try {
-        await db.execute(
-          'ALTER TABLE classe_matiere ADD COLUMN coefficient REAL DEFAULT 1',
-        );
-      } catch (e) {
-        debugPrint('Error adding coefficient to classe_matiere: $e');
-      }
+      await addColumnSafely(
+        db,
+        'classe_matiere',
+        'coefficient',
+        'REAL DEFAULT 1',
+      );
     }
 
     if (oldVersion < 29) {
-      try {
-        await db.execute(
-          'ALTER TABLE notes ADD COLUMN coefficient REAL DEFAULT 1',
-        );
-      } catch (e) {
-        debugPrint('Error adding coefficient to notes: $e');
-      }
+      await addColumnSafely(db, 'notes', 'coefficient', 'REAL DEFAULT 1');
     }
 
     if (oldVersion < 30) {
@@ -755,21 +661,17 @@ class DatabaseMigrations {
     if (oldVersion < 42) {
       try {
         // 1. Ensure 'statut' column exists
+        await addColumnSafely(
+          db,
+          'annee_scolaire',
+          'statut',
+          "TEXT CHECK (statut IN ('Active', 'Inactive')) DEFAULT 'Active'",
+        );
+
+        // 2. Migrate from 'etat' if it exists
         final List<Map<String, dynamic>> columns = await db.rawQuery(
           'PRAGMA table_info(annee_scolaire)',
         );
-
-        final bool hasStatut = columns.any(
-          (column) => column['name'] == 'statut',
-        );
-        if (!hasStatut) {
-          await db.execute(
-            "ALTER TABLE annee_scolaire ADD COLUMN statut TEXT CHECK (statut IN ('Active', 'Inactive')) DEFAULT 'Active'",
-          );
-          debugPrint('Column statut added to table annee_scolaire');
-        }
-
-        // 2. Migrate from 'etat' if it exists
         final bool hasEtat = columns.any((column) => column['name'] == 'etat');
         if (hasEtat) {
           await db.execute(
@@ -1106,6 +1008,72 @@ class DatabaseMigrations {
         debugPrint('Migration vers la version 55 terminée avec succès.');
       } catch (e) {
         debugPrint('Erreur lors de la migration v55 : $e');
+      }
+    }
+
+    if (oldVersion < 56) {
+      try {
+        await addColumnSafely(db, 'eleve_parcours', 'type_inscription', 'TEXT');
+        await addColumnSafely(db, 'eleve_parcours', 'date_inscription', 'TEXT');
+        debugPrint(
+          'Migration v56: type_inscription et date_inscription ajoutés à eleve_parcours.',
+        );
+      } catch (e) {
+        debugPrint('Erreur migration v56: $e');
+      }
+    }
+
+    if (oldVersion < 57) {
+      try {
+        await addColumnSafely(db, 'paiement', 'created_by_id', 'INTEGER');
+        await addColumnSafely(
+          db,
+          'paiement_detail',
+          'created_by_id',
+          'INTEGER',
+        );
+        debugPrint(
+          'Migration v57: created_by_id ajouté à paiement et paiement_detail.',
+        );
+      } catch (e) {
+        debugPrint('Erreur migration v57: $e');
+      }
+    }
+
+    if (oldVersion < 58) {
+      try {
+        await addColumnSafely(
+          db,
+          'enseignant',
+          'sexe',
+          "TEXT CHECK (sexe IN ('M','F'))",
+        );
+        await addColumnSafely(db, 'enseignant', 'date_naissance', "TEXT");
+        await addColumnSafely(db, 'enseignant', 'date_embauche', "TEXT");
+        await addColumnSafely(db, 'enseignant', 'photo', "TEXT");
+        await addColumnSafely(
+          db,
+          'enseignant',
+          'statut',
+          "TEXT DEFAULT 'Actif'",
+        );
+        await addColumnSafely(db, 'enseignant', 'matricule', "TEXT UNIQUE");
+        debugPrint(
+          'Migration v58: Colonnes manquantes ajoutées à la table enseignant.',
+        );
+      } catch (e) {
+        debugPrint('Erreur migration v58: $e');
+      }
+    }
+
+    if (oldVersion < 59) {
+      try {
+        await addColumnSafely(db, 'paiement_detail', 'mois', 'TEXT');
+        debugPrint(
+          'Migration v59: Colonne mois ajoutée à la table paiement_detail.',
+        );
+      } catch (e) {
+        debugPrint('Erreur migration v59: $e');
       }
     }
   }

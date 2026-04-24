@@ -19,9 +19,11 @@ class PaiementSchema {
       statut TEXT CHECK (statut IN ('Réglé', 'Partiel', 'Impayé')) DEFAULT 'Impayé',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      created_by_id INTEGER,
       FOREIGN KEY (eleve_id) REFERENCES eleve(id),
       FOREIGN KEY (classe_id) REFERENCES classe(id),
-      FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
+      FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id),
+      FOREIGN KEY (created_by_id) REFERENCES user(id)
     )
   ''';
 }

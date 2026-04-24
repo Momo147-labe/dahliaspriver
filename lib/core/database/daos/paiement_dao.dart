@@ -50,14 +50,14 @@ class PaiementDao extends BaseDao {
     await db.transaction((txn) async {
       // 1. Insert into paiement_detail
       if (!data.containsKey('classe_id') || !data.containsKey('frais_id')) {
-        final eleve = await txn.query(
-          'eleve',
+        final eleveParcours = await txn.query(
+          'eleve_parcours',
           columns: ['classe_id'],
-          where: 'id = ?',
-          whereArgs: [data['eleve_id']],
+          where: 'eleve_id = ? AND annee_scolaire_id = ?',
+          whereArgs: [data['eleve_id'], data['annee_scolaire_id']],
         );
-        if (eleve.isNotEmpty) {
-          final int classeId = eleve.first['classe_id'] as int;
+        if (eleveParcours.isNotEmpty) {
+          final int classeId = eleveParcours.first['classe_id'] as int;
           data['classe_id'] = classeId;
 
           final fees = await txn.query(
@@ -128,14 +128,14 @@ class PaiementDao extends BaseDao {
           ],
         );
       } else {
-        final eleve = await txn.query(
-          'eleve',
+        final eleveParcours = await txn.query(
+          'eleve_parcours',
           columns: ['classe_id'],
-          where: 'id = ?',
-          whereArgs: [data['eleve_id']],
+          where: 'eleve_id = ? AND annee_scolaire_id = ?',
+          whereArgs: [data['eleve_id'], data['annee_scolaire_id']],
         );
-        int? classeId = eleve.isNotEmpty
-            ? eleve.first['classe_id'] as int?
+        int? classeId = eleveParcours.isNotEmpty
+            ? eleveParcours.first['classe_id'] as int?
             : null;
 
         double totalFees = 0.0;
@@ -176,9 +176,9 @@ class PaiementDao extends BaseDao {
     final expectedResult = await db.rawQuery(
       '''
       SELECT SUM(fs.montant_total) as total
-      FROM eleve e
-      JOIN frais_scolarite fs ON e.classe_id = fs.classe_id AND e.annee_scolaire_id = fs.annee_scolaire_id
-      WHERE e.annee_scolaire_id = ?
+      FROM eleve_parcours ep
+      JOIN frais_scolarite fs ON ep.classe_id = fs.classe_id AND ep.annee_scolaire_id = fs.annee_scolaire_id
+      WHERE ep.annee_scolaire_id = ?
     ''',
       [anneeId],
     );
@@ -254,9 +254,9 @@ class PaiementDao extends BaseDao {
       '''
       SELECT c.nom, SUM(p.montant_paye) as paid, SUM(p.montant_total) as expected
       FROM classe c
-      JOIN eleve e ON e.classe_id = c.id
-      LEFT JOIN ${PaiementSchema.tableName} p ON p.eleve_id = e.id AND p.annee_scolaire_id = ?
-      WHERE e.annee_scolaire_id = ?
+      JOIN eleve_parcours ep ON ep.classe_id = c.id
+      LEFT JOIN ${PaiementSchema.tableName} p ON p.eleve_id = ep.eleve_id AND p.annee_scolaire_id = ?
+      WHERE ep.annee_scolaire_id = ?
       GROUP BY c.id
       ORDER BY c.nom ASC
     ''',
@@ -287,10 +287,12 @@ class PaiementDao extends BaseDao {
   }) async {
     String queryStr =
         '''
-      SELECT pd.*, e.nom as eleve_nom, e.prenom as eleve_prenom, e.id as eleve_id, e.photo as eleve_photo, c.nom as classe_nom, u.nom_complet as agent_nom, u.pseudo as agent_pseudo
+      SELECT pd.*, e.nom as eleve_nom, e.prenom as eleve_prenom, e.id as eleve_id, e.photo as eleve_photo, 
+             c.nom as classe_nom, u.nom_complet as agent_nom, u.pseudo as agent_pseudo
       FROM ${PaiementDetailSchema.tableName} pd
       JOIN eleve e ON pd.eleve_id = e.id
-      JOIN classe c ON e.classe_id = c.id
+      JOIN eleve_parcours ep ON ep.eleve_id = e.id AND ep.annee_scolaire_id = pd.annee_scolaire_id
+      JOIN classe c ON ep.classe_id = c.id
       LEFT JOIN user u ON pd.created_by_id = u.id
       WHERE pd.annee_scolaire_id = ?
     ''';
@@ -383,21 +385,31 @@ class PaiementDao extends BaseDao {
     final totalPaid =
         (paidResult.first['total_paid'] as num?)?.toDouble() ?? 0.0;
 
-    // 2. Get student's class ID and status
+    // 2. Get student's class ID and status from their parcours for the given year
+    final parcoursResult = await db.query(
+      'eleve_parcours',
+      columns: ['classe_id'],
+      where: 'eleve_id = ? AND annee_scolaire_id = ?',
+      whereArgs: [eleveId, anneeId],
+      limit: 1,
+    );
+
+    if (parcoursResult.isEmpty) {
+      return {'totalPaid': totalPaid, 'totalExpected': 0.0, 'balance': 0.0};
+    }
+
     final studentResult = await db.query(
       'eleve',
-      columns: ['classe_id', 'statut'],
+      columns: ['statut'],
       where: 'id = ?',
       whereArgs: [eleveId],
       limit: 1,
     );
 
-    if (studentResult.isEmpty) {
-      return {'totalPaid': totalPaid, 'totalExpected': 0.0, 'balance': 0.0};
-    }
-
-    final classeId = studentResult.first['classe_id'] as int;
-    final statut = studentResult.first['statut'] as String?;
+    final classeId = parcoursResult.first['classe_id'] as int;
+    final statut = studentResult.isNotEmpty
+        ? studentResult.first['statut'] as String?
+        : null;
 
     // 3. Get total expected fees for the class from frais_scolarite
     final feesResult = await db.query(
@@ -436,17 +448,18 @@ class PaiementDao extends BaseDao {
       '''
       SELECT 
         e.id, e.nom, e.prenom, e.matricule, e.statut as eleve_statut, e.photo,
-        e.classe_id, c.nom as classe_nom,
+        ep.classe_id, c.nom as classe_nom,
         cy.nom as cycle_nom,
         fs.inscription, fs.reinscription, fs.tranche1, fs.tranche2, fs.tranche3, fs.montant_total,
         COALESCE(p.montant_paye, 0) as total_paye,
         p.montant_restant
       FROM eleve e
-      JOIN classe c ON e.classe_id = c.id
-      JOIN cycle cy ON c.cycle_id = cy.id
-      LEFT JOIN frais_scolarite fs ON e.classe_id = fs.classe_id AND e.annee_scolaire_id = fs.annee_scolaire_id
-      LEFT JOIN ${PaiementSchema.tableName} p ON p.eleve_id = e.id AND p.annee_scolaire_id = e.annee_scolaire_id
-      WHERE e.annee_scolaire_id = ?
+      JOIN eleve_parcours ep ON e.id = ep.eleve_id
+      JOIN classe c ON ep.classe_id = c.id
+      JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+      LEFT JOIN frais_scolarite fs ON ep.classe_id = fs.classe_id AND ep.annee_scolaire_id = fs.annee_scolaire_id
+      LEFT JOIN ${PaiementSchema.tableName} p ON p.eleve_id = e.id AND p.annee_scolaire_id = ep.annee_scolaire_id
+      WHERE ep.annee_scolaire_id = ?
       ORDER BY cy.nom ASC, c.nom ASC, e.nom ASC
     ''',
       [anneeId],
@@ -471,10 +484,11 @@ class PaiementDao extends BaseDao {
         COALESCE(fs.reinscription, 0) as reinscription,
         e.statut as eleve_statut
       FROM eleve e
-      JOIN classe c ON e.classe_id = c.id
-      JOIN frais_scolarite fs ON e.classe_id = fs.classe_id AND e.annee_scolaire_id = fs.annee_scolaire_id
-      LEFT JOIN ${PaiementSchema.tableName} p ON p.eleve_id = e.id AND p.annee_scolaire_id = e.annee_scolaire_id
-      WHERE e.annee_scolaire_id = ?
+      JOIN eleve_parcours ep ON e.id = ep.eleve_id
+      JOIN classe c ON ep.classe_id = c.id
+      JOIN frais_scolarite fs ON ep.classe_id = fs.classe_id AND ep.annee_scolaire_id = fs.annee_scolaire_id
+      LEFT JOIN ${PaiementSchema.tableName} p ON p.eleve_id = e.id AND p.annee_scolaire_id = ep.annee_scolaire_id
+      WHERE ep.annee_scolaire_id = ?
     ''',
       [anneeId],
     );
@@ -573,8 +587,8 @@ class PaiementDao extends BaseDao {
         SUM(pd.montant) as total_collected,
         COUNT(pd.id) as payment_count
       FROM ${PaiementDetailSchema.tableName} pd
-      JOIN eleve e ON pd.eleve_id = e.id
-      WHERE e.annee_scolaire_id = ?
+      JOIN eleve_parcours ep ON pd.eleve_id = ep.eleve_id AND pd.annee_scolaire_id = ep.annee_scolaire_id
+      WHERE ep.annee_scolaire_id = ?
     ''',
       [currentYearId],
     );
@@ -585,7 +599,7 @@ class PaiementDao extends BaseDao {
       SELECT 
         SUM(
           (fs.inscription + fs.reinscription + fs.tranche1 + fs.tranche2 + fs.tranche3) * 
-          (SELECT COUNT(*) FROM eleve WHERE classe_id = fs.classe_id AND annee_scolaire_id = ?)
+          (SELECT COUNT(*) FROM eleve_parcours WHERE classe_id = fs.classe_id AND annee_scolaire_id = ?)
         ) as total_expected
       FROM frais_scolarite fs
       JOIN classe c ON fs.classe_id = c.id
@@ -594,7 +608,6 @@ class PaiementDao extends BaseDao {
       [currentYearId, currentYearId],
     );
 
-    // Previous year financial data
     Map<String, dynamic>? previousFinances;
     if (previousYearId != null) {
       final prevResult = await db.rawQuery(
@@ -604,8 +617,8 @@ class PaiementDao extends BaseDao {
           SUM(pd.montant) as total_collected,
           COUNT(pd.id) as payment_count
         FROM ${PaiementDetailSchema.tableName} pd
-        JOIN eleve e ON pd.eleve_id = e.id
-        WHERE e.annee_scolaire_id = ?
+        JOIN eleve_parcours ep ON pd.eleve_id = ep.eleve_id AND pd.annee_scolaire_id = ep.annee_scolaire_id
+        WHERE ep.annee_scolaire_id = ?
       ''',
         [previousYearId],
       );
@@ -617,8 +630,8 @@ class PaiementDao extends BaseDao {
       '''
       SELECT pd.mode_paiement, COUNT(*) as count, SUM(pd.montant) as total
       FROM ${PaiementDetailSchema.tableName} pd
-      JOIN eleve e ON pd.eleve_id = e.id
-      WHERE e.annee_scolaire_id = ?
+      JOIN eleve_parcours ep ON pd.eleve_id = ep.eleve_id AND pd.annee_scolaire_id = ep.annee_scolaire_id
+      WHERE ep.annee_scolaire_id = ?
       GROUP BY pd.mode_paiement
     ''',
       [currentYearId],

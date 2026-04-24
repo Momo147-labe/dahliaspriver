@@ -110,7 +110,7 @@ class FeesDao extends BaseDao {
         MIN(fs.montant_total) as min_fees,
         MAX(fs.montant_total) as max_fees,
         SUM(fs.montant_total * (
-          SELECT COUNT(*) FROM eleve 
+          SELECT COUNT(*) FROM eleve_parcours 
           WHERE classe_id = fs.classe_id AND annee_scolaire_id = ?
         )) as total_expected_revenue
       FROM classe c
@@ -141,7 +141,7 @@ class FeesDao extends BaseDao {
       SELECT c.*, fs.id as frais_id, fs.inscription, fs.reinscription, 
              fs.tranche1, fs.date_limite_t1, fs.tranche2, fs.date_limite_t2,
              fs.tranche3, fs.date_limite_t3, fs.montant_total,
-             (SELECT COUNT(*) FROM eleve WHERE classe_id = c.id AND annee_scolaire_id = ?) as nb_eleves
+             (SELECT COUNT(*) FROM eleve_parcours WHERE classe_id = c.id AND annee_scolaire_id = ?) as nb_eleves
       FROM classe c
       LEFT JOIN ${FraisScolariteSchema.tableName} fs ON c.id = fs.classe_id AND fs.annee_scolaire_id = ?
       ORDER BY c.nom ASC
@@ -235,10 +235,10 @@ class FeesDao extends BaseDao {
 
       if (classeId == null || fraisId == null) {
         final eleve = await txn.query(
-          'eleve',
+          'eleve_parcours',
           columns: ['classe_id'],
-          where: 'id = ?',
-          whereArgs: [data['eleve_id']],
+          where: 'eleve_id = ? AND annee_scolaire_id = ?',
+          whereArgs: [data['eleve_id'], data['annee_scolaire_id']],
         );
         if (eleve.isNotEmpty) {
           classeId = eleve.first['classe_id'] as int;

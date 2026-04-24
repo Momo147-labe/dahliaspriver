@@ -22,11 +22,15 @@ class EleveDao extends BaseDao {
   }
 
   Future<List<Map<String, dynamic>>> getElevesByAnnee(int anneeId) async {
-    return await db.query(
-      EleveSchema.tableName,
-      where: 'annee_scolaire_id = ?',
-      whereArgs: [anneeId],
-      orderBy: 'nom, prenom',
+    return await db.rawQuery(
+      '''
+      SELECT e.*, p.classe_id, p.annee_scolaire_id
+      FROM ${EleveSchema.tableName} e
+      JOIN eleve_parcours p ON e.id = p.eleve_id
+      WHERE p.annee_scolaire_id = ?
+      ORDER BY e.nom, e.prenom
+    ''',
+      [anneeId],
     );
   }
 
@@ -214,7 +218,7 @@ class EleveDao extends BaseDao {
 
   Future<int> getEleveCount(int anneeId) async {
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM ${EleveSchema.tableName} WHERE annee_scolaire_id = ?',
+      'SELECT COUNT(*) as count FROM eleve_parcours WHERE annee_scolaire_id = ?',
       [anneeId],
     );
     return Sqflite.firstIntValue(result) ?? 0;
@@ -282,20 +286,28 @@ class EleveDao extends BaseDao {
           });
         }
 
-        // 2. Créer l'entrée pour la nouvelle année
-        await txn.insert('eleve_parcours', {
-          'eleve_id': eleveId,
-          'classe_id': newClasseId,
-          'annee_scolaire_id': newAnneeId,
-          'confirmation_statut': confirmationStatut,
-          'type_inscription': decision == 'Admis'
-              ? 'Promotion'
-              : 'Redoublement',
-          'moyenne': null,
-          'rang': null,
-          'created_at': now,
-          'updated_at': now,
-        });
+        // 2. Créer l'entrée pour la nouvelle année si elle n'existe pas déjà
+        final existingNew = await txn.query(
+          'eleve_parcours',
+          where: 'eleve_id = ? AND annee_scolaire_id = ?',
+          whereArgs: [eleveId, newAnneeId],
+        );
+
+        if (existingNew.isEmpty) {
+          await txn.insert('eleve_parcours', {
+            'eleve_id': eleveId,
+            'classe_id': newClasseId,
+            'annee_scolaire_id': newAnneeId,
+            'confirmation_statut': confirmationStatut,
+            'type_inscription': decision == 'Admis'
+                ? 'Promotion'
+                : 'Redoublement',
+            'moyenne': null,
+            'rang': null,
+            'created_at': now,
+            'updated_at': now,
+          });
+        }
 
         // 3. Supprimer d'éventuelles moyennes résiduelles pour la nouvelle année
         await txn.delete(
