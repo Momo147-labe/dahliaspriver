@@ -324,6 +324,8 @@ class PaiementDao extends BaseDao {
       SELECT COUNT(*) as count 
       FROM ${PaiementDetailSchema.tableName} pd
       JOIN eleve e ON pd.eleve_id = e.id
+      JOIN eleve_parcours ep ON ep.eleve_id = e.id AND ep.annee_scolaire_id = pd.annee_scolaire_id
+      JOIN classe c ON ep.classe_id = c.id
       WHERE pd.annee_scolaire_id = ?
     ''';
     List<dynamic> args = [anneeId];

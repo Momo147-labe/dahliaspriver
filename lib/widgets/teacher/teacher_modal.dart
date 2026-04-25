@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import '../../core/database/database_helper.dart';
 import '../../models/enseignant.dart';
 import '../../theme/app_theme.dart';
@@ -26,9 +28,14 @@ class _TeacherModalState extends State<TeacherModal> {
   String? _selectedSexe;
   bool _isSaving = false;
 
+  // Autocomplete data
+  List<String> _prenomsSuggestions = [];
+  List<String> _nomsSuggestions = [];
+
   @override
   void initState() {
     super.initState();
+    _loadAutocompleteData();
     if (widget.teacher != null) {
       _nomController.text = widget.teacher!.nom;
       _prenomController.text = widget.teacher!.prenom;
@@ -61,6 +68,33 @@ class _TeacherModalState extends State<TeacherModal> {
       });
     } catch (e) {
       debugPrint('Error loading subjects for teacher specialty: $e');
+    }
+  }
+
+  Future<void> _loadAutocompleteData() async {
+    try {
+      final String prenomsJson = await rootBundle.loadString(
+        'assets/prenoms_guinee.json',
+      );
+      final String nomsJson = await rootBundle.loadString(
+        'assets/ListeNomFamilles.json',
+      );
+
+      final prenomsData = json.decode(prenomsJson);
+      final nomsData = json.decode(nomsJson);
+
+      if (mounted) {
+        setState(() {
+          _prenomsSuggestions = List<String>.from(
+            prenomsData['prenoms_guinee'] ?? [],
+          );
+          _nomsSuggestions = List<String>.from(
+            nomsData['noms_famille_guinee'] ?? [],
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du chargement des autocomplétions: $e');
     }
   }
 
@@ -163,22 +197,24 @@ class _TeacherModalState extends State<TeacherModal> {
               Row(
                 children: [
                   Expanded(
-                    child: _buildTextField(
+                    child: _buildAutocompleteField(
                       controller: _prenomController,
                       label: 'Prénom',
-                      hint: 'Ex: Jean',
-                      validator: (val) =>
-                          val == null || val.isEmpty ? 'Requis' : null,
+                      hintText: 'Ex: Jean',
+                      icon: Icons.person_outline,
+                      isRequired: true,
+                      suggestions: _prenomsSuggestions,
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: _buildTextField(
+                    child: _buildAutocompleteField(
                       controller: _nomController,
                       label: 'Nom',
-                      hint: 'Ex: Dupont',
-                      validator: (val) =>
-                          val == null || val.isEmpty ? 'Requis' : null,
+                      hintText: 'Ex: Dupont',
+                      icon: Icons.person,
+                      isRequired: true,
+                      suggestions: _nomsSuggestions,
                     ),
                   ),
                 ],
@@ -344,6 +380,131 @@ class _TeacherModalState extends State<TeacherModal> {
           keyboardType: keyboardType,
         ),
       ],
+    );
+  }
+
+  Widget _buildAutocompleteField({
+    required TextEditingController controller,
+    required String label,
+    String? hintText,
+    IconData? icon,
+    required bool isRequired,
+    required List<String> suggestions,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return RawAutocomplete<String>(
+      textEditingController: controller,
+      focusNode: FocusNode(),
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text.isEmpty) {
+          return const Iterable<String>.empty();
+        }
+        return suggestions.where((String option) {
+          return option.toLowerCase().contains(
+            textEditingValue.text.toLowerCase(),
+          );
+        });
+      },
+      onSelected: (String selection) {
+        controller.text = selection;
+        if (mounted) setState(() {});
+      },
+      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: textController,
+              focusNode: focusNode,
+              onFieldSubmitted: (value) => onFieldSubmitted(),
+              style: TextStyle(
+                fontSize: 15,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              decoration: InputDecoration(
+                hintText: hintText,
+                prefixIcon: icon != null
+                    ? Icon(
+                        icon,
+                        size: 20,
+                        color: AppTheme.primaryColor.withValues(alpha: 0.7),
+                      )
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white10 : Colors.grey.shade300,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primaryColor,
+                    width: 1.5,
+                  ),
+                ),
+                filled: true,
+                fillColor: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.white,
+                hintStyle: TextStyle(
+                  color: isDark ? Colors.white24 : Colors.grey.shade400,
+                  fontSize: 14,
+                ),
+              ),
+              validator: (value) {
+                if (isRequired && (value == null || value.isEmpty)) {
+                  return 'Requis';
+                }
+                return null;
+              },
+            ),
+          ],
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            color: isDark ? const Color(0xFF1F2937) : Colors.white,
+            child: Container(
+              width: 250,
+              constraints: const BoxConstraints(maxHeight: 250),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final String option = options.elementAt(index);
+                  return ListTile(
+                    title: Text(
+                      option,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    onTap: () => onSelected(option),
+                    hoverColor: isDark ? Colors.white10 : Colors.grey.shade100,
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

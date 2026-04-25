@@ -67,6 +67,9 @@ class _PaymentsPageState extends State<PaymentsPage>
     setState(() {
       _isLoading = true;
       _currentPage = 1; // Reset to first page
+      _searchQuery = '';
+      _selectedModeFilter = 'Tous';
+      _searchController.clear();
     });
     try {
       final summary = await dbHelper.getFinancialSummary(anneeId);

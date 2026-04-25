@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
@@ -55,9 +57,9 @@ class _AddStudentModalState extends State<AddStudentModal> {
   String _selectedSexe = 'M';
   String _selectedAnneeScolaire = '';
   String _selectedClasse = '';
-  String _selectedTypeInscription = 'nouveau';
+  String _selectedTypeInscription = 'inscrit';
   String _selectedTypePaiement = 'inscription';
-  String _selectedModePaiement = 'especes';
+  String _selectedModePaiement = 'Espèces';
   File? _selectedImage; // Image actuellement affiché (aperçu)
   File?
   _tempCapturedImage; // Fichier temporaire avant la soumission du formulaire
@@ -70,6 +72,11 @@ class _AddStudentModalState extends State<AddStudentModal> {
   int?
   _fraisId; // ID des frais de scolarité pour la classe et année sélectionnées
 
+  // Autocomplete data
+  List<String> _prenomsSuggestions = [];
+  List<String> _nomsSuggestions = [];
+  List<String> _localitesSuggestions = [];
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +88,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
         _nomPereController.text = _nomController.text;
       });
     }
+    _loadAutocompleteData();
     _loadData();
     // Générer la référence initiale
     _generateReference(_selectedModePaiement).then((ref) {
@@ -110,12 +118,12 @@ class _AddStudentModalState extends State<AddStudentModal> {
     // On garde le statut ou on mappe vers nouveau/reinscrit si nécessaire
     // Si c'est une validation d'un candidat "En attente", c'est souvent un nouveau
     if (s.statut == 'En attente') {
-      _selectedTypeInscription = 'nouveau';
+      _selectedTypeInscription = 'inscrit';
       _selectedTypePaiement = 'inscription';
     } else {
       _selectedTypeInscription = s.statut.toLowerCase() == 'reinscrit'
           ? 'reinscrit'
-          : 'nouveau';
+          : 'inscrit';
       _selectedTypePaiement = _selectedTypeInscription == 'reinscrit'
           ? 'reinscription'
           : 'inscription';
@@ -152,6 +160,40 @@ class _AddStudentModalState extends State<AddStudentModal> {
       _loadFraisScolarite();
     } catch (e) {
       print('Erreur lors du chargement des données: $e');
+    }
+  }
+
+  Future<void> _loadAutocompleteData() async {
+    try {
+      final String prenomsJson = await rootBundle.loadString(
+        'assets/prenoms_guinee.json',
+      );
+      final String nomsJson = await rootBundle.loadString(
+        'assets/ListeNomFamilles.json',
+      );
+      final String localitesJson = await rootBundle.loadString(
+        'assets/localites_frequentes.json',
+      );
+
+      final prenomsData = json.decode(prenomsJson);
+      final nomsData = json.decode(nomsJson);
+      final localitesData = json.decode(localitesJson);
+
+      if (mounted) {
+        setState(() {
+          _prenomsSuggestions = List<String>.from(
+            prenomsData['prenoms_guinee'] ?? [],
+          );
+          _nomsSuggestions = List<String>.from(
+            nomsData['noms_famille_guinee'] ?? [],
+          );
+          _localitesSuggestions = List<String>.from(
+            localitesData['localites_frequentes'] ?? [],
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du chargement des autocomplétions: $e');
     }
   }
 
@@ -571,7 +613,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
     // Préfixe selon le mode de paiement
     String prefix;
     switch (modePaiement) {
-      case 'especes':
+      case 'Espèces':
         prefix = 'ESP';
         break;
       case 'virement':
@@ -766,22 +808,24 @@ class _AddStudentModalState extends State<AddStudentModal> {
                     Row(
                       children: [
                         Expanded(
-                          child: _buildTextField(
+                          child: _buildAutocompleteField(
                             controller: _nomController,
                             label: 'Nom',
-                            hintText: 'Ex: DUPONT',
+                            hintText: 'Ex: Soumah',
                             icon: Icons.person,
                             isRequired: true,
+                            suggestions: _nomsSuggestions,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildTextField(
+                          child: _buildAutocompleteField(
                             controller: _prenomController,
                             label: 'Prénom',
-                            hintText: 'Ex: Jean-Luc',
+                            hintText: 'Ex:Fode Momo',
                             icon: Icons.person_outline,
                             isRequired: true,
+                            suggestions: _prenomsSuggestions,
                           ),
                         ),
                       ],
@@ -819,12 +863,13 @@ class _AddStudentModalState extends State<AddStudentModal> {
                         Expanded(child: _buildDateField()),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildTextField(
+                          child: _buildAutocompleteField(
                             controller: _lieuNaissanceController,
                             label: 'Lieu de naissance',
                             hintText: 'Ex: Conakry, Guinée',
                             icon: Icons.location_on,
                             isRequired: true,
+                            suggestions: _localitesSuggestions,
                           ),
                         ),
                       ],
@@ -936,12 +981,13 @@ class _AddStudentModalState extends State<AddStudentModal> {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: _buildAutocompleteField(
                   controller: _prenomPereController,
                   label: 'Prénom du Père',
                   hintText: 'Prénom',
                   icon: Icons.person_outline,
                   isRequired: false,
+                  suggestions: _prenomsSuggestions,
                 ),
               ),
             ],
@@ -950,22 +996,24 @@ class _AddStudentModalState extends State<AddStudentModal> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: _buildAutocompleteField(
                   controller: _nomMereController,
                   label: 'Nom de la Mère',
                   hintText: 'Nom',
                   icon: Icons.person,
                   isRequired: false,
+                  suggestions: _nomsSuggestions,
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: _buildAutocompleteField(
                   controller: _prenomMereController,
                   label: 'Prénom de la Mère',
                   hintText: 'Prénom',
                   icon: Icons.person_outline,
                   isRequired: false,
+                  suggestions: _prenomsSuggestions,
                 ),
               ),
             ],
@@ -1321,68 +1369,15 @@ class _AddStudentModalState extends State<AddStudentModal> {
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Type d\'inscription',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'Fixe',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: TextEditingController(text: 'Nouveau'),
-                  readOnly: true,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(
-                      Icons.app_registration_rounded,
-                      size: 20,
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.withValues(alpha: 0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                        color: Colors.grey.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    suffixIcon: const Icon(
-                      Icons.lock_outline,
-                      size: 16,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-              ],
+            child: _buildDropdownField(
+              label: 'Type d\'inscription',
+              selectedValue: _selectedTypeInscription,
+              values: ['inscrit', 'reinscrit'],
+              displayValues: ['Inscription', 'Réinscription'],
+              onChanged: (v) {
+                if (v != null) setState(() => _selectedTypeInscription = v);
+              },
+              isRequired: true,
             ),
           ),
         ],
@@ -1590,7 +1585,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
                 child: _buildDropdownField(
                   label: 'Mode de paiement',
                   selectedValue: _selectedModePaiement,
-                  values: ['especes', 'virement', 'cheque', 'mobile_money'],
+                  values: ['Espèces', 'virement', 'cheque', 'mobile_money'],
                   displayValues: [
                     'Espèces',
                     'Virement bancaire',
@@ -1946,6 +1941,139 @@ class _AddStudentModalState extends State<AddStudentModal> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildAutocompleteField({
+    required TextEditingController controller,
+    required String label,
+    String? hintText,
+    required IconData icon,
+    required bool isRequired,
+    required List<String> suggestions,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return RawAutocomplete<String>(
+      textEditingController: controller,
+      focusNode: FocusNode(),
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text.isEmpty) {
+          return const Iterable<String>.empty();
+        }
+        return suggestions.where((String option) {
+          return option.toLowerCase().contains(
+            textEditingValue.text.toLowerCase(),
+          );
+        });
+      },
+      onSelected: (String selection) {
+        controller.text = selection;
+        if (mounted) setState(() {});
+      },
+      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isRequired ? '$label *' : label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white70 : Colors.blueGrey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: textController,
+              focusNode: focusNode,
+              onFieldSubmitted: (value) => onFieldSubmitted(),
+              style: TextStyle(
+                fontSize: 15,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              decoration: InputDecoration(
+                hintText: hintText,
+                prefixIcon: Icon(
+                  icon,
+                  size: 20,
+                  color: AppTheme.primaryColor.withValues(alpha: 0.7),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white10 : Colors.grey.shade200,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white10 : Colors.grey.shade200,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primaryColor,
+                    width: 1.5,
+                  ),
+                ),
+                filled: true,
+                fillColor: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.white,
+                hintStyle: TextStyle(
+                  color: isDark ? Colors.white24 : Colors.grey.shade400,
+                  fontSize: 14,
+                ),
+              ),
+              validator: (value) {
+                if (isRequired && (value == null || value.isEmpty)) {
+                  return 'Ce champ est obligatoire';
+                }
+                return null;
+              },
+            ),
+          ],
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(14),
+            color: isDark ? const Color(0xFF1F2937) : Colors.white,
+            child: Container(
+              width: 300,
+              constraints: const BoxConstraints(maxHeight: 250),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final String option = options.elementAt(index);
+                  return ListTile(
+                    title: Text(
+                      option,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    onTap: () => onSelected(option),
+                    hoverColor: isDark ? Colors.white10 : Colors.grey.shade100,
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

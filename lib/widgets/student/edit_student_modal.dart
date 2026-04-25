@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:camera/camera.dart';
@@ -44,9 +46,15 @@ class _EditStudentModalState extends State<EditStudentModal> {
   File? _tempCapturedImage;
   bool _isLoading = false;
 
+  // Autocomplete data
+  List<String> _prenomsSuggestions = [];
+  List<String> _nomsSuggestions = [];
+  List<String> _localitesSuggestions = [];
+
   @override
   void initState() {
     super.initState();
+    _loadAutocompleteData();
     _nomController = TextEditingController(text: widget.student.nom);
     _prenomController = TextEditingController(text: widget.student.prenom);
     _matriculeController = TextEditingController(
@@ -77,6 +85,40 @@ class _EditStudentModalState extends State<EditStudentModal> {
     if (widget.student.photo.isNotEmpty &&
         File(widget.student.photo).existsSync()) {
       _selectedImage = File(widget.student.photo);
+    }
+  }
+
+  Future<void> _loadAutocompleteData() async {
+    try {
+      final String prenomsJson = await rootBundle.loadString(
+        'assets/prenoms_guinee.json',
+      );
+      final String nomsJson = await rootBundle.loadString(
+        'assets/ListeNomFamilles.json',
+      );
+      final String localitesJson = await rootBundle.loadString(
+        'assets/localites_frequentes.json',
+      );
+
+      final prenomsData = json.decode(prenomsJson);
+      final nomsData = json.decode(nomsJson);
+      final localitesData = json.decode(localitesJson);
+
+      if (mounted) {
+        setState(() {
+          _prenomsSuggestions = List<String>.from(
+            prenomsData['prenoms_guinee'] ?? [],
+          );
+          _nomsSuggestions = List<String>.from(
+            nomsData['noms_famille_guinee'] ?? [],
+          );
+          _localitesSuggestions = List<String>.from(
+            localitesData['localites_frequentes'] ?? [],
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du chargement des autocomplétions: $e');
     }
   }
 
@@ -445,22 +487,24 @@ class _EditStudentModalState extends State<EditStudentModal> {
                     Row(
                       children: [
                         Expanded(
-                          child: _buildTextField(
+                          child: _buildAutocompleteField(
                             controller: _nomController,
                             label: 'Nom',
                             hintText: 'Ex: DUPONT',
                             icon: Icons.person,
                             isRequired: true,
+                            suggestions: _nomsSuggestions,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildTextField(
+                          child: _buildAutocompleteField(
                             controller: _prenomController,
                             label: 'Prénom',
                             hintText: 'Ex: Jean-Luc',
                             icon: Icons.person_outline,
                             isRequired: true,
+                            suggestions: _prenomsSuggestions,
                           ),
                         ),
                       ],
@@ -499,12 +543,13 @@ class _EditStudentModalState extends State<EditStudentModal> {
                         Expanded(child: _buildDateField()),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildTextField(
+                          child: _buildAutocompleteField(
                             controller: _lieuNaissanceController,
                             label: 'Lieu de naissance',
                             hintText: 'Ex: Conakry, Guinée',
                             icon: Icons.location_on,
                             isRequired: true,
+                            suggestions: _localitesSuggestions,
                           ),
                         ),
                       ],
@@ -952,6 +997,139 @@ class _EditStudentModalState extends State<EditStudentModal> {
     );
   }
 
+  Widget _buildAutocompleteField({
+    required TextEditingController controller,
+    required String label,
+    String? hintText,
+    required IconData icon,
+    required bool isRequired,
+    required List<String> suggestions,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return RawAutocomplete<String>(
+      textEditingController: controller,
+      focusNode: FocusNode(),
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text.isEmpty) {
+          return const Iterable<String>.empty();
+        }
+        return suggestions.where((String option) {
+          return option.toLowerCase().contains(
+            textEditingValue.text.toLowerCase(),
+          );
+        });
+      },
+      onSelected: (String selection) {
+        controller.text = selection;
+        if (mounted) setState(() {});
+      },
+      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isRequired ? '$label *' : label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white70 : Colors.blueGrey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: textController,
+              focusNode: focusNode,
+              onFieldSubmitted: (value) => onFieldSubmitted(),
+              style: TextStyle(
+                fontSize: 15,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              decoration: InputDecoration(
+                hintText: hintText,
+                prefixIcon: Icon(
+                  icon,
+                  size: 20,
+                  color: AppTheme.primaryColor.withValues(alpha: 0.7),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white10 : Colors.grey.shade200,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white10 : Colors.grey.shade200,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primaryColor,
+                    width: 1.5,
+                  ),
+                ),
+                filled: true,
+                fillColor: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.white,
+                hintStyle: TextStyle(
+                  color: isDark ? Colors.white24 : Colors.grey.shade400,
+                  fontSize: 14,
+                ),
+              ),
+              validator: (value) {
+                if (isRequired && (value == null || value.isEmpty)) {
+                  return 'Ce champ est obligatoire';
+                }
+                return null;
+              },
+            ),
+          ],
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(14),
+            color: isDark ? const Color(0xFF1F2937) : Colors.white,
+            child: Container(
+              width: 300,
+              constraints: const BoxConstraints(maxHeight: 250),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final String option = options.elementAt(index);
+                  return ListTile(
+                    title: Text(
+                      option,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    onTap: () => onSelected(option),
+                    hoverColor: isDark ? Colors.white10 : Colors.grey.shade100,
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildParentsInfo() {
     return _buildSection(
       title: 'Informations des Parents',
@@ -961,22 +1139,24 @@ class _EditStudentModalState extends State<EditStudentModal> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: _buildAutocompleteField(
                   controller: _nomPereController,
                   label: 'Nom du Père',
                   hintText: 'Nom',
                   icon: Icons.person,
                   isRequired: false,
+                  suggestions: _nomsSuggestions,
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: _buildAutocompleteField(
                   controller: _prenomPereController,
                   label: 'Prénom du Père',
                   hintText: 'Prénom',
                   icon: Icons.person_outline,
                   isRequired: false,
+                  suggestions: _prenomsSuggestions,
                 ),
               ),
             ],
@@ -985,22 +1165,24 @@ class _EditStudentModalState extends State<EditStudentModal> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: _buildAutocompleteField(
                   controller: _nomMereController,
                   label: 'Nom de la Mère',
                   hintText: 'Nom',
                   icon: Icons.person,
                   isRequired: false,
+                  suggestions: _nomsSuggestions,
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: _buildAutocompleteField(
                   controller: _prenomMereController,
                   label: 'Prénom de la Mère',
                   hintText: 'Prénom',
                   icon: Icons.person_outline,
                   isRequired: false,
+                  suggestions: _prenomsSuggestions,
                 ),
               ),
             ],

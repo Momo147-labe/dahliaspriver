@@ -86,6 +86,9 @@ flutter:
     - assets/images/drapeau_guinee.png
     - assets/images/logo_ecole.png
     - assets/images/photo_eleve.png
+    - assets/prenoms_guinee.json
+    - assets/localites_frequentes.json
+    - assets/ListeNomFamilles.json
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

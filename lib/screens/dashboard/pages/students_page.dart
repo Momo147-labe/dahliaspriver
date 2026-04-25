@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import '../../../core/database/daos/eleve_dao.dart';
 import '../../../core/database/database_helper.dart';
@@ -23,6 +24,7 @@ class StudentsPage extends StatefulWidget {
 
 class _StudentsPageState extends State<StudentsPage> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchTimer;
   bool _isLoading = false;
   bool _showFilters = false;
 
@@ -51,6 +53,49 @@ class _StudentsPageState extends State<StudentsPage> {
   Map<String, int> _classesStats = {};
   List<Map<String, dynamic>> _allClasses =
       []; // All classes with IDs and levels
+
+  // Animation pour les stats par classe
+  late PageController _classStatsController;
+  Timer? _statsTimer;
+  int _currentStatsPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _classStatsController = PageController();
+    _startStatsAnimation();
+  }
+
+  void _startStatsAnimation() {
+    _statsTimer?.cancel();
+    _statsTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (!mounted || _classesStats.isEmpty) return;
+
+      int totalItems = _classesStats.length;
+      if (totalItems <= 4) return;
+
+      int totalPages = (totalItems / 4).ceil();
+      _currentStatsPage = (_currentStatsPage + 1) % totalPages;
+
+      if (_classStatsController.hasClients) {
+        _classStatsController.animateToPage(
+          _currentStatsPage,
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeInOut,
+        );
+        setState(() {}); // Pour mettre à jour les indicateurs
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _statsTimer?.cancel();
+    _classStatsController.dispose();
+    _searchTimer?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -196,15 +241,18 @@ class _StudentsPageState extends State<StudentsPage> {
     }
   }
 
-  Future<void> _loadData(int anneeId) async {
+  Future<void> _loadData(int anneeId, {bool loadStats = true}) async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
     try {
       final eleveDao = EleveDao(await DatabaseHelper.instance.database);
 
-      // 1. Charger les statistiques globales et par classe
-      final analytics = await eleveDao.getStudentAnalytics(anneeId);
+      // 1. Charger les statistiques globales uniquement si demandé
+      Map<String, dynamic>? analytics;
+      if (loadStats) {
+        analytics = await eleveDao.getStudentAnalytics(anneeId);
+      }
 
       // 2. Charger le nombre total filtré pour la pagination
       final totalCount = await eleveDao.getElevesFilteredCount(
@@ -244,7 +292,9 @@ class _StudentsPageState extends State<StudentsPage> {
       setState(() {
         _filteredStudents = students;
         _totalItems = totalCount;
-        _updateDisplayStats(analytics);
+        if (loadStats && analytics != null) {
+          _updateDisplayStats(analytics);
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -279,12 +329,16 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   void _filterStudents() {
-    setState(() {
-      _currentPage = 0;
+    _searchTimer?.cancel();
+    _searchTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      setState(() {
+        _currentPage = 0;
+      });
+      if (_lastLoadedAnneeId != null) {
+        _loadData(_lastLoadedAnneeId!, loadStats: false);
+      }
     });
-    if (_lastLoadedAnneeId != null) {
-      _loadData(_lastLoadedAnneeId!);
-    }
   }
 
   @override
@@ -296,7 +350,7 @@ class _StudentsPageState extends State<StudentsPage> {
       backgroundColor: isDark
           ? const Color(0xFF111827)
           : const Color(0xFFF9FAFB),
-      body: _isLoading
+      body: (_isLoading && _filteredStudents.isEmpty)
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -554,6 +608,15 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   Widget _buildDistributionCards(bool isDark) {
+    // Préparer les données par classe en paquets de 4
+    final entries = _classesStats.entries.toList();
+    final List<List<MapEntry<String, int>>> chunks = [];
+    for (var i = 0; i < entries.length; i += 4) {
+      chunks.add(
+        entries.sublist(i, i + 4 > entries.length ? entries.length : i + 4),
+      );
+    }
+
     return Row(
       children: [
         Expanded(
@@ -583,32 +646,79 @@ class _StudentsPageState extends State<StudentsPage> {
         Expanded(
           child: _buildDistributionCard(
             'Répartition par Classe',
-            _classesStats.entries
-                .map(
-                  (e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          e.key,
+            [
+              SizedBox(
+                height: 110, // Hauteur fixe pour 4 lignes
+                child: chunks.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Aucune donnée',
                           style: TextStyle(
                             color: isDark ? Colors.grey[400] : Colors.grey[600],
                             fontSize: 13,
                           ),
                         ),
-                        Text(
-                          '${e.value} élève${e.value > 1 ? 's' : ''}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
+                      )
+                    : PageView.builder(
+                        controller: _classStatsController,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: chunks.length,
+                        itemBuilder: (context, index) {
+                          return Column(
+                            children: chunks[index]
+                                .map(
+                                  (e) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          e.key,
+                                          style: TextStyle(
+                                            color: isDark
+                                                ? Colors.grey[400]
+                                                : Colors.grey[600],
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${e.value} élève${e.value > 1 ? 's' : ''}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          );
+                        },
+                      ),
+              ),
+              if (chunks.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(chunks.length, (dotIndex) {
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _currentStatsPage == dotIndex
+                              ? Colors.green
+                              : (isDark ? Colors.white24 : Colors.grey[300]),
                         ),
-                      ],
-                    ),
+                      );
+                    }),
                   ),
-                )
-                .toList(),
+                ),
+            ],
             isDark,
             Icons.class_outlined,
             Colors.green,
@@ -891,11 +1001,22 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   Widget _buildStudentsList(BuildContext context, bool isDark) {
-    if (MediaQuery.of(context).size.width > 1000) {
-      return _buildDesktopTable(isDark);
-    } else {
-      return _buildMobileCards(isDark);
-    }
+    return Column(
+      children: [
+        if (_isLoading && _filteredStudents.isNotEmpty)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: LinearProgressIndicator(
+              minHeight: 2,
+              backgroundColor: Colors.transparent,
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+            ),
+          ),
+        MediaQuery.of(context).size.width > 1000
+            ? _buildDesktopTable(isDark)
+            : _buildMobileCards(isDark),
+      ],
+    );
   }
 
   Widget _buildDesktopTable(bool isDark) {
@@ -1418,7 +1539,12 @@ class _StudentsPageState extends State<StudentsPage> {
             children: [
               IconButton(
                 onPressed: _currentPage > 0
-                    ? () => setState(() => _currentPage--)
+                    ? () {
+                        setState(() => _currentPage--);
+                        if (_lastLoadedAnneeId != null) {
+                          _loadData(_lastLoadedAnneeId!);
+                        }
+                      }
                     : null,
                 icon: const Icon(Icons.chevron_left),
                 color: AppTheme.primaryColor,
@@ -1435,7 +1561,12 @@ class _StudentsPageState extends State<StudentsPage> {
               const SizedBox(width: 8),
               IconButton(
                 onPressed: _currentPage < totalPages - 1
-                    ? () => setState(() => _currentPage++)
+                    ? () {
+                        setState(() => _currentPage++);
+                        if (_lastLoadedAnneeId != null) {
+                          _loadData(_lastLoadedAnneeId!);
+                        }
+                      }
                     : null,
                 icon: const Icon(Icons.chevron_right),
                 color: AppTheme.primaryColor,
