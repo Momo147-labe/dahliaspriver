@@ -83,9 +83,11 @@ class StudentCardDesign extends StatelessWidget {
                         letterSpacing: 0.5,
                       ),
                     ),
-                    const Text(
-                      'DISCIPLINE - TRAVAIL - PROGRÈS',
-                      style: TextStyle(
+                    Text(
+                      ecole?.slogan?.isNotEmpty == true
+                          ? ecole!.slogan!.toUpperCase()
+                          : 'DISCIPLINE - TRAVAIL - PROGRÈS',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 7,
                         fontWeight: FontWeight.w500,
@@ -174,9 +176,9 @@ class StudentCardDesign extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Ministère de l\'Éducation Nationale de l\'Alphabétisation et de la Promotion des Langues Nationales',
+                    'Ministère de l\'enseignement \n pré-universitaire et de l\'alphabétisation',
                     style: TextStyle(
-                      fontSize: 5.5,
+                      fontSize: 7,
                       fontWeight: FontWeight.w500,
                       color: Colors.grey[800],
                     ),

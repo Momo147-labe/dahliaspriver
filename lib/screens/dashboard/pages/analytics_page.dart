@@ -6,6 +6,8 @@ import '../../../providers/academic_year_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
+import '../../../services/pdf/analytics_pdf_service.dart';
 
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
@@ -16,6 +18,7 @@ class AnalyticsPage extends StatefulWidget {
 
 class _AnalyticsPageState extends State<AnalyticsPage> {
   bool _isLoading = true;
+  bool _isExporting = false;
   Map<String, dynamic> _studentData = {};
   Map<String, dynamic> _financialData = {};
   Map<String, dynamic> _academicData = {};
@@ -38,6 +41,50 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   void initState() {
     super.initState();
     _loadAnalytics();
+  }
+
+  Future<void> _exportAnalyticsPdf() async {
+    if (_currentYearId == null || _isExporting) return;
+    setState(() => _isExporting = true);
+    try {
+      final db = DatabaseHelper.instance;
+      final schoolInfo =
+          (await db.getConfigurationEcole(_currentYearId!)) ?? {};
+      final activeAnnee = await db.anneeScolaireDao.getActiveAnnee();
+      final yearLabel = activeAnnee?['annee']?.toString() ?? '';
+
+      await AnalyticsPdfService.generateAndPrint(
+        schoolInfo: schoolInfo,
+        academicYear: yearLabel,
+        studentData: _studentData,
+        financialData: _financialData,
+        academicData: _academicData,
+        classData: _classData,
+        teacherData: _teacherData,
+        ageDistribution: _ageDistribution,
+        geographicDistribution: _geographicDistribution,
+        genderStatsByCycle: _genderStatsByCycle,
+        subjectPerformance: _subjectPerformance,
+        teacherPerformanceStats: _teacherPerformanceStats,
+        monthlyCollectionCurve: _monthlyCollectionCurve,
+        schoolLogo:
+            schoolInfo['logo'] != null &&
+                File(schoolInfo['logo'].toString()).existsSync()
+            ? await File(schoolInfo['logo'].toString()).readAsBytes()
+            : null,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur export PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
   }
 
   @override
@@ -262,6 +309,29 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           icon: const Icon(Icons.refresh),
           tooltip: 'Actualiser',
         ),
+        const SizedBox(width: 8),
+        _isExporting
+            ? const SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : ElevatedButton.icon(
+                onPressed: _exportAnalyticsPdf,
+                icon: const Icon(Icons.picture_as_pdf, size: 18),
+                label: const Text('Exporter PDF'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
       ],
     );
   }
@@ -1357,12 +1427,15 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       isDark: isDark,
       child: Column(
         children: _subjectPerformance.map((e) {
-          final avg = ((e['avg_grade'] ?? 0.0) as num).toDouble();
+          final avg = ((e['avg_note'] ?? 0.0) as num).toDouble();
           final color = avg >= 10 ? Colors.green : Colors.red;
 
           return ListTile(
             dense: true,
-            title: Text(e['nom'] ?? '', style: const TextStyle(fontSize: 12)),
+            title: Text(
+              e['matiere_nom'] ?? '',
+              style: const TextStyle(fontSize: 12),
+            ),
             trailing: Text(
               avg.toStringAsFixed(2),
               style: TextStyle(
@@ -1433,11 +1506,11 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       isDark: isDark,
       child: Column(
         children: _teacherPerformanceStats.map((e) {
-          final avg = ((e['avg_grade'] ?? 0.0) as num).toDouble();
+          final avg = ((e['avg_note'] ?? 0.0) as num).toDouble();
           return ListTile(
             dense: true,
             title: Text(
-              e['nom_complet'] ?? '',
+              e['enseignant_nom'] ?? '',
               style: const TextStyle(fontSize: 12),
             ),
             trailing: Text(

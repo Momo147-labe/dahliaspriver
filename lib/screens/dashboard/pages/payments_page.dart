@@ -10,6 +10,8 @@ import '../../../core/database/database_helper.dart';
 import '../../../theme/app_theme.dart';
 import '../../../providers/academic_year_provider.dart';
 import '../../../widgets/reports/payment_receipt_pdf.dart';
+import '../../../widgets/reports/payment_history_pdf.dart';
+import '../../../services/excel_export_service.dart';
 import 'payment/new_payment_page.dart';
 import 'payment/payment_control_page.dart';
 
@@ -263,7 +265,7 @@ class _PaymentsPageState extends State<PaymentsPage>
           ),
         ),
         OutlinedButton.icon(
-          onPressed: () {}, // Implementation later
+          onPressed: _isLoading ? null : _exportPayments,
           icon: const Icon(Symbols.download),
           label: const Text('Exporter'),
           style: OutlinedButton.styleFrom(
@@ -971,6 +973,16 @@ class _PaymentsPageState extends State<PaymentsPage>
             ),
             DataColumn(
               label: Text(
+                'MATRICULE',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
                 'CLASSE',
                 style: TextStyle(
                   fontSize: 13,
@@ -1070,6 +1082,15 @@ class _PaymentsPageState extends State<PaymentsPage>
                         ),
                       ),
                     ],
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    t['eleve_matricule']?.toString() ?? '-',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 ),
                 DataCell(Text(t['classe_nom'] ?? 'N/A')),
@@ -1192,6 +1213,101 @@ class _PaymentsPageState extends State<PaymentsPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la génération du reçu : $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _exportPayments() async {
+    final String? selectedFormat = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Format d'exportation"),
+          content: const Text(
+            "Choisissez le format pour exporter l'historique des paiements :",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'PDF'),
+              child: const Text('PDF', style: TextStyle(color: Colors.red)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'EXCEL'),
+              child: const Text('EXCEL', style: TextStyle(color: Colors.green)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (selectedFormat == null) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final anneeId = context.read<AcademicYearProvider>().selectedAnneeId;
+      if (anneeId == null) throw Exception("Année scolaire non sélectionnée");
+
+      final annee = context.read<AcademicYearProvider>().allAnnees.firstWhere(
+        (a) => a['id'] == anneeId,
+      );
+
+      final schoolInfo = await dbHelper.getEcoleInfo();
+
+      // Fetch all transactions for the year without pagination limit
+      final transactions = await dbHelper.getRecentTransactions(
+        anneeId,
+        limit: 999999, // Get all
+        searchQuery: _searchQuery,
+        modeFilter: _selectedModeFilter,
+      );
+
+      if (transactions.isEmpty) {
+        throw Exception("Aucun paiement trouvé pour l'export.");
+      }
+
+      if (selectedFormat == 'EXCEL') {
+        final path = await ExcelExportService.instance.generatePaymentsExport(
+          transactions: transactions,
+          schoolInfo: schoolInfo,
+          academicYear: annee['annee']?.toString() ?? '',
+        );
+
+        if (!mounted) return;
+
+        if (path != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Historique exporté avec succès (Documents)"),
+              backgroundColor: Colors.teal,
+            ),
+          );
+        } else {
+          throw Exception("Échec de la génération Excel");
+        }
+      } else if (selectedFormat == 'PDF') {
+        Uint8List? schoolLogo;
+        if (schoolInfo['logo'] != null &&
+            File(schoolInfo['logo']).existsSync()) {
+          schoolLogo = await File(schoolInfo['logo']).readAsBytes();
+        }
+
+        await PaymentHistoryPdf.generateAndPrint(
+          transactions: transactions,
+          schoolInfo: schoolInfo,
+          schoolLogo: schoolLogo,
+          academicYear: annee['annee']?.toString() ?? '',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erreur lors de l'exportation: $e"),
             backgroundColor: Colors.red,
           ),
         );

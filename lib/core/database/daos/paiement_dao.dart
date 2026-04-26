@@ -297,7 +297,7 @@ class PaiementDao extends BaseDao {
   }) async {
     String queryStr =
         '''
-      SELECT pd.*, e.nom as eleve_nom, e.prenom as eleve_prenom, e.id as eleve_id, e.photo as eleve_photo, 
+      SELECT pd.*, e.nom as eleve_nom, e.prenom as eleve_prenom, e.id as eleve_id, e.photo as eleve_photo, e.matricule as eleve_matricule,
              c.nom as classe_nom, u.nom_complet as agent_nom, u.pseudo as agent_pseudo
       FROM ${PaiementDetailSchema.tableName} pd
       JOIN eleve e ON pd.eleve_id = e.id

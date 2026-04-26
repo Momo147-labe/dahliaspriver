@@ -519,6 +519,7 @@ class _PaiementEnseignantModalState extends State<_PaiementEnseignantModal> {
   String _modePaiement = 'Espèces';
   DateTime _datePaiement = DateTime.now();
   bool _isSaving = false;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -539,6 +540,12 @@ class _PaiementEnseignantModalState extends State<_PaiementEnseignantModal> {
       _modePaiement = widget.payment!['mode_paiement'];
       _datePaiement = DateTime.parse(widget.payment!['date_paiement']);
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   String _getMonthName(int month) {
@@ -655,6 +662,7 @@ class _PaiementEnseignantModalState extends State<_PaiementEnseignantModal> {
           child: Form(
             key: _formKey,
             child: SingleChildScrollView(
+              controller: _scrollController,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,

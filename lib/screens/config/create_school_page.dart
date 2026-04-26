@@ -15,6 +15,7 @@ class CreateSchoolPage extends StatefulWidget {
 
 class _CreateSchoolPageState extends State<CreateSchoolPage> {
   final schoolNameCtrl = TextEditingController();
+  final sloganCtrl = TextEditingController();
   final founderCtrl = TextEditingController();
   final directorCtrl = TextEditingController();
   final addressCtrl = TextEditingController();
@@ -335,6 +336,14 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
           label: "Nom de l'école",
           hint: "Ex: Lycée de Conakry",
           icon: Icons.school,
+          isDark: isDark,
+        ),
+        const SizedBox(height: 20),
+        _buildEnhancedTextField(
+          controller: sloganCtrl,
+          label: "Slogan / Devise",
+          hint: "Ex: Discipline - Travail - Progrès",
+          icon: Icons.format_quote_outlined,
           isDark: isDark,
         ),
         const SizedBox(height: 20),
@@ -842,6 +851,7 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
 
       final schoolData = {
         'nom': schoolNameCtrl.text.trim(),
+        'slogan': sloganCtrl.text.trim(),
         'fondateur': founderCtrl.text.trim(),
         'directeur': directorCtrl.text.trim(),
         'adresse': addressCtrl.text.trim(),

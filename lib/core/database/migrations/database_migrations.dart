@@ -1270,6 +1270,14 @@ class DatabaseMigrations {
         debugPrint('Erreur migration v63: $e');
       }
     }
+
+    if (oldVersion < 64) {
+      await addColumnSafely(db, 'averages', 'mention', 'TEXT');
+    }
+
+    if (oldVersion < 65) {
+      await addColumnSafely(db, 'ecole', 'slogan', 'TEXT');
+    }
   }
 
   static Future<void> addColumnSafely(

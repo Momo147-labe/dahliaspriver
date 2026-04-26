@@ -108,6 +108,9 @@ class NotesDao extends BaseDao {
     } else {
       await db.insert(NotesSchema.tableName, noteData);
     }
+
+    // Trigger rank calculation for the class
+    await calculerRangsClasse(classeId, noteData['annee_scolaire_id'] as int);
   }
 
   Future<Map<String, dynamic>> getGradesStats(
@@ -562,6 +565,31 @@ class NotesDao extends BaseDao {
   }
 
   Future<void> calculerRangsClasse(int classeId, int anneeId) async {
+    // 1. Get class cycle info
+    final classInfo = await db.rawQuery(
+      '''
+      SELECT c.*, cy.id as cycle_id
+      FROM classe c
+      LEFT JOIN cycles_scolaires cy ON c.cycle_id = cy.id
+      WHERE c.id = ?
+    ''',
+      [classeId],
+    );
+
+    int? cycleId;
+    if (classInfo.isNotEmpty) {
+      cycleId = classInfo.first['cycle_id'] as int?;
+    }
+
+    // 2. Get mentions for this cycle (or global if cycle null)
+    final mentions = await db.query(
+      'mention_config',
+      where: cycleId == null ? 'cycle_id IS NULL' : 'cycle_id = ?',
+      whereArgs: cycleId == null ? [] : [cycleId],
+      orderBy: 'note_min DESC',
+    );
+
+    // 3. Get students in class
     final eleves = await db.query(
       'eleve_parcours',
       where: 'classe_id = ? AND annee_scolaire_id = ?',
@@ -575,9 +603,26 @@ class NotesDao extends BaseDao {
         eleve['eleve_id'] as int,
         anneeId,
       );
-      resultats.add({'eleve_id': eleve['eleve_id'], 'moyenne': moyenne});
+
+      // Find mention
+      String? mentionLabel;
+      for (var m in mentions) {
+        final double min = (m['note_min'] as num?)?.toDouble() ?? 0.0;
+        final double max = (m['note_max'] as num?)?.toDouble() ?? 20.0;
+        if (moyenne >= min && moyenne <= max) {
+          mentionLabel = m['label'] as String?;
+          break;
+        }
+      }
+
+      resultats.add({
+        'eleve_id': eleve['eleve_id'],
+        'moyenne': moyenne,
+        'mention': mentionLabel,
+      });
     }
 
+    // 4. Sort and save
     resultats.sort(
       (a, b) => (b['moyenne'] as double).compareTo(a['moyenne'] as double),
     );
@@ -588,6 +633,7 @@ class NotesDao extends BaseDao {
         'annee_scolaire_id': anneeId,
         'moyenne': resultats[i]['moyenne'],
         'rang': i + 1,
+        'mention': resultats[i]['mention'],
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }

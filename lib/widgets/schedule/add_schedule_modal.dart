@@ -207,20 +207,30 @@ class _AddScheduleModalState extends State<AddScheduleModal> {
           final fin = _formatTime(entryData.endTime);
 
           // Conflict check
-          final conflicts = await dbHelper.timetableDao.checkConflicts(
+          final conflict = await dbHelper.timetableDao.checkConflicts(
             entryData.day,
             debut,
             fin,
             enseignantId: entryData.enseignantId,
             classeId: widget.classeId,
             excludeId: widget.entry?.id,
+            anneeId: DatabaseHelper.activeAnneeId,
             txn: txn,
           );
 
-          if (conflicts > 0) {
-            throw Exception(
-              'Conflit détecté le ${_getDayName(entryData.day)} à $debut : l\'enseignant ou la classe est déjà occupé(e).',
-            );
+          if (conflict != null) {
+            String conflictMsg =
+                'Conflit détecté le ${_getDayName(entryData.day)} à $debut.';
+            if (conflict['classe_id'] == widget.classeId) {
+              conflictMsg +=
+                  ' La classe est déjà occupée par le cours de ${conflict['matiere_nom']}.';
+            } else if (entryData.enseignantId != null &&
+                conflict['enseignant_id'] == entryData.enseignantId) {
+              final ensNom = conflict['enseignant_nom'] ?? 'l\'enseignant';
+              conflictMsg +=
+                  ' $ensNom est déjà occupé(e) en classe de ${conflict['classe_nom']}.';
+            }
+            throw Exception(conflictMsg);
           }
 
           final entry = EmploiDuTemps(

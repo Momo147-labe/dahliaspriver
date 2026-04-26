@@ -195,7 +195,9 @@ class StudentCardPdfService {
                     ),
                   ),
                   pw.Text(
-                    'DISCIPLINE - TRAVAIL - PROGRÈS',
+                    ecole?.slogan?.isNotEmpty == true
+                        ? ecole!.slogan!.toUpperCase()
+                        : 'DISCIPLINE - TRAVAIL - PROGRÈS',
                     style: pw.TextStyle(color: PdfColors.white, fontSize: 6),
                   ),
                 ],
@@ -265,8 +267,8 @@ class StudentCardPdfService {
                 ),
                 pw.SizedBox(height: 2),
                 pw.Text(
-                  'Ministère de l\'Éducation Nationale de l\'Alphabétisation et de la Promotion des Langues Nationales',
-                  style: const pw.TextStyle(fontSize: 4.5),
+                  'Ministère de l\'enseignement \n pré-universitaire et de l\'alphabétisation',
+                  style: const pw.TextStyle(fontSize: 7),
                   textAlign: pw.TextAlign.center,
                   maxLines: 2,
                 ),

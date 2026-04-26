@@ -3,6 +3,7 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../theme/app_theme.dart';
+import '../../services/excel_export_service.dart';
 import '../../widgets/reports/grade_blank_sheet_pdf_helper.dart';
 
 class GradeSheetSelectionModal extends StatefulWidget {
@@ -32,6 +33,7 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
   int? _selectedTrimestre;
   bool _isLoading = true;
   bool _isGenerating = false;
+  String _selectedFormat = "PDF"; // "PDF" or "EXCEL"
 
   @override
   void initState() {
@@ -123,9 +125,22 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
       final ecole = await widget.dbHelper.getEcole();
 
       // 4. Get sequences for the trimester
-      final allSequences = await widget.dbHelper.getSequencesPlanification(
-        widget.anneeId,
-      );
+      List<Map<String, dynamic>> allSequences = await widget.dbHelper
+          .getSequencesPlanification(widget.anneeId);
+
+      // FALLBACK: If no planning exists, provide a default structure (3 trimesters, 2 sequences each)
+      if (allSequences.isEmpty) {
+        allSequences = List.generate(6, (index) {
+          int tri = (index / 2).floor() + 1;
+          int seq = index + 1;
+          return {
+            'numero_sequence': seq,
+            'trimestre': tri,
+            'nom': 'Séquence $seq',
+          };
+        });
+      }
+
       final trimesterSequences = allSequences
           .where((s) => s['trimestre'] == _selectedTrimestre)
           .toList();
@@ -135,10 +150,57 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
         ),
       );
 
-      if (trimesterSequences.isEmpty) {
+      if (trimesterSequences.isEmpty && _selectedFormat == "PDF") {
         throw Exception(
           "Aucune séquence planifiée pour ce trimestre dans l'année active",
         );
+      }
+
+      if (students.isEmpty) {
+        throw Exception("Aucun élève trouvé dans cette classe.");
+      }
+
+      if (_selectedFormat == "EXCEL") {
+        // Prepare data for ExcelExportService
+        Map<int, List<Map<String, dynamic>>> fullSequencesMap = {};
+
+        final allTrimesters =
+            allSequences.map((s) => s['trimestre'] as int).toSet().toList()
+              ..sort();
+        for (int t in allTrimesters) {
+          fullSequencesMap[t] =
+              allSequences.where((s) => s['trimestre'] == t).toList()..sort(
+                (a, b) => (a['numero_sequence'] as int).compareTo(
+                  b['numero_sequence'] as int,
+                ),
+              );
+        }
+
+        final path = await ExcelExportService.instance.generateGradeTemplate(
+          className: _selectedClass!['nom'],
+          subjectName: _selectedSubject!['nom'],
+          students: students,
+          trimesters: allTrimesters,
+          trimesterSequences: fullSequencesMap,
+          schoolInfo: ecole?.toMap() ?? {},
+          teacherName: teacherName,
+          academicYear: anneeNom,
+        );
+
+        if (!mounted) return;
+        Navigator.pop(context);
+
+        if (path != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Fiche Excel générée (Documents)"),
+              backgroundColor: Colors.teal,
+            ),
+          );
+        } else {
+          throw Exception("Échec de la génération Excel");
+        }
+        return;
       }
 
       // Generate PDF
@@ -232,6 +294,28 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
               return DropdownMenuItem<int>(value: t, child: Text(label));
             }).toList(),
             onChanged: (val) => setState(() => _selectedTrimestre = val),
+          ),
+          const SizedBox(height: 16),
+
+          // Format Dropdown
+          DropdownButtonFormField<String>(
+            dropdownColor: isDark ? AppTheme.surfaceDark : Colors.white,
+            style: TextStyle(
+              color: isDark ? Colors.white : AppTheme.textPrimary,
+            ),
+            decoration: _buildInputDecoration("Format d'exportation", isDark),
+            value: _selectedFormat,
+            items: const [
+              DropdownMenuItem(
+                value: "PDF",
+                child: Text("Fiche PDF (Impression)"),
+              ),
+              DropdownMenuItem(
+                value: "EXCEL",
+                child: Text("Modèle Excel (Saisie)"),
+              ),
+            ],
+            onChanged: (val) => setState(() => _selectedFormat = val!),
           ),
           const SizedBox(height: 16),
 

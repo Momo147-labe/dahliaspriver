@@ -1,6 +1,7 @@
 class Ecole {
   final int? id;
   final String nom;
+  final String? slogan;
   final String fondateur;
   final String directeur;
   final String? logo;
@@ -15,6 +16,7 @@ class Ecole {
   Ecole({
     this.id,
     required this.nom,
+    this.slogan,
     required this.fondateur,
     required this.directeur,
     this.logo,
@@ -31,6 +33,7 @@ class Ecole {
     return {
       'id': id,
       'nom': nom,
+      'slogan': slogan,
       'fondateur': fondateur,
       'directeur': directeur,
       'logo': logo,
@@ -46,6 +49,7 @@ class Ecole {
     return Ecole(
       id: map['id'],
       nom: map['nom'],
+      slogan: map['slogan'],
       fondateur: map['fondateur'],
       directeur: map['directeur'],
       logo: map['logo'],
@@ -62,6 +66,7 @@ class Ecole {
   Ecole copyWith({
     int? id,
     String? nom,
+    String? slogan,
     String? fondateur,
     String? directeur,
     String? logo,
@@ -74,6 +79,7 @@ class Ecole {
     return Ecole(
       id: id ?? this.id,
       nom: nom ?? this.nom,
+      slogan: slogan ?? this.slogan,
       fondateur: fondateur ?? this.fondateur,
       directeur: directeur ?? this.directeur,
       logo: logo ?? this.logo,

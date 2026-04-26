@@ -418,7 +418,8 @@ class ResultDao extends BaseDao {
       SELECT 
         AVG(n.note) as average_grade,
         COUNT(DISTINCT n.eleve_id) as students_graded,
-        COUNT(n.id) as total_grades
+        COUNT(n.id) as total_grades,
+        (CAST(SUM(CASE WHEN n.note >= 10.0 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(n.id)) * 100.0 as success_rate
       FROM notes n
       WHERE n.annee_scolaire_id = ?
     ''';
@@ -568,12 +569,16 @@ class ResultDao extends BaseDao {
   ) async {
     return await db.rawQuery(
       '''
-      SELECT m.nom, AVG(n.note) as avg_grade
+      SELECT 
+        m.nom as matiere_nom, 
+        AVG(n.note) as avg_note,
+        (CAST(SUM(CASE WHEN n.note >= 10.0 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(n.id)) * 100.0 as taux_reussite,
+        COUNT(n.id) as nombre_evaluations
       FROM notes n
       JOIN matiere m ON n.matiere_id = m.id
       WHERE n.annee_scolaire_id = ?
-      GROUP BY m.nom
-      ORDER BY avg_grade DESC
+      GROUP BY m.id
+      ORDER BY avg_note DESC
       ''',
       [anneeId],
     );
@@ -584,14 +589,19 @@ class ResultDao extends BaseDao {
   ) async {
     return await db.rawQuery(
       '''
-      SELECT ens.nom || ' ' || ens.prenom as nom_complet, AVG(n.note) as avg_grade
+      SELECT 
+        ens.nom || ' ' || ens.prenom as enseignant_nom, 
+        m.nom as matiere_nom,
+        AVG(n.note) as avg_note,
+        (CAST(SUM(CASE WHEN n.note >= 10.0 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(n.id)) * 100.0 as taux_reussite
       FROM notes n
       JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND n.annee_scolaire_id = ep.annee_scolaire_id
       JOIN attribution_enseignant ae ON n.matiere_id = ae.matiere_id AND ep.classe_id = ae.classe_id
       JOIN enseignant ens ON ae.enseignant_id = ens.id
+      JOIN matiere m ON n.matiere_id = m.id
       WHERE n.annee_scolaire_id = ?
-      GROUP BY nom_complet
-      ORDER BY avg_grade DESC
+      GROUP BY ens.id, m.id
+      ORDER BY avg_note DESC
       ''',
       [anneeId],
     );

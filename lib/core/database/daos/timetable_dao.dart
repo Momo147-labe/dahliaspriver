@@ -22,7 +22,7 @@ class TimetableDao extends BaseDao {
     );
   }
 
-  Future<int> checkConflicts(
+  Future<Map<String, dynamic>?> checkConflicts(
     int jour,
     String debut,
     String fin, {
@@ -34,35 +34,41 @@ class TimetableDao extends BaseDao {
   }) async {
     String queryStr =
         '''
-      SELECT COUNT(*) as count FROM ${EmploiDuTempsSchema.tableName}
-      WHERE jour_semaine = ? AND annee_scolaire_id = ?
+      SELECT edt.*, m.nom as matiere_nom, e.nom as enseignant_nom, e.prenom as enseignant_prenom, c.nom as classe_nom
+      FROM ${EmploiDuTempsSchema.tableName} edt
+      JOIN matiere m ON edt.matiere_id = m.id
+      JOIN classe c ON edt.classe_id = c.id
+      LEFT JOIN enseignant e ON edt.enseignant_id = e.id
+      WHERE edt.jour_semaine = ? AND edt.annee_scolaire_id = ?
       AND (
-        (heure_debut < ? AND heure_fin > ?) OR
-        (heure_debut < ? AND heure_fin > ?) OR
-        (heure_debut >= ? AND heure_fin <= ?)
+        (edt.heure_debut < ? AND edt.heure_fin > ?) OR
+        (edt.heure_debut < ? AND edt.heure_fin > ?) OR
+        (edt.heure_debut >= ? AND edt.heure_fin <= ?)
       )
     ''';
     List<dynamic> args = [jour, anneeId, fin, debut, fin, debut, debut, fin];
 
     if (enseignantId != null && classeId != null) {
-      queryStr += ' AND (enseignant_id = ? OR classe_id = ?)';
+      queryStr += ' AND (edt.enseignant_id = ? OR edt.classe_id = ?)';
       args.addAll([enseignantId, classeId]);
     } else if (enseignantId != null) {
-      queryStr += ' AND enseignant_id = ?';
+      queryStr += ' AND edt.enseignant_id = ?';
       args.add(enseignantId);
     } else if (classeId != null) {
-      queryStr += ' AND classe_id = ?';
+      queryStr += ' AND edt.classe_id = ?';
       args.add(classeId);
     }
 
     if (excludeId != null) {
-      queryStr += ' AND id != ?';
+      queryStr += ' AND edt.id != ?';
       args.add(excludeId);
     }
 
+    queryStr += ' LIMIT 1';
+
     final executor = txn ?? db;
     final result = await executor.rawQuery(queryStr, args);
-    return Sqflite.firstIntValue(result) ?? 0;
+    return result.isNotEmpty ? result.first : null;
   }
 
   Future<void> bulkSaveTimetableEntries(

@@ -6,6 +6,7 @@ class EcoleSchema {
     CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nom TEXT NOT NULL,
+      slogan TEXT,
       fondateur TEXT NOT NULL,
       directeur TEXT NOT NULL,
       logo TEXT,             -- chemin ou URL du logo

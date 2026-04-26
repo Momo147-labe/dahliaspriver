@@ -155,7 +155,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 63,
+      version: 65,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -374,13 +374,14 @@ class DatabaseHelper {
     int anneeScolaireId,
   ) => timetableDao.getTimetableByClass(classeId, anneeScolaireId);
 
-  Future<int> checkConflicts(
+  Future<Map<String, dynamic>?> checkConflicts(
     int jour,
     String debut,
     String fin, {
     int? enseignantId,
     int? classeId,
     int? excludeId,
+    int? anneeId,
   }) => timetableDao.checkConflicts(
     jour,
     debut,
@@ -388,6 +389,7 @@ class DatabaseHelper {
     enseignantId: enseignantId,
     classeId: classeId,
     excludeId: excludeId,
+    anneeId: anneeId,
   );
 
   // -------------------------
@@ -528,7 +530,10 @@ class DatabaseHelper {
   Future<Map<String, dynamic>> getFinancialAnalytics(
     int currentYearId,
     int? previousYearId,
-  ) => feesDao.getFinancialAnalytics(currentYearId, previousYearId);
+  ) => paiementDao.getFinancialAnalytics(
+    currentYearId,
+    previousYearId: previousYearId,
+  );
 
   /// Get academic performance analytics comparing two years
   Future<Map<String, dynamic>> getAcademicAnalytics(

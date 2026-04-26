@@ -130,7 +130,7 @@ class ClasseDao extends BaseDao {
     final currentClasses = await db.rawQuery(
       '''
       SELECT 
-        COUNT(DISTINCT c.id) as total_classes,
+        COUNT(DISTINCT c.id) as total,
         AVG(student_counts.count) as avg_class_size,
         MAX(student_counts.count) as max_class_size,
         MIN(student_counts.count) as min_class_size
@@ -151,7 +151,7 @@ class ClasseDao extends BaseDao {
       final prevResult = await db.rawQuery(
         '''
         SELECT 
-          COUNT(DISTINCT c.id) as total_classes,
+          COUNT(DISTINCT c.id) as total,
           AVG(student_counts.count) as avg_class_size
         FROM ${ClasseSchema.tableName} c
         LEFT JOIN (

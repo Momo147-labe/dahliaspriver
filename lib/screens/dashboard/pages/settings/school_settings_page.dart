@@ -24,6 +24,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
   final _emailController = TextEditingController();
   final _directorController = TextEditingController();
   final _founderController = TextEditingController();
+  final _sloganController = TextEditingController();
   final _licenseController = TextEditingController();
 
   bool _isLicenseValidated = false;
@@ -56,6 +57,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
           _emailController.text = ecole.email ?? '';
           _directorController.text = ecole.directeur;
           _founderController.text = ecole.fondateur;
+          _sloganController.text = ecole.slogan ?? '';
           _logoPath = ecole.logo;
           _timbrePath = ecole.timbre;
         });
@@ -92,6 +94,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
     _emailController.dispose();
     _directorController.dispose();
     _founderController.dispose();
+    _sloganController.dispose();
     _licenseController.dispose();
     super.dispose();
   }
@@ -129,6 +132,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
         final ecole = Ecole(
           id: _currentEcole?.id,
           nom: _nameController.text,
+          slogan: _sloganController.text,
           fondateur: _founderController.text,
           directeur: _directorController.text,
           adresse: _addressController.text,
@@ -336,6 +340,13 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
                               label: 'NOM DE L\'ÉTABLISSEMENT',
                               hint: 'Ex: Groupe Scolaire La Renaissance',
                               icon: Icons.school_outlined,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildTextField(
+                              controller: _sloganController,
+                              label: 'SLOGAN / DEVISE DE L\'ÉTABLISSEMENT',
+                              hint: 'Ex: Discipline - Travail - Progrès',
+                              icon: Icons.format_quote_outlined,
                             ),
                             const SizedBox(height: 20),
                             Row(

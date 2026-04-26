@@ -56,7 +56,8 @@ class DatabaseSchema {
         eleve_id INTEGER NOT NULL,
         annee_scolaire_id INTEGER NOT NULL,
         moyenne REAL,
-        rang INTEGER
+        rang INTEGER,
+        mention TEXT
       )
     ''');
 

@@ -7,6 +7,7 @@ import '../../grades/grade_sheet_selection_modal.dart';
 import 'global_ranking_page.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/academic_year_provider.dart';
+import '../../../../widgets/grades/grade_import_modal.dart';
 
 class GradesPage extends StatefulWidget {
   const GradesPage({super.key});
@@ -108,6 +109,8 @@ class _GradesPageState extends State<GradesPage> {
 
   Future<void> _loadOverview(int anneeId) async {
     try {
+      await _loadConfig(anneeId);
+
       final overviewRows = await _dbHelper.getGradesOverview(anneeId);
       final Map<String, Map<String, dynamic>> grouped = {};
 
@@ -569,9 +572,60 @@ class _GradesPageState extends State<GradesPage> {
                   ),
                 ),
               ),
+              const SizedBox(width: 12),
+              if (_isSaisieMode) ...[
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: _showImportModal,
+                  icon: const Icon(Icons.file_upload_outlined, size: 20),
+                  label: const Text("Importer Notes"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                    foregroundColor: Colors.blue,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _showImportModal() {
+    if (_lastLoadedAnneeId == null ||
+        _selectedClass == null ||
+        _selectedSubject == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Veuillez sélectionner une classe et une matière avant d'importer",
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => GradeImportModal(
+        classId: _selectedClass!['id'],
+        subjectId: _selectedSubject!['id'],
+        trimester: _selectedTrimestre,
+        sequence: _selectedSequence,
+        anneeId: _lastLoadedAnneeId!,
+        onSuccess: () => _loadGrades(_lastLoadedAnneeId!),
       ),
     );
   }
@@ -666,15 +720,18 @@ class _GradesPageState extends State<GradesPage> {
                     size: 14,
                     color: AppTheme.primaryColor,
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _assignedTeacher != null
-                        ? 'Enseignant: ${_assignedTeacher!['prenom']} ${_assignedTeacher!['nom']}'
-                        : 'Aucun enseignant assigné',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primaryColor,
+                  Flexible(
+                    child: Text(
+                      _assignedTeacher != null
+                          ? 'Enseignant: ${_assignedTeacher!['prenom']} ${_assignedTeacher!['nom']}'
+                          : 'Aucun enseignant assigné',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ),
                 ],
@@ -844,13 +901,23 @@ class _GradesPageState extends State<GradesPage> {
                                     ),
                                   ),
                                 ),
-                                child: Text(
-                                  'Seq ${e.key}: ${e.value.toStringAsFixed(1)}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.primaryColor,
-                                  ),
+                                child: Builder(
+                                  builder: (context) {
+                                    final seqName = _sequences.firstWhere(
+                                      (s) =>
+                                          s['numero_sequence'] == e.key &&
+                                          s['trimestre'] == _selectedTrimestre,
+                                      orElse: () => {'nom': 'Seq ${e.key}'},
+                                    )['nom'];
+                                    return Text(
+                                      '$seqName: ${e.value.toStringAsFixed(1)}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    );
+                                  },
                                 ),
                               );
                             })

@@ -23,11 +23,18 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
   List<Map<String, dynamic>> _teachers = [];
   Map<int, int?> _assignments = {}; // subjectId -> teacherId
   bool _isLoading = true;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -162,8 +169,8 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
                           );
                           if (firstTeacherId != null) {
                             setState(() {
-                              for (var key in _assignments.keys) {
-                                _assignments[key] = firstTeacherId;
+                              for (var subject in _subjects) {
+                                _assignments[subject['id']] = firstTeacherId;
                               }
                             });
                           }
@@ -210,6 +217,7 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
           else
             Expanded(
               child: ListView.separated(
+                controller: _scrollController,
                 itemCount: _subjects.length,
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 12),
