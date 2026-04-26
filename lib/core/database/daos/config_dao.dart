@@ -210,6 +210,55 @@ class ConfigDao extends BaseDao {
     return await db.query(NiveauxSchema.tableName, where: 'actif = 1');
   }
 
+  // Default Subjects by Cycle
+  Future<List<Map<String, dynamic>>> getDefaultSubjectsByCycle(
+    int cycleId,
+  ) async {
+    return await db.query(
+      'cycle_matiere_default',
+      where: 'cycle_id = ?',
+      whereArgs: [cycleId],
+    );
+  }
+
+  Future<void> autoAssignDefaultSubjectsToClass(
+    int classeId,
+    int cycleId,
+  ) async {
+    final defaults = await getDefaultSubjectsByCycle(cycleId);
+    if (defaults.isEmpty) return;
+
+    await db.transaction((txn) async {
+      for (var def in defaults) {
+        final matiereNom = def['matiere_nom'] as String;
+        final coefficient = def['coefficient'] as double? ?? 1.0;
+
+        // 1. S'assurer que la matière existe globalement
+        final matieres = await txn.query(
+          MatiereSchema.tableName,
+          where: 'nom = ?',
+          whereArgs: [matiereNom],
+        );
+
+        int matiereId;
+        if (matieres.isEmpty) {
+          matiereId = await txn.insert(MatiereSchema.tableName, {
+            'nom': matiereNom,
+          });
+        } else {
+          matiereId = matieres.first['id'] as int;
+        }
+
+        // 2. Lier à la classe
+        await txn.insert('classe_matiere', {
+          'classe_id': classeId,
+          'matiere_id': matiereId,
+          'coefficient': coefficient,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+    });
+  }
+
   Future<void> initializeTeachingStructure({
     required bool prescolaire,
     required bool primaire,

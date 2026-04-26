@@ -45,6 +45,12 @@ class DashboardDao extends BaseDao {
       [anneeId],
     );
 
+    final salaryResult = await db.rawQuery(
+      'SELECT SUM(montant) as total FROM paiement_enseignant WHERE annee_scolaire_id = ?',
+      [anneeId],
+    );
+    double expenses = (salaryResult.first['total'] as num?)?.toDouble() ?? 0.0;
+
     double expected =
         (expectedResult.first['total'] as num?)?.toDouble() ?? 0.0;
     double collected =
@@ -56,6 +62,8 @@ class DashboardDao extends BaseDao {
       'expected': expected,
       'collected': collected,
       'remaining': remaining,
+      'expenses': expenses,
+      'netRevenue': collected - expenses,
       'recoveryRate': recoveryRate,
     };
 
@@ -132,6 +140,19 @@ class DashboardDao extends BaseDao {
       SELECT SUBSTR(pd.date_paiement, 1, 7) as month, SUM(pd.montant) as total 
       FROM ${PaiementDetailSchema.tableName} pd
       WHERE pd.annee_scolaire_id = ?
+      GROUP BY month
+      ORDER BY month DESC
+      LIMIT 6
+    ''',
+      [anneeId],
+    );
+
+    // 10b. Expense Monthly Stats (6 last months)
+    final expenseMonthlyStats = await db.rawQuery(
+      '''
+      SELECT SUBSTR(date_paiement, 1, 7) as month, SUM(montant) as total 
+      FROM paiement_enseignant
+      WHERE annee_scolaire_id = ?
       GROUP BY month
       ORDER BY month DESC
       LIMIT 6
@@ -280,6 +301,7 @@ class DashboardDao extends BaseDao {
       'cycleStats': cycleStats,
       'classStats': classStats,
       'paymentMonthlyStats': paymentMonthlyStats,
+      'expenseMonthlyStats': expenseMonthlyStats,
     };
   }
 

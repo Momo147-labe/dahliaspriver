@@ -92,8 +92,8 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      width: 600,
       constraints: BoxConstraints(
+        maxWidth: 800,
         maxHeight: MediaQuery.of(context).size.height * 0.8,
       ),
       padding: const EdgeInsets.all(24),
@@ -108,43 +108,78 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Symbols.person_add,
+                        color: Colors.purple,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Affectation Enseignants',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Classe: ${widget.classe['nom']}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.purple.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Symbols.person_add,
-                      color: Colors.purple,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Affectation Enseignants',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  if (_assignments.isNotEmpty && _teachers.isNotEmpty)
+                    Tooltip(
+                      message:
+                          'Affecter le premier enseignant à toutes les matières',
+                      child: TextButton.icon(
+                        onPressed: () {
+                          final firstTeacherId = _assignments.values.firstWhere(
+                            (id) => id != null,
+                            orElse: () => null,
+                          );
+                          if (firstTeacherId != null) {
+                            setState(() {
+                              for (var key in _assignments.keys) {
+                                _assignments[key] = firstTeacherId;
+                              }
+                            });
+                          }
+                        },
+                        icon: const Icon(Symbols.group_add, size: 20),
+                        label: const Text(
+                          'Tout affecter',
+                          style: TextStyle(fontSize: 12),
                         ),
                       ),
-                      Text(
-                        'Classe: ${widget.classe['nom']}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
+                    ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Symbols.close),
                   ),
                 ],
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Symbols.close),
               ),
             ],
           ),
@@ -197,7 +232,7 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
                     child: Row(
                       children: [
                         Expanded(
-                          flex: 2,
+                          flex: 1,
                           child: Text(
                             subject['nom'],
                             style: const TextStyle(
@@ -210,17 +245,21 @@ class _AssignTeacherModalState extends State<AssignTeacherModal> {
                         Expanded(
                           flex: 3,
                           child: DropdownButtonFormField<int>(
+                            isExpanded: true,
                             value: _assignments[subject['id']],
                             hint: const Text(
                               'Sélectionner un enseignant',
                               style: TextStyle(fontSize: 12),
                             ),
                             items: _teachers.map((t) {
+                              final matricule = t['matricule'] ?? '?';
+                              final specialite = t['specialite'] ?? 'N/A';
                               return DropdownMenuItem<int>(
                                 value: t['id'],
                                 child: Text(
-                                  '${t['prenom']} ${t['nom']}',
+                                  '${t['prenom']} ${t['nom']} [$matricule] - $specialite',
                                   style: const TextStyle(fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               );
                             }).toList(),

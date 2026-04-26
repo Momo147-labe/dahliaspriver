@@ -275,12 +275,15 @@ class _DashboardOverviewState extends State<DashboardOverview> {
           iconBackgroundColor: AppTheme.primaryColor,
         ),
         StatsCard(
-          title: 'Personnel',
-          value: '${_stats?['teachers'] ?? 0}',
-          subtitle: 'Enseignants & Staff',
-          icon: Icons.school_rounded,
+          title: 'Dépenses',
+          value: _formatAbbreviatedAmount(
+            (financial['expenses'] ?? 0).toDouble(),
+          ),
+          tooltipMessage: _currencyFormat.format(financial['expenses'] ?? 0),
+          subtitle: 'Salaires & Charges',
+          icon: Icons.outbox_rounded,
           iconColor: Colors.white,
-          iconBackgroundColor: Colors.orange,
+          iconBackgroundColor: Colors.redAccent,
         ),
         StatsCard(
           title: 'Recouvrement',
@@ -291,6 +294,19 @@ class _DashboardOverviewState extends State<DashboardOverview> {
           iconBackgroundColor: Colors.green,
           showProgress: true,
           progressValue: recoveryRate / 100,
+        ),
+        StatsCard(
+          title: 'Budget Net',
+          value: _formatAbbreviatedAmount(
+            (financial['netRevenue'] ?? financial['collected'] ?? 0).toDouble(),
+          ),
+          tooltipMessage: _currencyFormat.format(
+            financial['netRevenue'] ?? financial['collected'] ?? 0,
+          ),
+          subtitle: 'Trésorerie Actuelle',
+          icon: Icons.account_balance_rounded,
+          iconColor: Colors.white,
+          iconBackgroundColor: Colors.teal,
         ),
         StatsCard(
           title: 'Collecte Mensuelle',
@@ -308,13 +324,12 @@ class _DashboardOverviewState extends State<DashboardOverview> {
               : Colors.red,
         ),
         StatsCard(
-          title: 'Moyenne Générale',
-          value:
-              '${(academic['average'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
-          subtitle: 'Moyenne de l\'école',
-          icon: Icons.analytics_rounded,
+          title: 'Personnel',
+          value: '${_stats?['teachers'] ?? 0}',
+          subtitle: 'Enseignants & Staff',
+          icon: Icons.school_rounded,
           iconColor: Colors.white,
-          iconBackgroundColor: Colors.purple,
+          iconBackgroundColor: Colors.orange,
         ),
         StatsCard(
           title: 'Taux de Réussite',
@@ -323,37 +338,19 @@ class _DashboardOverviewState extends State<DashboardOverview> {
           subtitle: 'Global (Matières)',
           icon: Icons.auto_graph_rounded,
           iconColor: Colors.white,
-          iconBackgroundColor: Colors.teal,
+          iconBackgroundColor: Colors.cyan,
           showProgress: true,
           progressValue:
               ((academic['successRate'] as num?)?.toDouble() ?? 0.0) / 100,
         ),
         StatsCard(
-          title: 'Réussite Hommes',
+          title: 'Moyenne Générale',
           value:
-              '${(academic['maleSuccessRate'] as num?)?.toStringAsFixed(1) ?? '0.0'}%',
-          subtitle:
-              '${academic['malePassed'] ?? 0}/${academic['maleTotal'] ?? 0} garçons admis',
-          icon: Icons.male_rounded,
+              '${(academic['average'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+          subtitle: 'Moyenne de l\'école',
+          icon: Icons.analytics_rounded,
           iconColor: Colors.white,
-          iconBackgroundColor: Colors.blue.shade700,
-          showProgress: true,
-          progressValue:
-              ((academic['maleSuccessRate'] as num?)?.toDouble() ?? 0.0) / 100,
-        ),
-        StatsCard(
-          title: 'Réussite Femmes',
-          value:
-              '${(academic['femaleSuccessRate'] as num?)?.toStringAsFixed(1) ?? '0.0'}%',
-          subtitle:
-              '${academic['femalePassed'] ?? 0}/${academic['femaleTotal'] ?? 0} filles admises',
-          icon: Icons.female_rounded,
-          iconColor: Colors.white,
-          iconBackgroundColor: Colors.pink.shade400,
-          showProgress: true,
-          progressValue:
-              ((academic['femaleSuccessRate'] as num?)?.toDouble() ?? 0.0) /
-              100,
+          iconBackgroundColor: Colors.purple,
         ),
       ],
     );
@@ -530,6 +527,12 @@ class _DashboardOverviewState extends State<DashboardOverview> {
         _buildPaymentTrendCard(
           'Tendance des Paiements',
           _stats?['paymentMonthlyStats'] ?? [],
+        ),
+        const SizedBox(height: 24),
+        _buildRevenueVsExpenseCard(
+          'Revenus vs Dépenses',
+          _stats?['paymentMonthlyStats'] ?? [],
+          _stats?['expenseMonthlyStats'] ?? [],
         ),
       ],
     );
@@ -742,8 +745,17 @@ class _DashboardOverviewState extends State<DashboardOverview> {
                             },
                           ),
                         ),
-                        leftTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                _formatAbbreviatedAmount(value),
+                                style: const TextStyle(fontSize: 8),
+                              );
+                            },
+                          ),
                         ),
                         topTitles: const AxisTitles(
                           sideTitles: SideTitles(showTitles: false),
@@ -762,13 +774,13 @@ class _DashboardOverviewState extends State<DashboardOverview> {
                             );
                           }).toList(),
                           isCurved: true,
-                          color: Colors.green,
+                          color: AppTheme.primaryColor,
                           barWidth: 4,
                           isStrokeCapRound: true,
                           dotData: const FlDotData(show: true),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: Colors.green.withValues(alpha: 0.1),
+                            color: AppTheme.primaryColor.withValues(alpha: 0.1),
                           ),
                         ),
                       ],
@@ -777,6 +789,184 @@ class _DashboardOverviewState extends State<DashboardOverview> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRevenueVsExpenseCard(
+    String title,
+    List revenueData,
+    List expenseData,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Process data to align months
+    final Map<String, double> revenueMap = {
+      for (var item in revenueData)
+        item['month']: (item['total'] as num).toDouble(),
+    };
+    final Map<String, double> expenseMap = {
+      for (var item in expenseData)
+        item['month']: (item['total'] as num).toDouble(),
+    };
+
+    final Set<String> allMonths = {...revenueMap.keys, ...expenseMap.keys};
+    final List<String> sortedMonths = allMonths.toList()..sort();
+    final List<String> displayMonths = sortedMonths.length > 6
+        ? sortedMonths.sublist(sortedMonths.length - 6)
+        : sortedMonths;
+
+    return Container(
+      height: 400,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.grey.shade100,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Row(
+                children: [
+                  _buildLegendItem('Revenus', Colors.green),
+                  const SizedBox(width: 16),
+                  _buildLegendItem('Dépenses', Colors.red),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          Expanded(
+            child: displayMonths.isEmpty
+                ? const Center(child: Text('Pas de données comparatives'))
+                : BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY:
+                          1.2 *
+                          ([...revenueMap.values, ...expenseMap.values].isEmpty
+                              ? 1000
+                              : [
+                                  ...revenueMap.values,
+                                  ...expenseMap.values,
+                                ].reduce((a, b) => a > b ? a : b)),
+                      barTouchData: BarTouchData(
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            String month = displayMonths[group.x.toInt()];
+                            String type = rodIndex == 0 ? 'Revenu' : 'Dépense';
+                            return BarTooltipItem(
+                              '$month : $type\n',
+                              const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: _currencyFormat.format(rod.toY),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              int idx = value.toInt();
+                              if (idx >= 0 && idx < displayMonths.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(
+                                    displayMonths[idx].split('-').last,
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                );
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 45,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                _formatAbbreviatedAmount(value),
+                                style: const TextStyle(fontSize: 9),
+                              );
+                            },
+                          ),
+                        ),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      gridData: const FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                      ),
+                      barGroups: displayMonths.asMap().entries.map((e) {
+                        final month = e.value;
+                        return BarChartGroupData(
+                          x: e.key,
+                          barRods: [
+                            BarChartRodData(
+                              toY: revenueMap[month] ?? 0.0,
+                              color: Colors.green,
+                              width: 12,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            BarChartRodData(
+                              toY: expenseMap[month] ?? 0.0,
+                              color: Colors.red,
+                              width: 12,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
     );
   }
 

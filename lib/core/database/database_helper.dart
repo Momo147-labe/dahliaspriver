@@ -155,7 +155,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 61,
+      version: 63,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -586,6 +586,8 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getMonthlyCollectionCurve(int anneeId) =>
       feesDao.getMonthlyCollectionCurve(anneeId);
+  Future<List<Map<String, dynamic>>> getMonthlyExpenseCurve(int anneeId) =>
+      paiementDao.getMonthlyExpenseCurve(anneeId);
 
   Future<List<Map<String, dynamic>>> getAttributionsByClass(int classeId) =>
       enseignantDao.getAttributionsByClass(classeId);
@@ -672,6 +674,18 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getClassesByTeacher(int enseignantId) =>
       enseignantDao.getClassesByTeacher(enseignantId);
+
+  // Paiements Enseignants
+  Future<List<Map<String, dynamic>>> getPaiementsEnseignant(
+    int? enseignantId,
+    int anneeId,
+  ) => enseignantDao.getPaiementsEnseignant(enseignantId, anneeId);
+
+  Future<int> addPaiementEnseignant(Map<String, dynamic> paiement) =>
+      enseignantDao.addPaiementEnseignant(paiement);
+
+  Future<int> deletePaiementEnseignant(int id) =>
+      enseignantDao.deletePaiementEnseignant(id);
 
   Future<void> deleteFraisForClasses(
     List<int> classeIds,

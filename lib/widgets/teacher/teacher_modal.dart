@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../../core/database/database_helper.dart';
@@ -24,8 +25,11 @@ class _TeacherModalState extends State<TeacherModal> {
   String? _selectedSpecialty;
   List<String> _specialtyOptions = [];
   final _photoController = TextEditingController();
+  final _matriculeController = TextEditingController();
   final _dateNaissanceController = TextEditingController();
   String? _selectedSexe;
+  String _typeRemuneration = 'Fixe';
+  final _salaireBaseController = TextEditingController(text: '0');
   bool _isSaving = false;
 
   // Autocomplete data
@@ -39,12 +43,16 @@ class _TeacherModalState extends State<TeacherModal> {
     if (widget.teacher != null) {
       _nomController.text = widget.teacher!.nom;
       _prenomController.text = widget.teacher!.prenom;
+      _matriculeController.text = widget.teacher!.matricule ?? '';
       _telephoneController.text = widget.teacher!.telephone ?? '';
       _emailController.text = widget.teacher!.email ?? '';
       _selectedSpecialty = widget.teacher!.specialite;
       _photoController.text = widget.teacher!.photo ?? '';
       _dateNaissanceController.text = widget.teacher!.dateNaissance ?? '';
       _selectedSexe = widget.teacher!.sexe;
+      _typeRemuneration = widget.teacher!.typeRemuneration ?? 'Fixe';
+      _salaireBaseController.text = (widget.teacher!.salaireBase ?? 0)
+          .toString();
     }
     _loadSubjects();
   }
@@ -105,7 +113,9 @@ class _TeacherModalState extends State<TeacherModal> {
     _telephoneController.dispose();
     _emailController.dispose();
     _photoController.dispose();
+    _matriculeController.dispose();
     _dateNaissanceController.dispose();
+    _salaireBaseController.dispose();
     super.dispose();
   }
 
@@ -114,8 +124,27 @@ class _TeacherModalState extends State<TeacherModal> {
 
     setState(() => _isSaving = true);
 
+    String matricule = _matriculeController.text.trim();
+
+    if (widget.teacher == null && matricule.isEmpty) {
+      final yearStr = DateTime.now().year.toString().substring(2);
+      final nom = _nomController.text.trim().toUpperCase();
+      final prenom = _prenomController.text.trim().toUpperCase();
+
+      final nomPart = nom.length >= 2
+          ? nom.substring(0, 2)
+          : nom.padRight(2, 'X');
+      final prenomPart = prenom.length >= 2
+          ? prenom.substring(0, 2)
+          : prenom.padRight(2, 'X');
+
+      final randomValue = Random().nextInt(9000) + 1000;
+      matricule = 'ENS$yearStr-$nomPart$prenomPart-$randomValue';
+    }
+
     final teacher = Enseignant(
       id: widget.teacher?.id,
+      matricule: matricule,
       nom: _nomController.text.trim(),
       prenom: _prenomController.text.trim(),
       telephone: _telephoneController.text.trim(),
@@ -124,6 +153,8 @@ class _TeacherModalState extends State<TeacherModal> {
       sexe: _selectedSexe,
       photo: _photoController.text.trim(),
       dateNaissance: _dateNaissanceController.text.trim(),
+      typeRemuneration: _typeRemuneration,
+      salaireBase: double.tryParse(_salaireBaseController.text) ?? 0,
     );
 
     try {
@@ -194,6 +225,13 @@ class _TeacherModalState extends State<TeacherModal> {
                 ),
               ),
               const SizedBox(height: 24),
+              _buildTextField(
+                controller: _matriculeController,
+                label: 'Matricule',
+                hint: 'Laisser vide pour génération automatique',
+                icon: Icons.badge_outlined,
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -320,6 +358,69 @@ class _TeacherModalState extends State<TeacherModal> {
                 hint: 'adresse@ecole.com',
                 keyboardType: TextInputType.emailAddress,
               ),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 16),
+              Text(
+                'Paramètres de Rémunération',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Type de Salaire',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: _typeRemuneration,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'Fixe',
+                              child: Text('Mensuel Fixe'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Horaire',
+                              child: Text('Taux Horaire'),
+                            ),
+                          ],
+                          onChanged: (val) =>
+                              setState(() => _typeRemuneration = val!),
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _salaireBaseController,
+                      label: _typeRemuneration == 'Fixe'
+                          ? 'Salaire Mensuel'
+                          : 'Taux Horaire',
+                      hint: 'Ex: 50000',
+                      keyboardType: TextInputType.number,
+                      icon: Icons.payments_outlined,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
@@ -358,9 +459,11 @@ class _TeacherModalState extends State<TeacherModal> {
     required TextEditingController controller,
     required String label,
     String? hint,
+    IconData? icon,
     String? Function(String?)? validator,
     TextInputType? keyboardType,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -370,7 +473,23 @@ class _TeacherModalState extends State<TeacherModal> {
           controller: controller,
           decoration: InputDecoration(
             hintText: hint,
+            prefixIcon: icon != null
+                ? Icon(icon, color: AppTheme.primaryColor)
+                : null,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? Colors.white10 : Colors.grey.shade300,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: AppTheme.primaryColor,
+                width: 1.5,
+              ),
+            ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,

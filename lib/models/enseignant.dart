@@ -9,6 +9,8 @@ class Enseignant {
   final String? sexe; // 'M' ou 'F'
   final String? photo;
   final String? dateNaissance;
+  final String? typeRemuneration; // 'Fixe' ou 'Horaire'
+  final double? salaireBase;
 
   Enseignant({
     this.id,
@@ -21,6 +23,8 @@ class Enseignant {
     this.sexe,
     this.photo,
     this.dateNaissance,
+    this.typeRemuneration = 'Fixe',
+    this.salaireBase = 0.0,
   });
 
   factory Enseignant.fromMap(Map<String, dynamic> map) {
@@ -35,6 +39,8 @@ class Enseignant {
       sexe: map['sexe'] as String?,
       photo: map['photo'] as String?,
       dateNaissance: map['date_naissance'] as String?,
+      typeRemuneration: map['type_remuneration'] as String? ?? 'Fixe',
+      salaireBase: (map['salaire_base'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -50,6 +56,8 @@ class Enseignant {
       'sexe': sexe,
       'photo': photo,
       'date_naissance': dateNaissance,
+      'type_remuneration': typeRemuneration,
+      'salaire_base': salaireBase,
     };
   }
 
@@ -66,6 +74,8 @@ class Enseignant {
     String? sexe,
     String? photo,
     String? dateNaissance,
+    String? typeRemuneration,
+    double? salaireBase,
   }) {
     return Enseignant(
       id: id ?? this.id,
@@ -78,6 +88,8 @@ class Enseignant {
       sexe: sexe ?? this.sexe,
       photo: photo ?? this.photo,
       dateNaissance: dateNaissance ?? this.dateNaissance,
+      typeRemuneration: typeRemuneration ?? this.typeRemuneration,
+      salaireBase: salaireBase ?? this.salaireBase,
     );
   }
 }

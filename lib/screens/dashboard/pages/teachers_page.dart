@@ -7,6 +7,7 @@ import '../../../theme/app_theme.dart';
 import '../../../widgets/teacher/teacher_modal.dart';
 import '../../../providers/academic_year_provider.dart';
 import 'package:provider/provider.dart';
+import 'teacher_payments_page.dart';
 
 class TeachersPage extends StatefulWidget {
   const TeachersPage({super.key});
@@ -250,10 +251,26 @@ class _TeachersPageState extends State<TeachersPage>
           Row(
             children: [
               _buildActionButton(
-                'Ajouter un enseignant',
+                context,
+                isDark,
                 Icons.person_add,
+                'Ajouter un enseignant',
                 const Color(0xFF9333EA),
                 _openAddModal,
+              ),
+              const SizedBox(width: 16),
+              _buildActionButton(
+                context,
+                isDark,
+                Symbols.payments,
+                'Salaires',
+                Colors.green,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TeacherPaymentsPage(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -263,22 +280,24 @@ class _TeachersPageState extends State<TeachersPage>
   }
 
   Widget _buildActionButton(
-    String label,
+    BuildContext context,
+    bool isDark,
     IconData icon,
+    String label,
     Color color,
     VoidCallback onPressed,
   ) {
     return ElevatedButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon, size: 18),
+      icon: Icon(icon, size: 20),
       label: Text(label),
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 0,
-      ).copyWith(overlayColor: WidgetStateProperty.all(Colors.white10)),
+      ),
     );
   }
 
@@ -754,13 +773,41 @@ class _TeachersPageState extends State<TeachersPage>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            Text(
-              teacher.specialite ?? 'Sans spécialité',
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
+            Row(
+              children: [
+                if (teacher.matricule != null && teacher.matricule!.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: color.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      teacher.matricule!,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Text(
+                    teacher.specialite ?? 'Sans spécialité',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             // Afficher les classes assignées
@@ -919,9 +966,25 @@ class _TeachersPageState extends State<TeachersPage>
                     ],
                   ],
                 ),
-                Text(
-                  teacher.specialite ?? 'Sans spécialité',
-                  style: TextStyle(color: color, fontSize: 12),
+                Row(
+                  children: [
+                    Text(
+                      teacher.specialite ?? 'Sans spécialité',
+                      style: TextStyle(color: color, fontSize: 12),
+                    ),
+                    if (teacher.matricule != null &&
+                        teacher.matricule!.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '• ${teacher.matricule}',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 if (_teacherClasses[teacher.id] != null &&
                     _teacherClasses[teacher.id]!.isNotEmpty)

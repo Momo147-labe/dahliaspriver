@@ -1457,7 +1457,11 @@ class _ClassesPageState extends State<ClassesPage> {
 
     try {
       if (id == null) {
-        await DatabaseHelper.instance.insert('classe', data);
+        final newId = await DatabaseHelper.instance.insert('classe', data);
+        if (_selectedCycleId != null) {
+          await DatabaseHelper.instance.configDao
+              .autoAssignDefaultSubjectsToClass(newId, _selectedCycleId!);
+        }
       } else {
         await DatabaseHelper.instance.update('classe', data, 'id = ?', [id]);
       }

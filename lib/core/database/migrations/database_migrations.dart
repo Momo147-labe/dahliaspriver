@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../schemas/document_template_schema.dart';
+import '../schemas/cycle_matiere_default_schema.dart';
 
 class DatabaseMigrations {
   static Future<void> upgrade(
@@ -1148,6 +1149,125 @@ class DatabaseMigrations {
         debugPrint('Migration v61: colonne ville ajoutée à la table ecole.');
       } catch (e) {
         debugPrint('Erreur migration v61: $e');
+      }
+    }
+
+    if (oldVersion < 62) {
+      try {
+        await db.execute(CycleMatiereDefaultSchema.createTable);
+
+        // Peupler les données par défaut par cycle
+        // Primaire (cycle 2)
+        final primaireMatieres = [
+          "Français",
+          "Calculs",
+          "Sciences d'observation",
+          "Histoire-Géographie",
+          "ECM",
+          "Dessin / Arts plastiques",
+          "Éducation physique et sportive (EPS)",
+        ];
+        for (var m in primaireMatieres) {
+          await db.insert('cycle_matiere_default', {
+            'cycle_id': 2,
+            'matiere_nom': m,
+            'coefficient': 1.0,
+          });
+        }
+
+        // Collège (cycle 3)
+        final collegeMatieres = [
+          "Français",
+          "Mathématiques",
+          "Anglais",
+          "Physique",
+          "Chimie",
+          "Biologie",
+          "Géologie",
+          "Histoire",
+          "Géographie",
+          "ECM",
+          "Informatique",
+          "EPS",
+        ];
+        for (var m in collegeMatieres) {
+          await db.insert('cycle_matiere_default', {
+            'cycle_id': 3,
+            'matiere_nom': m,
+            'coefficient': 1.0,
+          });
+        }
+
+        // Lycée (cycle 4)
+        final lyceeMatieres = [
+          "Français",
+          "Philosophie",
+          "Anglais",
+          "Mathématiques",
+          "Physique",
+          "Chimie",
+          "Biologie",
+          "Géologie",
+          "Histoire",
+          "Géographie",
+          "EPS",
+          "Économie",
+        ];
+        for (var m in lyceeMatieres) {
+          await db.insert('cycle_matiere_default', {
+            'cycle_id': 4,
+            'matiere_nom': m,
+            'coefficient': 1.0,
+          });
+        }
+        debugPrint(
+          'Migration v62: table cycle_matiere_default créée et peuplée.',
+        );
+      } catch (e) {
+        debugPrint('Erreur migration v62: $e');
+      }
+    }
+
+    if (oldVersion < 63) {
+      try {
+        // Table pour les paiements des enseignants
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS paiement_enseignant (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            enseignant_id INTEGER NOT NULL,
+            annee_scolaire_id INTEGER NOT NULL,
+            montant REAL NOT NULL,
+            date_paiement TEXT NOT NULL,
+            mode_paiement TEXT NOT NULL,
+            type_calcul TEXT NOT NULL,
+            nb_heures REAL,
+            taux_horaire REAL,
+            periode TEXT NOT NULL,
+            observations TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (enseignant_id) REFERENCES enseignant(id),
+            FOREIGN KEY (annee_scolaire_id) REFERENCES annee_scolaire(id)
+          )
+        ''');
+
+        // Ajout des champs de rémunération à la table enseignant
+        await addColumnSafely(
+          db,
+          'enseignant',
+          'type_remuneration',
+          "TEXT DEFAULT 'Fixe'",
+        );
+        await addColumnSafely(
+          db,
+          'enseignant',
+          'salaire_base',
+          'REAL DEFAULT 0',
+        );
+
+        debugPrint('Migration v63: table paiement_enseignant créée.');
+      } catch (e) {
+        debugPrint('Erreur migration v63: $e');
       }
     }
   }

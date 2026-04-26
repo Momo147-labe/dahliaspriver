@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../theme/app_theme.dart';
@@ -27,6 +28,8 @@ class _PaymentsPageState extends State<PaymentsPage>
   List<Map<String, dynamic>> _recoveryByClass = [];
   List<Map<String, dynamic>> _paymentMethods = [];
   List<Map<String, dynamic>> _recentTransactions = [];
+  List<Map<String, dynamic>> _monthlyRevenue = [];
+  List<Map<String, dynamic>> _monthlyExpenses = [];
 
   bool _isLoading = true;
   bool _isLoadingPayments = false;
@@ -83,6 +86,8 @@ class _PaymentsPageState extends State<PaymentsPage>
         limit: _itemsPerPage,
         offset: 0,
       );
+      final monthlyRevenue = await dbHelper.getMonthlyCollectionCurve(anneeId);
+      final monthlyExpenses = await dbHelper.getMonthlyExpenseCurve(anneeId);
 
       setState(() {
         _summary = summary;
@@ -90,6 +95,8 @@ class _PaymentsPageState extends State<PaymentsPage>
         _paymentMethods = methods;
         _recentTransactions = transactions;
         _totalPayments = total;
+        _monthlyRevenue = monthlyRevenue;
+        _monthlyExpenses = monthlyExpenses;
         _isLoading = false;
       });
       _fadeController.forward(from: 0.0);
@@ -180,6 +187,8 @@ class _PaymentsPageState extends State<PaymentsPage>
                     _buildStatsGrid(isDark, theme),
                     const SizedBox(height: 32),
                     _buildChartsSection(isDark, theme),
+                    const SizedBox(height: 32),
+                    _buildRevenueVsExpenseComparison(isDark, theme),
                     const SizedBox(height: 32),
                     _buildRecentTransactions(isDark, theme),
                   ],
@@ -287,14 +296,15 @@ class _PaymentsPageState extends State<PaymentsPage>
 
   Widget _buildStatsGrid(bool isDark, ThemeData theme) {
     if (_summary == null) return const SizedBox.shrink();
+    final isDesktop = MediaQuery.of(context).size.width > 900;
 
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 4,
+      crossAxisCount: isDesktop ? 3 : 2, // 3 columns on desktop, 2 on mobile
       crossAxisSpacing: 20,
       mainAxisSpacing: 20,
-      childAspectRatio: 1.5,
+      childAspectRatio: isDesktop ? 2.0 : 1.5,
       children: [
         _buildStatCard(
           'Total attendu',
@@ -309,7 +319,7 @@ class _PaymentsPageState extends State<PaymentsPage>
           '${NumberFormat('#,###', 'fr_FR').format(_summary!['collected'])} GNF',
           Symbols.account_balance_wallet,
           Colors.green,
-          '${_summary!['growth'] >= 0 ? '+' : ''}${_summary!['growth'].toStringAsFixed(1)}% vs mois dernier',
+          '${_summary!['growth'] >= 0 ? '+' : ''}${_summary!['growth'].toStringAsFixed(1)}% vs mois dern.',
           isDark,
           highlight: true,
         ),
@@ -321,8 +331,25 @@ class _PaymentsPageState extends State<PaymentsPage>
           'Retards de paiement',
           isDark,
         ),
+        _buildStatCard(
+          'Dépenses (Salaires)',
+          '${NumberFormat('#,###', 'fr_FR').format(_summary!['expenses'] ?? 0)} GNF',
+          Symbols.outbox,
+          Colors.redAccent,
+          'Paiements enseignants',
+          isDark,
+        ),
+        _buildStatCard(
+          'Revenu Net',
+          '${NumberFormat('#,###', 'fr_FR').format(_summary!['netRevenue'] ?? _summary!['collected'])} GNF',
+          Symbols.account_balance,
+          Colors.teal,
+          'Encaissements - Salaires',
+          isDark,
+          highlight: true,
+        ),
         _buildProgressCard(
-          'Recouvrement',
+          'Taux Recouvr.',
           '${_summary!['recoveryRate'].toStringAsFixed(1)}%',
           Symbols.analytics,
           AppTheme.primaryColor,
@@ -1172,5 +1199,206 @@ class _PaymentsPageState extends State<PaymentsPage>
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Widget _buildRevenueVsExpenseComparison(bool isDark, ThemeData theme) {
+    if (_monthlyRevenue.isEmpty && _monthlyExpenses.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(child: Text('Aucune donnée de tendance disponible')),
+        ),
+      );
+    }
+
+    final currencyFormat = NumberFormat.currency(
+      locale: 'fr_FR',
+      symbol: 'GNF',
+      decimalDigits: 0,
+    );
+
+    // Process data to align months
+    final Map<String, double> revenueMap = {
+      for (var item in _monthlyRevenue)
+        item['month'] as String: (item['total'] as num).toDouble(),
+    };
+    final Map<String, double> expenseMap = {
+      for (var item in _monthlyExpenses)
+        item['month'] as String: (item['total'] as num).toDouble(),
+    };
+
+    final Set<String> allMonths = {...revenueMap.keys, ...expenseMap.keys};
+    final List<String> sortedMonths = allMonths.toList()..sort();
+    final List<String> displayMonths = sortedMonths.length > 6
+        ? sortedMonths.sublist(sortedMonths.length - 6)
+        : sortedMonths;
+
+    return Container(
+      height: 400,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.grey.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Revenus vs Dépenses',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Comparaison mensuelle des encaissements et salaires',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  _buildLegendItem('Revenus', Colors.green),
+                  const SizedBox(width: 16),
+                  _buildLegendItem('Dépenses', Colors.red),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY:
+                    1.2 *
+                    ([...revenueMap.values, ...expenseMap.values].isEmpty
+                        ? 1000
+                        : [
+                            ...revenueMap.values,
+                            ...expenseMap.values,
+                          ].reduce((a, b) => a > b ? a : b)),
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      String month = displayMonths[group.x.toInt()];
+                      String type = rodIndex == 0 ? 'Revenu' : 'Dépense';
+                      return BarTooltipItem(
+                        '$month : $type\n',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: currencyFormat.format(rod.toY),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        int idx = value.toInt();
+                        if (idx >= 0 && idx < displayMonths.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              displayMonths[idx].split('-').last,
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 60,
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const Text('');
+                        return Text(
+                          NumberFormat.compact(locale: 'fr_FR').format(value),
+                          style: const TextStyle(fontSize: 10),
+                        );
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: isDark ? Colors.white10 : Colors.grey.shade100,
+                    strokeWidth: 1,
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: displayMonths.asMap().entries.map((e) {
+                  final month = e.value;
+                  return BarChartGroupData(
+                    x: e.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: revenueMap[month] ?? 0.0,
+                        color: Colors.green,
+                        width: 16,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(4),
+                        ),
+                      ),
+                      BarChartRodData(
+                        toY: expenseMap[month] ?? 0.0,
+                        color: Colors.red,
+                        width: 16,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(4),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
+    );
   }
 }

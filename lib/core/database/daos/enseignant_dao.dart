@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import '../schemas/enseignant_schema.dart';
+import '../schemas/paiement_enseignant_schema.dart';
 import 'base_dao.dart';
 
 class EnseignantDao extends BaseDao {
@@ -182,6 +183,45 @@ class EnseignantDao extends BaseDao {
   Future<int> deleteEnseignant(int id) async {
     return await db.delete(
       EnseignantSchema.tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // --- Gestion des Paiements Enseignants ---
+
+  Future<List<Map<String, dynamic>>> getPaiementsEnseignant(
+    int? enseignantId,
+    int anneeId,
+  ) async {
+    String query =
+        '''
+      SELECT p.*, e.nom, e.prenom
+      FROM ${PaiementEnseignantSchema.tableName} p
+      JOIN ${EnseignantSchema.tableName} e ON p.enseignant_id = e.id
+      WHERE p.annee_scolaire_id = ?
+    ''';
+    List<dynamic> args = [anneeId];
+
+    if (enseignantId != null) {
+      query += ' AND p.enseignant_id = ?';
+      args.add(enseignantId);
+    }
+
+    query += ' ORDER BY p.date_paiement DESC';
+
+    return await db.rawQuery(query, args);
+  }
+
+  Future<int> addPaiementEnseignant(Map<String, dynamic> paiement) async {
+    paiement['created_at'] = DateTime.now().toIso8601String();
+    paiement['updated_at'] = DateTime.now().toIso8601String();
+    return await db.insert(PaiementEnseignantSchema.tableName, paiement);
+  }
+
+  Future<int> deletePaiementEnseignant(int id) async {
+    return await db.delete(
+      PaiementEnseignantSchema.tableName,
       where: 'id = ?',
       whereArgs: [id],
     );

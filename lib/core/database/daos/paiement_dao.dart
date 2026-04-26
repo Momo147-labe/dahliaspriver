@@ -239,6 +239,14 @@ class PaiementDao extends BaseDao {
         ? ((thisMonth - lastMonth) / lastMonth) * 100
         : 0.0;
 
+    // Total Teacher Salaries (Expenses)
+    final salaryResult = await db.rawQuery(
+      'SELECT SUM(montant) as total FROM paiement_enseignant WHERE annee_scolaire_id = ?',
+      [anneeId],
+    );
+    double totalSalaries =
+        (salaryResult.first['total'] as num?)?.toDouble() ?? 0.0;
+
     return {
       'expected': expected,
       'collected': collected,
@@ -246,6 +254,8 @@ class PaiementDao extends BaseDao {
       'recoveryRate': recoveryRate,
       'thisMonth': thisMonth,
       'growth': growth,
+      'expenses': totalSalaries,
+      'netRevenue': collected - totalSalaries,
     };
   }
 
@@ -587,12 +597,13 @@ class PaiementDao extends BaseDao {
       SELECT 
         COUNT(DISTINCT pd.eleve_id) as students_paid,
         SUM(pd.montant) as total_collected,
+        (SELECT SUM(montant) FROM paiement_enseignant WHERE annee_scolaire_id = ?) as expenses,
         COUNT(pd.id) as payment_count
       FROM ${PaiementDetailSchema.tableName} pd
       JOIN eleve_parcours ep ON pd.eleve_id = ep.eleve_id AND pd.annee_scolaire_id = ep.annee_scolaire_id
       WHERE ep.annee_scolaire_id = ?
     ''',
-      [currentYearId],
+      [currentYearId, currentYearId],
     );
 
     // Get total expected fees for current year
@@ -617,12 +628,13 @@ class PaiementDao extends BaseDao {
         SELECT 
           COUNT(DISTINCT pd.eleve_id) as students_paid,
           SUM(pd.montant) as total_collected,
+          (SELECT SUM(montant) FROM paiement_enseignant WHERE annee_scolaire_id = ?) as expenses,
           COUNT(pd.id) as payment_count
         FROM ${PaiementDetailSchema.tableName} pd
         JOIN eleve_parcours ep ON pd.eleve_id = ep.eleve_id AND pd.annee_scolaire_id = ep.annee_scolaire_id
         WHERE ep.annee_scolaire_id = ?
       ''',
-        [previousYearId],
+        [previousYearId, previousYearId],
       );
       previousFinances = prevResult.isNotEmpty ? prevResult.first : null;
     }
@@ -639,10 +651,23 @@ class PaiementDao extends BaseDao {
       [currentYearId],
     );
 
+    // Teacher salaries as expenses
+    final salaryResult = await db.rawQuery(
+      'SELECT SUM(montant) as total FROM paiement_enseignant WHERE annee_scolaire_id = ?',
+      [currentYearId],
+    );
+    final totalSalaries =
+        (salaryResult.first['total'] as num?)?.toDouble() ?? 0.0;
+
     return {
       'current': {
         ...currentFinances.first,
         'expected': currentExpected.first['total_expected'] ?? 0,
+        'expenses': totalSalaries,
+        'netRevenue':
+            ((currentFinances.first['total_collected'] as num?)?.toDouble() ??
+                0.0) -
+            totalSalaries,
       },
       'previous': previousFinances,
       'paymentMethods': paymentMethods,
@@ -686,5 +711,18 @@ class PaiementDao extends BaseDao {
     String sequence = (count + 1).toString().padLeft(4, '0');
 
     return 'REC-$yearPrefix-$sequence';
+  }
+
+  Future<List<Map<String, dynamic>>> getMonthlyExpenseCurve(int anneeId) async {
+    return await db.rawQuery(
+      '''
+      SELECT SUBSTR(date_paiement, 1, 7) as month, SUM(montant) as total 
+      FROM paiement_enseignant
+      WHERE annee_scolaire_id = ?
+      GROUP BY month
+      ORDER BY month ASC
+    ''',
+      [anneeId],
+    );
   }
 }

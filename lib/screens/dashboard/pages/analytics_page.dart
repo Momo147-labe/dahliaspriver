@@ -5,6 +5,7 @@ import '../../../theme/app_theme.dart';
 import '../../../providers/academic_year_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
@@ -31,6 +32,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   List<Map<String, dynamic>> _subjectPerformance = [];
   List<Map<String, dynamic>> _teacherPerformanceStats = [];
   List<Map<String, dynamic>> _monthlyCollectionCurve = [];
+  List<Map<String, dynamic>> _monthlyExpenseCurve = [];
 
   @override
   void initState() {
@@ -105,6 +107,9 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       final monthlyCollectionCurve = await db.getMonthlyCollectionCurve(
         _currentYearId!,
       );
+      final monthlyExpenseCurve = await db.getMonthlyExpenseCurve(
+        _currentYearId!,
+      );
 
       if (mounted) {
         setState(() {
@@ -120,6 +125,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           _subjectPerformance = subjectPerformance;
           _teacherPerformanceStats = teacherPerformanceStats;
           _monthlyCollectionCurve = monthlyCollectionCurve;
+          _monthlyExpenseCurve = monthlyExpenseCurve;
 
           _isLoading = false;
         });
@@ -189,6 +195,8 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
             ),
           ),
           const SizedBox(height: 16),
+          _buildRevenueVsExpenseChart(isDark),
+          const SizedBox(height: 24),
           _buildRevenueCurve(isDark),
           const SizedBox(height: 24),
           Row(
@@ -263,10 +271,20 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     final previousStudents = _studentData['previous']?['total'];
     final currentRevenue = _financialData['current']?['total_collected'] ?? 0.0;
     final previousRevenue = _financialData['previous']?['total_collected'];
+    final currentExpenses = _financialData['current']?['expenses'] ?? 0.0;
+    final previousExpenses = _financialData['previous']?['expenses'];
+    final currentNetRevenue =
+        _financialData['current']?['netRevenue'] ?? currentRevenue;
+    final previousNetRevenue = _financialData['previous'] != null
+        ? (_financialData['previous']['total_collected'] ?? 0.0) -
+              (_financialData['previous']['expenses'] ?? 0.0)
+        : null;
+
     final currentAvgGrade = _academicData['current']?['average_grade'] ?? 0.0;
-    final previousAvgGrade = _academicData['previous']?['average_grade'];
-    final currentClasses = _classData['current']?['total_classes'] ?? 0;
-    final previousClasses = _classData['previous']?['total_classes'];
+    final currentSuccessRate = _academicData['current']?['success_rate'] ?? 0.0;
+    final previousSuccessRate = _academicData['previous']?['success_rate'];
+    final currentClasses = _classData['current']?['total'] ?? 0;
+    final previousClasses = _classData['previous']?['total'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,12 +299,12 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         ),
         const SizedBox(height: 16),
         GridView.count(
-          crossAxisCount: 4,
+          crossAxisCount: 3,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
-          childAspectRatio: 1.5,
+          childAspectRatio: 2.2,
           children: [
             _buildSummaryCard(
               'Effectif Total',
@@ -294,6 +312,14 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
               previousStudents,
               Symbols.group,
               Colors.blue,
+              isDark,
+            ),
+            _buildSummaryCard(
+              'Classes',
+              currentClasses.toString(),
+              previousClasses,
+              Symbols.meeting_room,
+              Colors.brown,
               isDark,
             ),
             _buildSummaryCard(
@@ -306,20 +332,38 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
               isFinancial: true,
             ),
             _buildSummaryCard(
+              'Dépenses Total',
+              '${(currentExpenses as num).toStringAsFixed(0)} FG',
+              previousExpenses,
+              Symbols.outbox,
+              Colors.redAccent,
+              isDark,
+              isFinancial: true,
+            ),
+            _buildSummaryCard(
+              'Résultat Net',
+              '${(currentNetRevenue as num).toStringAsFixed(0)} FG',
+              previousNetRevenue,
+              Symbols.account_balance,
+              Colors.teal,
+              isDark,
+              isFinancial: true,
+            ),
+            _buildSummaryCard(
               'Moyenne Générale',
               (currentAvgGrade as num).toStringAsFixed(2),
-              previousAvgGrade,
+              _academicData['previous']?['average_grade'],
               Symbols.school,
               Colors.purple,
               isDark,
               isGrade: true,
             ),
             _buildSummaryCard(
-              'Classes',
-              currentClasses.toString(),
-              previousClasses,
-              Symbols.door_front,
-              Colors.orange,
+              'Taux de Réussite',
+              '${(currentSuccessRate as num).toStringAsFixed(1)}%',
+              previousSuccessRate,
+              Symbols.auto_graph,
+              Colors.cyan,
               isDark,
             ),
           ],
@@ -1403,6 +1447,183 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           );
         }).toList(),
       ),
+    );
+  }
+
+  Widget _buildRevenueVsExpenseChart(bool isDark) {
+    if (_monthlyCollectionCurve.isEmpty && _monthlyExpenseCurve.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final currencyFormat = NumberFormat.currency(
+      locale: 'fr_FR',
+      symbol: 'GNF',
+      decimalDigits: 0,
+    );
+
+    // Filter to last 6 months for readability
+    final Map<String, double> revenueMap = {
+      for (var item in _monthlyCollectionCurve)
+        item['month'] as String: (item['total'] as num).toDouble(),
+    };
+    final Map<String, double> expenseMap = {
+      for (var item in _monthlyExpenseCurve)
+        item['month'] as String: (item['total'] as num).toDouble(),
+    };
+
+    final allMonths = {...revenueMap.keys, ...expenseMap.keys}.toList()..sort();
+    final displayMonths = allMonths.length > 6
+        ? allMonths.sublist(allMonths.length - 6)
+        : allMonths;
+
+    return _buildSection(
+      title: 'Comparatif Revenus vs Dépenses',
+      icon: Symbols.query_stats,
+      color: Colors.blue,
+      isDark: isDark,
+      child: Container(
+        height: 350,
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _buildLegendItem('Revenus', Colors.green),
+                const SizedBox(width: 16),
+                _buildLegendItem('Dépenses', Colors.red),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY:
+                      1.2 *
+                      ([...revenueMap.values, ...expenseMap.values].isEmpty
+                          ? 1000
+                          : [
+                              ...revenueMap.values,
+                              ...expenseMap.values,
+                            ].reduce((a, b) => a > b ? a : b)),
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        String month = displayMonths[group.x.toInt()];
+                        String type = rodIndex == 0 ? 'Revenu' : 'Dépense';
+                        return BarTooltipItem(
+                          '$month : $type\n',
+                          const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: currencyFormat.format(rod.toY),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          int idx = value.toInt();
+                          if (idx >= 0 && idx < displayMonths.length) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                displayMonths[idx].split('-').last,
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            );
+                          }
+                          return const Text('');
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 60,
+                        getTitlesWidget: (value, meta) {
+                          if (value == 0) return const Text('');
+                          return Text(
+                            NumberFormat.compact(locale: 'fr_FR').format(value),
+                            style: const TextStyle(fontSize: 10),
+                          );
+                        },
+                      ),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                  ),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: null,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: isDark ? Colors.white10 : Colors.grey.shade100,
+                      strokeWidth: 1,
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barGroups: displayMonths.asMap().entries.map((e) {
+                    final month = e.value;
+                    return BarChartGroupData(
+                      x: e.key,
+                      barRods: [
+                        BarChartRodData(
+                          toY: revenueMap[month] ?? 0.0,
+                          color: Colors.green,
+                          width: 14,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(4),
+                          ),
+                        ),
+                        BarChartRodData(
+                          toY: expenseMap[month] ?? 0.0,
+                          color: Colors.red,
+                          width: 14,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(4),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
     );
   }
 }
