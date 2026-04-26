@@ -117,4 +117,31 @@ class TimetableDao extends BaseDao {
       whereArgs: [classId, anneeId],
     );
   }
+
+  Future<double> getTeacherWeeklyHours(int teacherId, int anneeId) async {
+    final result = await db.rawQuery(
+      '''
+      SELECT heure_debut, heure_fin 
+      FROM ${EmploiDuTempsSchema.tableName}
+      WHERE enseignant_id = ? AND annee_scolaire_id = ?
+    ''',
+      [teacherId, anneeId],
+    );
+
+    double totalHours = 0.0;
+    for (var row in result) {
+      final debut = row['heure_debut'] as String;
+      final fin = row['heure_fin'] as String;
+
+      final startParts = debut.split(':');
+      final endParts = fin.split(':');
+
+      if (startParts.length == 2 && endParts.length == 2) {
+        final start = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+        final end = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+        totalHours += (end - start) / 60.0;
+      }
+    }
+    return totalHours;
+  }
 }

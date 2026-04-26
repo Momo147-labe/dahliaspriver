@@ -133,128 +133,162 @@ class _TeacherPaymentsPageState extends State<TeacherPaymentsPage> {
   }
 
   Widget _buildSummaryCards(ThemeData theme, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-              : [
-                  AppTheme.primaryColor,
-                  AppTheme.primaryColor.withValues(alpha: 0.8),
-                ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryColor.withValues(alpha: 0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _buildSummaryItem(
+    return Row(
+      children: [
+        Expanded(
+          child: _buildGlassStatCard(
             'Total Payé',
-            '${NumberFormat.currency(symbol: 'GNF', decimalDigits: 0).format(_totalPaid)}',
+            NumberFormat.currency(
+              symbol: 'GNF',
+              decimalDigits: 0,
+            ).format(_totalPaid),
             Symbols.payments,
-            Colors.white,
+            const [Color(0xFF6366F1), Color(0xFF4F46E5)],
+            isDark,
           ),
-          const Spacer(),
-          _buildSummaryItem(
-            'Nombre de Paiements',
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: _buildGlassStatCard(
+            'Paiements',
             '${_payments.length}',
             Symbols.receipt_long,
-            Colors.white.withValues(alpha: 0.8),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryItem(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: color, fontSize: 14)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            const [Color(0xFF10B981), Color(0xFF059669)],
+            isDark,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGlassStatCard(
+    String label,
+    String value,
+    IconData icon,
+    List<Color> gradient,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+        ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: gradient[0].withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: gradient),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            label,
+            style: TextStyle(
+              color: isDark ? Colors.white60 : AppTheme.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                color: isDark ? Colors.white : AppTheme.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildFilters(ThemeData theme, bool isDark) {
-    return Row(
-      children: [
-        Expanded(
-          child: DropdownButtonFormField<int?>(
-            value: _selectedTeacherId,
-            decoration: InputDecoration(
-              labelText: 'Enseignant',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              prefixIcon: const Icon(Symbols.person),
-            ),
-            items: [
-              const DropdownMenuItem(
-                value: null,
-                child: Text('Tous les enseignants'),
-              ),
-              ..._teachers.map(
-                (t) => DropdownMenuItem(
-                  value: t.id,
-                  child: Text('${t.prenom} ${t.nom}'),
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.grey.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: DropdownButtonHideUnderline(
+              child: DropdownButtonFormField<int?>(
+                value: _selectedTeacherId,
+                decoration: InputDecoration(
+                  hintText: 'Filtrer par Enseignant',
+                  prefixIcon: const Icon(Symbols.person, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                 ),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Tous')),
+                  ..._teachers.map(
+                    (t) => DropdownMenuItem(
+                      value: t.id,
+                      child: Text('${t.prenom} ${t.nom}'),
+                    ),
+                  ),
+                ],
+                onChanged: (val) {
+                  setState(() => _selectedTeacherId = val);
+                  _loadData();
+                },
               ),
-            ],
-            onChanged: (val) {
-              setState(() => _selectedTeacherId = val);
-              _loadData();
-            },
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: DropdownButtonFormField<String>(
-            value: _selectedMonth,
-            decoration: InputDecoration(
-              labelText: 'Mois',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              prefixIcon: const Icon(Symbols.calendar_month),
             ),
-            items: _months
-                .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                .toList(),
-            onChanged: (val) {
-              setState(() => _selectedMonth = val!);
-              // Client-side filtering could be done here, but for now we reload
-              _loadData();
-            },
           ),
-        ),
-      ],
+          Container(
+            width: 1,
+            height: 30,
+            color: isDark ? Colors.white10 : Colors.black12,
+          ),
+          Expanded(
+            flex: 1,
+            child: DropdownButtonHideUnderline(
+              child: DropdownButtonFormField<String>(
+                value: _selectedMonth,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Symbols.calendar_month, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                items: _months
+                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                    .toList(),
+                onChanged: (val) {
+                  setState(() => _selectedMonth = val!);
+                  _loadData();
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -264,15 +298,27 @@ class _TeacherPaymentsPageState extends State<TeacherPaymentsPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Symbols.receipt_long,
-              size: 64,
-              color: isDark ? Colors.white24 : Colors.grey.shade300,
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.03)
+                    : Colors.grey.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Symbols.receipt_long,
+                size: 64,
+                color: isDark ? Colors.white24 : Colors.grey.shade300,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
-              'Aucun paiement trouvé',
-              style: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
+              'Aucun règlement pour cette période',
+              style: TextStyle(
+                color: isDark ? Colors.white38 : Colors.grey,
+                fontSize: 16,
+              ),
             ),
           ],
         ),
@@ -280,98 +326,165 @@ class _TeacherPaymentsPageState extends State<TeacherPaymentsPage> {
     }
 
     return ListView.builder(
+      physics: const BouncingScrollPhysics(),
       itemCount: _payments.length,
       itemBuilder: (context, index) {
         final p = _payments[index];
         final bool isHoraire = p['type_calcul'] == 'Horaire';
 
-        return Card(
+        return Container(
           margin: const EdgeInsets.only(bottom: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 0,
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 12,
-            ),
-            leading: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Symbols.payments, color: Colors.green),
-            ),
-            title: Text(
-              '${p['prenom']} ${p['nom']}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text('Période: ${p['periode']} • ${p['date_paiement']}'),
-                if (isHoraire)
-                  Text(
-                    '${p['nb_heures']}h x ${NumberFormat.simpleCurrency(name: 'GNF').format(p['taux_horaire'])}/h',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-              ],
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${NumberFormat.currency(symbol: '', decimalDigits: 0).format(p['montant'])} GNF',
-                  style: TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  p['mode_paiement'] ?? '',
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ],
-            ),
-            onLongPress: () {
-              // Delete confirmation
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Supprimer le paiement ?'),
-                  content: const Text('Cette action est irréversible.'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Annuler'),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        await dbHelper.deletePaiementEnseignant(p['id']);
-                        Navigator.pop(context);
-                        _loadData();
-                      },
-                      child: const Text(
-                        'Supprimer',
-                        style: TextStyle(color: Colors.red),
-                      ),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: isDark
+                ? []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
                   ],
-                ),
-              );
-            },
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onLongPress: () => _showDeleteConfirmation(p),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : AppTheme.primaryColor.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      Symbols.account_balance_wallet,
+                      color: isDark ? Colors.white70 : AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${p['prenom']} ${p['nom']}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Symbols.calendar_today,
+                              size: 14,
+                              color: isDark ? Colors.white38 : Colors.black38,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              p['periode'],
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? Colors.white38 : Colors.black38,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(
+                              Symbols.sell,
+                              size: 14,
+                              color: isDark ? Colors.white38 : Colors.black38,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              p['mode_paiement'] ?? '',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? Colors.white38 : Colors.black38,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (isHoraire) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '${p['nb_heures']}h x ${NumberFormat.decimalPattern().format(p['taux_horaire'])}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: isDark
+                                  ? Colors.amber.withValues(alpha: 0.7)
+                                  : Colors.amber.shade800,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${NumberFormat.decimalPattern().format(p['montant'])}',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppTheme.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                        ),
+                      ),
+                      Text(
+                        'GNF',
+                        style: TextStyle(
+                          color: isDark ? Colors.white38 : Colors.black38,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },
+    );
+  }
+
+  void _showDeleteConfirmation(Map<String, dynamic> p) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Supprimer le paiement ?'),
+        content: const Text(
+          'Voulez-vous vraiment supprimer ce règlement ? Cette action est irréversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await dbHelper.deletePaiementEnseignant(p['id']);
+              Navigator.pop(context);
+              _loadData();
+            },
+            child: const Text(
+              'Supprimer',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -447,19 +560,32 @@ class _PaiementEnseignantModalState extends State<_PaiementEnseignantModal> {
     return months[month];
   }
 
-  void _onTeacherChanged(int? id) {
+  Future<void> _onTeacherChanged(int? id) async {
     if (id == null) return;
     final teacher = widget.teachers.firstWhere((t) => t.id == id);
-    setState(() {
-      _teacherId = id;
-      _typeCalcul = teacher.typeRemuneration ?? 'Fixe';
-      if (_typeCalcul == 'Fixe') {
-        _montantController.text = teacher.salaireBase?.toString() ?? '0';
-      } else {
-        _tauxHoraireController.text = teacher.salaireBase?.toString() ?? '0';
-        _calculateTotal();
-      }
-    });
+
+    // Fetch weekly hours from timetable
+    final weeklyHours = await DatabaseHelper.instance.getTeacherWeeklyHours(
+      id,
+      widget.anneeId,
+    );
+
+    if (mounted) {
+      setState(() {
+        _teacherId = id;
+        _typeCalcul = teacher.typeRemuneration ?? 'Fixe';
+        if (_typeCalcul == 'Fixe') {
+          _montantController.text = teacher.salaireBase?.toString() ?? '0';
+        } else {
+          _tauxHoraireController.text = teacher.salaireBase?.toString() ?? '0';
+          // Auto-set hours for the month (approx 4 weeks)
+          if (weeklyHours > 0) {
+            _nbHeuresController.text = (weeklyHours * 4).toStringAsFixed(0);
+          }
+          _calculateTotal();
+        }
+      });
+    }
   }
 
   void _calculateTotal() {
@@ -511,236 +637,308 @@ class _PaiementEnseignantModalState extends State<_PaiementEnseignantModal> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        top: 32,
-        left: 32,
-        right: 32,
-      ),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF111827) : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 30,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Nouveau Règlement de Salaire',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              DropdownButtonFormField<int>(
-                value: _teacherId,
-                decoration: InputDecoration(
-                  labelText: 'Sélectionner l\'Enseignant',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  prefixIcon: const Icon(Symbols.person),
-                ),
-                items: widget.teachers
-                    .map(
-                      (t) => DropdownMenuItem(
-                        value: t.id,
-                        child: Text('${t.prenom} ${t.nom}'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: _onTeacherChanged,
-                validator: (v) =>
-                    v == null ? 'Veuillez choisir un enseignant' : null,
-              ),
-
-              const SizedBox(height: 16),
-
-              Row(
+      child: FractionallySizedBox(
+        heightFactor: 0.9,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _typeCalcul,
-                      decoration: InputDecoration(
-                        labelText: 'Type',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  Text(
+                    'Nouveau Règlement de Salaire',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  DropdownButtonFormField<int>(
+                    value: _teacherId,
+                    decoration: InputDecoration(
+                      labelText: 'Sélectionner l\'Enseignant',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Symbols.person),
+                    ),
+                    items: widget.teachers
+                        .map(
+                          (t) => DropdownMenuItem(
+                            value: t.id,
+                            child: Text('${t.prenom} ${t.nom}'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _onTeacherChanged,
+                    validator: (v) =>
+                        v == null ? 'Veuillez choisir un enseignant' : null,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _typeCalcul,
+                          decoration: InputDecoration(
+                            labelText: 'Type',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'Fixe',
+                              child: Text('Fixe'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Horaire',
+                              child: Text('Horaire'),
+                            ),
+                          ],
+                          onChanged: (v) => setState(() => _typeCalcul = v!),
                         ),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'Fixe', child: Text('Fixe')),
-                        DropdownMenuItem(
-                          value: 'Horaire',
-                          child: Text('Horaire'),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _periodeController,
+                          decoration: InputDecoration(
+                            labelText: 'Période (Mois)',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          validator: (v) => v!.isEmpty ? 'Requis' : null,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  if (_typeCalcul == 'Horaire') ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _nbHeuresController,
+                            decoration: InputDecoration(
+                              labelText: 'Heures',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (_) => _calculateTotal(),
+                            validator: (v) => v!.isEmpty ? 'Requis' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _tauxHoraireController,
+                            decoration: InputDecoration(
+                              labelText: 'Taux Horaire',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (_) => _calculateTotal(),
+                            validator: (v) => v!.isEmpty ? 'Requis' : null,
+                          ),
                         ),
                       ],
-                      onChanged: (v) => setState(() => _typeCalcul = v!),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _periodeController,
-                      decoration: InputDecoration(
-                        labelText: 'Période (Mois)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      validator: (v) => v!.isEmpty ? 'Requis' : null,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              if (_typeCalcul == 'Horaire') ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _nbHeuresController,
-                        decoration: InputDecoration(
-                          labelText: 'Heures',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        keyboardType: TextInputType.number,
-                        onChanged: (_) => _calculateTotal(),
-                        validator: (v) => v!.isEmpty ? 'Requis' : null,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _tauxHoraireController,
-                        decoration: InputDecoration(
-                          labelText: 'Taux Horaire',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        keyboardType: TextInputType.number,
-                        onChanged: (_) => _calculateTotal(),
-                        validator: (v) => v!.isEmpty ? 'Requis' : null,
-                      ),
-                    ),
+                    const SizedBox(height: 16),
                   ],
-                ),
-                const SizedBox(height: 16),
-              ],
 
-              TextFormField(
-                controller: _montantController,
-                decoration: InputDecoration(
-                  labelText: 'Montant Total (GNF)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  _buildModernTextField(
+                    controller: _montantController,
+                    label: 'Montant Total (GNF)',
+                    icon: Symbols.payments,
+                    keyboardType: TextInputType.number,
+                    readOnly: _typeCalcul == 'Horaire',
+                    validator: (v) => v!.isEmpty ? 'Requis' : null,
                   ),
-                  prefixIcon: const Icon(Symbols.payments),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (v) => v!.isEmpty ? 'Requis' : null,
-                readOnly: _typeCalcul == 'Horaire',
-              ),
 
-              const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _modePaiement,
-                      decoration: InputDecoration(
-                        labelText: 'Mode',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _modePaiement,
+                          decoration: InputDecoration(
+                            labelText: 'Mode',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          items:
+                              ['Espèces', 'Virement', 'Mobile Money', 'Chèque']
+                                  .map(
+                                    (m) => DropdownMenuItem(
+                                      value: m,
+                                      child: Text(m),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged: (v) => setState(() => _modePaiement = v!),
                         ),
                       ),
-                      items: ['Espèces', 'Virement', 'Mobile Money', 'Chèque']
-                          .map(
-                            (m) => DropdownMenuItem(value: m, child: Text(m)),
-                          )
-                          .toList(),
-                      onChanged: (v) => setState(() => _modePaiement = v!),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _datePaiement,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2030),
-                        );
-                        if (picked != null)
-                          setState(() => _datePaiement = picked);
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: 'Date',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _datePaiement,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2030),
+                            );
+                            if (picked != null)
+                              setState(() => _datePaiement = picked);
+                          },
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Date',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              DateFormat('dd/MM/yyyy').format(_datePaiement),
+                            ),
                           ),
                         ),
-                        child: Text(
-                          DateFormat('dd/MM/yyyy').format(_datePaiement),
-                        ),
                       ),
-                    ),
+                    ],
                   ),
+
+                  const SizedBox(height: 16),
+                  _buildModernTextField(
+                    controller: _obsController,
+                    label: 'Observations (Optionnel)',
+                    icon: Symbols.notes,
+                    maxLines: 2,
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  _buildSaveButton(isDark),
+                  const SizedBox(height: 48),
                 ],
               ),
-
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: _obsController,
-                decoration: InputDecoration(
-                  labelText: 'Observations (Optionnel)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                maxLines: 2,
-              ),
-
-              const SizedBox(height: 32),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isSaving
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Enregistrer le Paiement',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 32),
-            ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool readOnly = false,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+    VoidCallback? onChanged,
+  }) {
+    return TextFormField(
+      controller: controller,
+      readOnly: readOnly,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      onChanged: (_) => onChanged?.call(),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, size: 20),
+        filled: true,
+        fillColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.grey.withValues(alpha: 0.03),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: AppTheme.primaryColor),
+        ),
+      ),
+      validator: validator,
+    );
+  }
+
+  Widget _buildSaveButton(bool isDark) {
+    return SizedBox(
+      width: double.infinity,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ElevatedButton(
+          onPressed: _isSaving ? null : _save,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            shadowColor: Colors.transparent,
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: _isSaving
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text(
+                  'Confirmer le Règlement',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    letterSpacing: 0.5,
+                  ),
+                ),
         ),
       ),
     );

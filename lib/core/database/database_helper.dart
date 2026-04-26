@@ -273,6 +273,11 @@ class DatabaseHelper {
   Future<double> calculerMoyenneGenerale(int eleveId, int anneeId) =>
       resultDao.calculerMoyenneGenerale(eleveId, anneeId);
 
+  Future<int> deleteTimetableByClass(int classId, int anneeId) =>
+      timetableDao.deleteTimetableByClass(classId, anneeId);
+  Future<double> getTeacherWeeklyHours(int teacherId, int anneeId) =>
+      timetableDao.getTeacherWeeklyHours(teacherId, anneeId);
+
   Future<void> calculerRangsClasse(int classeId, int anneeId) =>
       resultDao.calculerRangsClasse(classeId, anneeId);
 

@@ -344,6 +344,31 @@ class _DashboardOverviewState extends State<DashboardOverview> {
               ((academic['successRate'] as num?)?.toDouble() ?? 0.0) / 100,
         ),
         StatsCard(
+          title: 'Succès (Garçons)',
+          value:
+              '${(academic['maleSuccessRate'] as num?)?.toStringAsFixed(1) ?? '0.0'}%',
+          subtitle: 'Taux de réussite Ma.',
+          icon: Icons.male_rounded,
+          iconColor: Colors.white,
+          iconBackgroundColor: Colors.blueAccent,
+          showProgress: true,
+          progressValue:
+              ((academic['maleSuccessRate'] as num?)?.toDouble() ?? 0.0) / 100,
+        ),
+        StatsCard(
+          title: 'Succès (Filles)',
+          value:
+              '${(academic['femaleSuccessRate'] as num?)?.toStringAsFixed(1) ?? '0.0'}%',
+          subtitle: 'Taux de réussite Fe.',
+          icon: Icons.female_rounded,
+          iconColor: Colors.white,
+          iconBackgroundColor: Colors.pinkAccent,
+          showProgress: true,
+          progressValue:
+              ((academic['femaleSuccessRate'] as num?)?.toDouble() ?? 0.0) /
+              100,
+        ),
+        StatsCard(
           title: 'Moyenne Générale',
           value:
               '${(academic['average'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
