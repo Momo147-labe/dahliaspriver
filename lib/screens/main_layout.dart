@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/theme_provider.dart';
 import '../core/database/database_helper.dart';
 import '../widgets/dashboard/header.dart';
-import '../widgets/dashboard/school_profile_card.dart';
+import '../widgets/dashboard/sidebar.dart';
 
 // Pages dashboard
 import 'dashboard/pages/dashboard_overview.dart';
@@ -119,7 +118,21 @@ class _MainLayoutState extends State<MainLayout> {
           ? AppTheme.backgroundDark
           : AppTheme.backgroundLight,
       drawer: isMobile && titles[_currentIndex] != 'Paramètres'
-          ? _mobileDrawer(isDark)
+          ? Drawer(
+              child: Sidebar(
+                selectedIndex: _currentIndex,
+                onItemSelected: (index) {
+                  setState(() => _currentIndex = index);
+                  Navigator.pop(context);
+                },
+                isCollapsed: false,
+                onToggle: () {},
+                schoolData: schoolData,
+                isLoading: _isLoading,
+                titles: titles,
+                icons: icons,
+              ),
+            )
           : null,
       appBar: isMobile && titles[_currentIndex] != 'Paramètres'
           ? AppBar(
@@ -135,7 +148,16 @@ class _MainLayoutState extends State<MainLayout> {
       body: Row(
         children: [
           if (!isMobile && titles[_currentIndex] != 'Paramètres')
-            _sidebar(isDark),
+            Sidebar(
+              selectedIndex: _currentIndex,
+              onItemSelected: (index) => setState(() => _currentIndex = index),
+              isCollapsed: _isCollapsed,
+              onToggle: () => setState(() => _isCollapsed = !_isCollapsed),
+              schoolData: schoolData,
+              isLoading: _isLoading,
+              titles: titles,
+              icons: icons,
+            ),
           Expanded(
             child: Column(
               children: [
@@ -147,300 +169,6 @@ class _MainLayoutState extends State<MainLayout> {
           ),
         ],
       ),
-    );
-  }
-
-  // ===================== SIDEBAR =====================
-  Widget _sidebar(bool isDark) {
-    final sidebarWidth = _isCollapsed ? 80.0 : 250.0;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      width: sidebarWidth,
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
-        border: Border(
-          right: BorderSide(
-            color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
-          ),
-        ),
-      ),
-      child: Stack(
-        children: [
-          Column(
-            children: [
-              if (!_isCollapsed)
-                SchoolProfileCard(
-                  school: schoolData,
-                  isDark: isDark,
-                  isLoading: _isLoading,
-                )
-              else
-                const SizedBox(
-                  height: 56,
-                ), // Réserve l'espace pour le bouton en mode réduit
-              Expanded(child: _menu(isDark)),
-            ],
-          ),
-
-          // Bouton de réduction en position absolue
-          Positioned(
-            top: 12,
-            right: _isCollapsed ? 0 : 12,
-            left: _isCollapsed ? 0 : null,
-            child: Align(
-              alignment: _isCollapsed
-                  ? Alignment.center
-                  : Alignment.centerRight,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    debugPrint('Sidebar toggle clicked: !$_isCollapsed');
-                    setState(() => _isCollapsed = !_isCollapsed);
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white10
-                          : Colors.black.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isDark ? Colors.white10 : Colors.black12,
-                      ),
-                    ),
-                    child: Icon(
-                      _isCollapsed ? Icons.chevron_right : Icons.chevron_left,
-                      size: 20,
-                      color: isDark ? Colors.white70 : Colors.black54,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===================== MENU =====================
-  Widget _menu(bool isDark) {
-    return ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-      child: ListView.builder(
-        padding: EdgeInsets.symmetric(
-          horizontal: _isCollapsed ? 8 : 12,
-          vertical: 8,
-        ),
-        itemCount: titles.length,
-        itemBuilder: (_, i) {
-          final selected = _currentIndex == i;
-
-          // Mode Réduit
-          if (_isCollapsed) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Tooltip(
-                message: titles[i],
-                preferBelow: false,
-                child: InkWell(
-                  onTap: () => setState(() => _currentIndex = i),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: selected
-                          ? AppTheme.primaryColor.withValues(alpha: 0.15)
-                          : Colors.transparent,
-                    ),
-                    child: Center(
-                      child: Icon(
-                        icons[i],
-                        size: 24,
-                        color: selected
-                            ? AppTheme.primaryColor
-                            : isDark
-                            ? Colors.white70
-                            : AppTheme.textSecondary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-
-          // Mode Étendu
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: selected
-                    ? AppTheme.primaryColor.withValues(alpha: 0.15)
-                    : Colors.transparent,
-                border: selected
-                    ? const Border(
-                        left: BorderSide(
-                          color: AppTheme.primaryColor,
-                          width: 3,
-                        ),
-                      )
-                    : null,
-              ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const NeverScrollableScrollPhysics(),
-                child: SizedBox(
-                  width: 250,
-                  child: InkWell(
-                    onTap: () => setState(() => _currentIndex = i),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            icons[i],
-                            size: 20,
-                            color: selected
-                                ? AppTheme.primaryColor
-                                : isDark
-                                ? Colors.white70
-                                : AppTheme.textSecondary,
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: selected
-                                ? TypewriterText(
-                                    text: titles[i],
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.primaryColor,
-                                    ),
-                                  )
-                                : Text(
-                                    titles[i],
-                                    overflow: TextOverflow.clip,
-                                    softWrap: false,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: isDark
-                                          ? Colors.white70
-                                          : AppTheme.textSecondary,
-                                    ),
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ===================== DRAWER MOBILE =====================
-  Drawer _mobileDrawer(bool isDark) {
-    return Drawer(
-      child: Column(
-        children: [
-          SchoolProfileCard(
-            school: schoolData,
-            isDark: isDark,
-            isLoading: _isLoading,
-          ),
-          Expanded(child: _menu(isDark)),
-        ],
-      ),
-    );
-  }
-}
-
-class TypewriterText extends StatefulWidget {
-  final String text;
-  final TextStyle style;
-  final Duration duration;
-
-  const TypewriterText({
-    super.key,
-    required this.text,
-    required this.style,
-    this.duration = const Duration(milliseconds: 100),
-  });
-
-  @override
-  State<TypewriterText> createState() => _TypewriterTextState();
-}
-
-class _TypewriterTextState extends State<TypewriterText> {
-  String _displayedText = "";
-  int _charIndex = 0;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _startAnimation();
-  }
-
-  @override
-  void didUpdateWidget(TypewriterText oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.text != oldWidget.text) {
-      _resetAnimation();
-    }
-  }
-
-  void _resetAnimation() {
-    _timer?.cancel();
-    setState(() {
-      _displayedText = "";
-      _charIndex = 0;
-    });
-    _startAnimation();
-  }
-
-  void _startAnimation() {
-    _timer = Timer.periodic(widget.duration, (timer) {
-      if (_charIndex < widget.text.length) {
-        setState(() {
-          _displayedText += widget.text[_charIndex];
-          _charIndex++;
-        });
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      _displayedText,
-      style: widget.style,
-      overflow: TextOverflow.clip,
-      softWrap: false,
     );
   }
 }

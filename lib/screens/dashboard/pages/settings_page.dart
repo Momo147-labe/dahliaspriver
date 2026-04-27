@@ -7,6 +7,7 @@ import 'settings/subpages/cycle_level_settings_page.dart';
 import 'settings/subpages/grading_settings_page.dart';
 import 'settings/subpages/evaluation_planning_settings_page.dart';
 import 'settings/subpages/appreciation_settings_page.dart';
+import '../../../widgets/common/typewriter_text.dart';
 
 class SettingsPage extends StatefulWidget {
   final VoidCallback? onRetour;
@@ -150,22 +151,27 @@ class _SettingsPageState extends State<SettingsPage> {
                                               : AppTheme.textSecondary)),
                               size: 20,
                             ),
-                            title: Text(
-                              item['label'] as String,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.w500,
-                                color: isSelected
-                                    ? AppTheme.primaryColor
-                                    : (isAction
+                            title: isSelected
+                                ? TypewriterText(
+                                    text: item['label'] as String,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  )
+                                : Text(
+                                    item['label'] as String,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: isAction
                                           ? Colors.redAccent
                                           : (isDark
                                                 ? Colors.white70
-                                                : AppTheme.textSecondary)),
-                              ),
-                            ),
+                                                : AppTheme.textSecondary),
+                                    ),
+                                  ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),

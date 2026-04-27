@@ -1,555 +1,224 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
+import '../common/typewriter_text.dart';
+import 'school_profile_card.dart';
 
-class Sidebar extends StatefulWidget {
+class Sidebar extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onItemSelected;
+  final bool isCollapsed;
+  final VoidCallback onToggle;
+  final Map<String, dynamic>? schoolData;
+  final bool isLoading;
+  final List<String> titles;
+  final List<IconData> icons;
 
   const Sidebar({
     super.key,
     required this.selectedIndex,
     required this.onItemSelected,
+    required this.isCollapsed,
+    required this.onToggle,
+    required this.schoolData,
+    required this.isLoading,
+    required this.titles,
+    required this.icons,
   });
 
   @override
-  State<Sidebar> createState() => _SidebarState();
-}
-
-class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
-  bool _isCollapsed = false;
-
-  static const double _expandedWidth = 288;
-  static const double _collapsedWidth = 72;
-
-  late final AnimationController _animController;
-  late final Animation<double> _widthAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
-    _widthAnimation = Tween<double>(begin: _expandedWidth, end: _collapsedWidth)
-        .animate(
-          CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
-        );
-  }
-
-  @override
-  void dispose() {
-    _animController.dispose();
-    super.dispose();
-  }
-
-  void _toggleSidebar() {
-    setState(() {
-      _isCollapsed = !_isCollapsed;
-      if (_isCollapsed) {
-        _animController.forward();
-      } else {
-        _animController.reverse();
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sidebarWidth = isCollapsed ? 80.0 : 250.0;
 
-    return AnimatedBuilder(
-      animation: _widthAnimation,
-      builder: (context, child) {
-        final currentWidth = _widthAnimation.value;
-        final isNarrow = currentWidth < (_expandedWidth + _collapsedWidth) / 2;
-
-        return Container(
-          width: currentWidth,
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.8,
-          ),
-          clipBehavior: Clip.hardEdge,
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
-            border: Border(
-              right: BorderSide(
-                color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
-                width: 1,
-              ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: isDark
-                    ? Colors.black.withValues(alpha: 0.2)
-                    : Colors.black.withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(2, 0),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              _buildTopToggle(isDark, isNarrow),
-              _buildHeader(isDark, isNarrow),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.all(isNarrow ? 8 : 16),
-                  child: Column(
-                    children: [
-                      _buildNavItem(
-                        0,
-                        Icons.dashboard,
-                        'Dashboard',
-                        isDark,
-                        isNarrow,
-                      ),
-                      _buildNavItem(1, Icons.group, 'Élèves', isDark, isNarrow),
-                      _buildNavItem(
-                        2,
-                        Icons.meeting_room,
-                        'Classes',
-                        isDark,
-                        isNarrow,
-                      ),
-                      _buildNavItem(
-                        3,
-                        Icons.person,
-                        'Enseignants',
-                        isDark,
-                        isNarrow,
-                      ),
-                      _buildNavItem(
-                        4,
-                        Icons.menu_book,
-                        'Matières',
-                        isDark,
-                        isNarrow,
-                      ),
-                      _buildNavItem(
-                        5,
-                        Icons.history_edu,
-                        'Cours',
-                        isDark,
-                        isNarrow,
-                      ),
-                      _buildNavItem(
-                        6,
-                        Icons.calendar_today,
-                        'Emploi du temps',
-                        isDark,
-                        isNarrow,
-                      ),
-                      _buildNavItem(
-                        7,
-                        Icons.how_to_reg,
-                        'Présences',
-                        isDark,
-                        isNarrow,
-                      ),
-                      const SizedBox(height: 16),
-                      if (!isNarrow)
-                        _buildSectionHeader(
-                          'Finance \u0026 Académique',
-                          isDark,
-                        ),
-                      if (isNarrow)
-                        Divider(
-                          color: (isDark
-                              ? AppTheme.borderDark
-                              : AppTheme.borderLight),
-                          height: 24,
-                        ),
-                      _buildNavItem(
-                        8,
-                        Icons.account_balance,
-                        'Frais Scolaire',
-                        isDark,
-                        isNarrow,
-                      ),
-                      _buildNavItem(
-                        9,
-                        Icons.fact_check,
-                        'Contrôle de Paiements',
-                        isDark,
-                        isNarrow,
-                      ),
-                      _buildNavItem(10, Icons.grade, 'Notes', isDark, isNarrow),
-                      _buildNavItem(
-                        11,
-                        Icons.description,
-                        'Bulletins',
-                        isDark,
-                        isNarrow,
-                      ),
-                      _buildNavItem(
-                        12,
-                        Icons.analytics,
-                        'Rapport',
-                        isDark,
-                        isNarrow,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildNavItem(
-                        13,
-                        Icons.settings,
-                        'Paramètres',
-                        isDark,
-                        isNarrow,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              _buildLogoutButton(isDark, isNarrow),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTopToggle(bool isDark, bool isNarrow) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: isNarrow ? 8 : 12, vertical: 8),
-      width: double.infinity,
-      child: Align(
-        alignment: isNarrow ? Alignment.center : Alignment.centerRight,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _toggleSidebar,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : Colors.black.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.black.withValues(alpha: 0.1),
-                  width: 1,
-                ),
-              ),
-              child: Icon(
-                isNarrow
-                    ? Icons.chevron_right_rounded
-                    : Icons.chevron_left_rounded,
-                size: 20,
-                color: isDark
-                    ? AppTheme.textDarkSecondary
-                    : AppTheme.textSecondary,
-              ),
-            ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      width: sidebarWidth,
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
+        border: Border(
+          right: BorderSide(
+            color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildHeader(bool isDark, bool isNarrow) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.only(
-        top: 0,
-        left: isNarrow ? 8 : 16,
-        right: isNarrow ? 8 : 16,
-        bottom: 12,
-      ),
-      decoration: BoxDecoration(
-        color: isDark
-            ? AppTheme.surfaceDark.withValues(alpha: 0.5)
-            : AppTheme.surfaceLight,
-      ),
-      child: Column(
+      child: Stack(
         children: [
-          Row(
-            mainAxisAlignment: isNarrow
-                ? MainAxisAlignment.center
-                : MainAxisAlignment.start,
+          Column(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppTheme.primaryColor, AppTheme.primaryLight],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.school, color: Colors.white, size: 20),
-              ),
-              if (!isNarrow) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Guinée École',
-                        style: TextStyle(
-                          color: isDark
-                              ? AppTheme.textDarkPrimary
-                              : AppTheme.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        'GESTION SCOLAIRE',
-                        style: TextStyle(
-                          color: isDark
-                              ? AppTheme.textDarkSecondary
-                              : AppTheme.textSecondary,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              if (!isCollapsed)
+                SchoolProfileCard(
+                  school: schoolData,
+                  isDark: isDark,
+                  isLoading: isLoading,
+                )
+              else
+                const SizedBox(height: 56),
+              Expanded(child: _buildMenu(isDark)),
             ],
           ),
-          const SizedBox(height: 12),
-          Divider(
-            color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
-            height: 1,
+
+          // Bouton de réduction en position absolue
+          Positioned(
+            top: 12,
+            right: isCollapsed ? 0 : 12,
+            left: isCollapsed ? 0 : null,
+            child: Align(
+              alignment: isCollapsed ? Alignment.center : Alignment.centerRight,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onToggle,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white10
+                          : Colors.black.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isDark ? Colors.white10 : Colors.black12,
+                      ),
+                    ),
+                    child: Icon(
+                      isCollapsed ? Icons.chevron_right : Icons.chevron_left,
+                      size: 20,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, bool isDark) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          color: isDark ? AppTheme.textDarkSecondary : AppTheme.textSecondary,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.5,
+  Widget _buildMenu(bool isDark) {
+    return ScrollConfiguration(
+      behavior: const ScrollBehavior().copyWith(scrollbars: false),
+      child: ListView.builder(
+        padding: EdgeInsets.symmetric(
+          horizontal: isCollapsed ? 8 : 12,
+          vertical: 8,
         ),
-      ),
-    );
-  }
+        itemCount: titles.length,
+        itemBuilder: (_, i) {
+          final selected = selectedIndex == i;
 
-  Widget _buildNavItem(
-    int index,
-    IconData icon,
-    String title,
-    bool isDark,
-    bool isNarrow,
-  ) {
-    final isSelected = widget.selectedIndex == index;
-
-    final child = Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? AppTheme.primaryColor.withValues(alpha: 0.2)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: isSelected
-            ? Border.all(
-                color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                width: 1,
-              )
-            : null,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => widget.onItemSelected(index),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isNarrow ? 0 : 16,
-              vertical: 12,
-            ),
-            child: isNarrow
-                ? Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppTheme.primaryColor
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+          // Mode Réduit
+          if (isCollapsed) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Tooltip(
+                message: titles[i],
+                preferBelow: false,
+                child: InkWell(
+                  onTap: () => onItemSelected(i),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: selected
+                          ? AppTheme.primaryColor.withValues(alpha: 0.15)
+                          : Colors.transparent,
+                    ),
+                    child: Center(
                       child: Icon(
-                        icon,
-                        size: 20,
-                        color: isSelected
-                            ? Colors.white
-                            : (isDark
-                                  ? AppTheme.textDarkSecondary
-                                  : AppTheme.textSecondary),
+                        icons[i],
+                        size: 24,
+                        color: selected
+                            ? AppTheme.primaryColor
+                            : isDark
+                            ? Colors.white70
+                            : AppTheme.textSecondary,
                       ),
                     ),
-                  )
-                : Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppTheme.primaryColor
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          icon,
-                          size: 20,
-                          color: isSelected
-                              ? Colors.white
-                              : (isDark
-                                    ? AppTheme.textDarkSecondary
-                                    : AppTheme.textSecondary),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: TextStyle(
-                            color: isSelected
-                                ? AppTheme.primaryColor
-                                : (isDark
-                                      ? AppTheme.textDarkPrimary
-                                      : AppTheme.textPrimary),
-                            fontSize: 14,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (isSelected)
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.white.withValues(alpha: 0.4),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
                   ),
-          ),
-        ),
-      ),
-    );
-
-    // Tooltip on collapsed mode
-    if (isNarrow) {
-      return Tooltip(
-        message: title,
-        preferBelow: false,
-        waitDuration: const Duration(milliseconds: 400),
-        child: child,
-      );
-    }
-    return child;
-  }
-
-  Widget _buildLogoutButton(bool isDark, bool isNarrow) {
-    final button = Container(
-      padding: EdgeInsets.all(isNarrow ? 8 : 16),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
-            width: 1,
-          ),
-        ),
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {},
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isNarrow ? 0 : 16,
-                vertical: 12,
-              ),
-              decoration: BoxDecoration(
-                color: AppTheme.errorColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppTheme.errorColor.withValues(alpha: 0.3),
-                  width: 1,
                 ),
               ),
-              child: isNarrow
-                  ? Center(
-                      child: Icon(
-                        Icons.logout,
-                        size: 20,
-                        color: AppTheme.errorColor,
+            );
+          }
+
+          // Mode Étendu
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: selected
+                    ? AppTheme.primaryColor.withValues(alpha: 0.15)
+                    : Colors.transparent,
+                border: selected
+                    ? const Border(
+                        left: BorderSide(
+                          color: AppTheme.primaryColor,
+                          width: 3,
+                        ),
+                      )
+                    : null,
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                child: SizedBox(
+                  width: 250,
+                  child: InkWell(
+                    onTap: () => onItemSelected(i),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
                       ),
-                    )
-                  : Row(
-                      children: [
-                        Icon(
-                          Icons.logout,
-                          size: 20,
-                          color: AppTheme.errorColor,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Déconnexion',
-                          style: TextStyle(
-                            color: AppTheme.errorColor,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                      child: Row(
+                        children: [
+                          Icon(
+                            icons[i],
+                            size: 20,
+                            color: selected
+                                ? AppTheme.primaryColor
+                                : isDark
+                                ? Colors.white70
+                                : AppTheme.textSecondary,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: selected
+                                ? TypewriterText(
+                                    text: titles[i],
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  )
+                                : Text(
+                                    titles[i],
+                                    overflow: TextOverflow.clip,
+                                    softWrap: false,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: isDark
+                                          ? Colors.white70
+                                          : AppTheme.textSecondary,
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
-
-    if (isNarrow) {
-      return Tooltip(
-        message: 'Déconnexion',
-        preferBelow: false,
-        waitDuration: const Duration(milliseconds: 400),
-        child: button,
-      );
-    }
-    return button;
   }
 }
