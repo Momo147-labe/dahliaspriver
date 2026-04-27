@@ -3,6 +3,7 @@ import '../schemas/configuration_annee_schema.dart';
 import '../schemas/cycles_scolaires_schema.dart';
 import '../schemas/niveaux_schema.dart';
 import '../schemas/matiere_schema.dart';
+import '../migrations/database_migrations.dart';
 import 'base_dao.dart';
 
 class ConfigDao extends BaseDao {
@@ -544,6 +545,9 @@ class ConfigDao extends BaseDao {
           );
         }
       }
+
+      // Populate default subjects mapping
+      await DatabaseMigrations.populateDefaultSubjects(txn);
     });
   }
 

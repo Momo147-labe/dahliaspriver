@@ -22,6 +22,7 @@ import '../schemas/cycle_matiere_default_schema.dart';
 import '../schemas/paiement_enseignant_schema.dart';
 // These tables are defined directly in the create method below because their schema files are missing
 import '../schemas/document_template_schema.dart';
+import '../migrations/database_migrations.dart';
 
 class DatabaseSchema {
   static Future<void> create(Database db) async {
@@ -71,6 +72,7 @@ class DatabaseSchema {
     await db.execute(ClasseMatiereSchema.createTable);
     await db.execute(PromotionLogSchema.createTable);
     await db.execute(CycleMatiereDefaultSchema.createTable);
+    await DatabaseMigrations.populateDefaultSubjects(db);
     await db.execute(PaiementEnseignantSchema.createTable);
 
     // Check if mention_config and appreciation_config have schemas

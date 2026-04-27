@@ -1121,7 +1121,6 @@ class _ClassesPageState extends State<ClassesPage> {
       _salleController.clear();
       _selectedCycleId = null;
       _selectedNiveauId = null;
-      _selectedAnneeId = DatabaseHelper.activeAnneeId;
       _selectedProfPrincipalId = null;
       _isFinalClass = false;
       _filteredNiveauxForModal = [];
@@ -1465,8 +1464,13 @@ class _ClassesPageState extends State<ClassesPage> {
       } else {
         await DatabaseHelper.instance.update('classe', data, 'id = ?', [id]);
       }
-      Navigator.pop(context);
-      _loadClasses(_selectedAnneeId!);
+      final currentAnneeId =
+          _selectedAnneeId ??
+          context.read<AcademicYearProvider>().selectedAnneeId;
+      if (currentAnneeId == null) throw 'Aucune année scolaire sélectionnée';
+
+      _loadClasses(currentAnneeId);
+      if (mounted) Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(id == null ? 'Classe créée' : 'Classe mise à jour'),

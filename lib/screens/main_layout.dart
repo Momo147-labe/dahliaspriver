@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/theme_provider.dart';
@@ -318,22 +319,27 @@ class _MainLayoutState extends State<MainLayout> {
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: Text(
-                              titles[i],
-                              overflow: TextOverflow.clip,
-                              softWrap: false,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: selected
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
-                                color: selected
-                                    ? AppTheme.primaryColor
-                                    : isDark
-                                    ? Colors.white70
-                                    : AppTheme.textSecondary,
-                              ),
-                            ),
+                            child: selected
+                                ? TypewriterText(
+                                    text: titles[i],
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  )
+                                : Text(
+                                    titles[i],
+                                    overflow: TextOverflow.clip,
+                                    softWrap: false,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: isDark
+                                          ? Colors.white70
+                                          : AppTheme.textSecondary,
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
@@ -361,6 +367,80 @@ class _MainLayoutState extends State<MainLayout> {
           Expanded(child: _menu(isDark)),
         ],
       ),
+    );
+  }
+}
+
+class TypewriterText extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+  final Duration duration;
+
+  const TypewriterText({
+    super.key,
+    required this.text,
+    required this.style,
+    this.duration = const Duration(milliseconds: 100),
+  });
+
+  @override
+  State<TypewriterText> createState() => _TypewriterTextState();
+}
+
+class _TypewriterTextState extends State<TypewriterText> {
+  String _displayedText = "";
+  int _charIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAnimation();
+  }
+
+  @override
+  void didUpdateWidget(TypewriterText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.text != oldWidget.text) {
+      _resetAnimation();
+    }
+  }
+
+  void _resetAnimation() {
+    _timer?.cancel();
+    setState(() {
+      _displayedText = "";
+      _charIndex = 0;
+    });
+    _startAnimation();
+  }
+
+  void _startAnimation() {
+    _timer = Timer.periodic(widget.duration, (timer) {
+      if (_charIndex < widget.text.length) {
+        setState(() {
+          _displayedText += widget.text[_charIndex];
+          _charIndex++;
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      _displayedText,
+      style: widget.style,
+      overflow: TextOverflow.clip,
+      softWrap: false,
     );
   }
 }

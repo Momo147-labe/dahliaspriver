@@ -155,7 +155,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 65,
+      version: 67,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );

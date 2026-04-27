@@ -1278,6 +1278,98 @@ class DatabaseMigrations {
     if (oldVersion < 65) {
       await addColumnSafely(db, 'ecole', 'slogan', 'TEXT');
     }
+
+    if (oldVersion < 66) {
+      // Fixup: Ensure teacher remuneration columns exist (might have been missed in some v63/v64 installs)
+      await addColumnSafely(
+        db,
+        'enseignant',
+        'type_remuneration',
+        "TEXT DEFAULT 'Fixe'",
+      );
+      await addColumnSafely(db, 'enseignant', 'salaire_base', 'REAL DEFAULT 0');
+    }
+
+    if (oldVersion < 67) {
+      // Fixup: Populate cycle_matiere_default if it was empty
+      await populateDefaultSubjects(db);
+    }
+  }
+
+  static Future<void> populateDefaultSubjects(DatabaseExecutor db) async {
+    final List<Map<String, dynamic>> existing = await db.query(
+      'cycle_matiere_default',
+      limit: 1,
+    );
+    if (existing.isNotEmpty) return;
+
+    // Primaire (cycle 2)
+    final primaireMatieres = [
+      "Français",
+      "Calculs",
+      "Sciences d'observation",
+      "Histoire-Géographie",
+      "ECM",
+      "Dessin / Arts plastiques",
+      "Éducation physique et sportive (EPS)",
+    ];
+    for (var m in primaireMatieres) {
+      await db.insert('cycle_matiere_default', {
+        'cycle_id': 2,
+        'matiere_nom': m,
+        'coefficient': 1.0,
+      });
+    }
+
+    // Collège (cycle 3)
+    final collegeMatieres = [
+      "Français",
+      "Mathématiques",
+      "Anglais",
+      "Physique",
+      "Chimie",
+      "Biologie",
+      "Géologie",
+      "Histoire",
+      "Géographie",
+      "ECM",
+      "Informatique",
+      "EPS",
+    ];
+    for (var m in collegeMatieres) {
+      await db.insert('cycle_matiere_default', {
+        'cycle_id': 3,
+        'matiere_nom': m,
+        'coefficient': 1.0,
+      });
+    }
+
+    // Lycée (cycle 4)
+    final lyceeMatieres = [
+      "Français",
+      "Philosophie",
+      "Anglais",
+      "Mathématiques",
+      "Physique",
+      "Chimie",
+      "Biologie",
+      "Géologie",
+      "Histoire",
+      "Géographie",
+      "EPS",
+      "Économie",
+    ];
+    for (var m in lyceeMatieres) {
+      await db.insert('cycle_matiere_default', {
+        'cycle_id': 4,
+        'matiere_nom': m,
+        'coefficient': 1.0,
+      });
+    }
+
+    debugPrint(
+      'Default subjects populated successfully in cycle_matiere_default',
+    );
   }
 
   static Future<void> addColumnSafely(

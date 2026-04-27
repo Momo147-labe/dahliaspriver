@@ -253,11 +253,17 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
 
   Widget _buildHeader(bool isDark, bool isNarrow) {
     return Container(
+      width: double.infinity,
       padding: EdgeInsets.only(
         top: 0,
         left: isNarrow ? 8 : 16,
         right: isNarrow ? 8 : 16,
         bottom: 12,
+      ),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppTheme.surfaceDark.withValues(alpha: 0.5)
+            : AppTheme.surfaceLight,
       ),
       child: Column(
         children: [

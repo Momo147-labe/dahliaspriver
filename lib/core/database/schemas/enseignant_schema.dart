@@ -16,6 +16,8 @@ class EnseignantSchema {
       date_embauche TEXT,
       photo TEXT,
       statut TEXT DEFAULT 'Actif',
+      type_remuneration TEXT DEFAULT 'Fixe',
+      salaire_base REAL DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )

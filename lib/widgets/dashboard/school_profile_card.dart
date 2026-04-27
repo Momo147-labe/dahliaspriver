@@ -34,6 +34,7 @@ class SchoolProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark
@@ -105,7 +106,7 @@ class SchoolProfileCard extends StatelessWidget {
               ],
             )
           else
-            // Nom de l'école
+            // Nom de l'école (Statique comme demandé)
             Text(
               school != null ? school!['nom'] ?? 'École' : 'École',
               style: TextStyle(
