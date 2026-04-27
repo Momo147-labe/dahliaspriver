@@ -6,6 +6,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'trial_service.dart';
 
 class LicenseService {
   static final LicenseService _instance = LicenseService._internal();
@@ -13,6 +14,7 @@ class LicenseService {
   LicenseService._internal();
 
   static const String _licenseTokenKey = 'signed_license_token';
+  static const String _licenseBlockedKey = 'license_blocked_status';
   static const String _secretKey = 'dahliaspriver_security_salt_2024';
 
   final _storage = const FlutterSecureStorage(
@@ -152,16 +154,27 @@ class LicenseService {
       if (result.isNotEmpty) {
         final bool isActive = result.first[0] as bool;
         if (!isActive) {
-          debugPrint("Licence révoquée par le serveur. Nettoyage local.");
-          await _storage.delete(key: _licenseTokenKey);
+          debugPrint(
+            "Licence révoquée par le serveur. Marquage comme bloquée.",
+          );
+          await _storage.write(key: _licenseBlockedKey, value: 'true');
         } else {
-          debugPrint("Licence confirmée par le serveur.");
+          debugPrint(
+            "Licence confirmée par le serveur. Déblocage si nécessaire.",
+          );
+          await _storage.delete(key: _licenseBlockedKey);
         }
       }
     } catch (e) {
       // Échec silencieux si pas d'internet
       debugPrint("Vérification online ignorée (Hors-ligne)");
     }
+  }
+
+  /// Vérifie si la licence est actuellement marquée comme bloquée
+  Future<bool> isLicenseBlocked() async {
+    final blocked = await _storage.read(key: _licenseBlockedKey);
+    return blocked == 'true';
   }
 
   /// Vérifie et active la licence
@@ -242,6 +255,10 @@ class LicenseService {
 
       // Sauvegarde sécurisée locale
       await _saveLocalLicense(licenseKey, deviceId);
+
+      // Réinitialiser les données d'essai car la licence est active
+      await TrialService.resetTrial();
+      await _storage.delete(key: _licenseBlockedKey);
 
       return {
         'success': true,

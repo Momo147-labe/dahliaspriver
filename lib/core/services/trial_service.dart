@@ -150,4 +150,22 @@ class TrialService {
     }
     return 'generic_id';
   }
+
+  /// Réinitialise complètement les données d'essai (appelé après activation licence réelle)
+  static Future<void> resetTrial() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_trialKey);
+    await prefs.remove(_lastRunKey);
+
+    try {
+      final directory = await getApplicationSupportDirectory();
+      final path = '${directory.path}/.sys_data_cache.db';
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (e) {
+      // Ignorer
+    }
+  }
 }

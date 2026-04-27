@@ -13,6 +13,7 @@ import 'providers/academic_year_provider.dart';
 import 'screens/onboarding_page.dart';
 import 'screens/auth/login_page.dart';
 import 'screens/auth/license_activation_page.dart';
+import 'screens/auth/license_blocked_page.dart';
 import 'screens/auth/admin_registration_page.dart';
 import 'screens/main_layout.dart';
 import 'core/services/trial_service.dart';
@@ -87,6 +88,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _hasEcoles = false;
   bool _isLoggedIn = false;
   bool _isLicenseValidated = false;
+  bool _isLicenseBlocked = false;
   bool _isTrialActive = false;
   bool _hasUser = false;
 
@@ -102,12 +104,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
       final prefs = await SharedPreferences.getInstance();
 
       // 1. Check license
-      final licenseValidated = await LicenseService().checkLicenseLocally();
+      final licenseService = LicenseService();
+      final licenseValidated = await licenseService.checkLicenseLocally();
+      final licenseBlocked = await licenseService.isLicenseBlocked();
       final isTrialActive = await TrialService.isTrialActive();
 
       // Trigger background sync if internet is available (don't await)
-      if (licenseValidated) {
-        LicenseService().syncLicenseWithServer();
+      if (licenseValidated && !licenseBlocked) {
+        licenseService.syncLicenseWithServer();
       }
 
       // 2. Check school
@@ -127,6 +131,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       setState(() {
         _isLicenseValidated = licenseValidated;
+        _isLicenseBlocked = licenseBlocked;
         _isTrialActive = isTrialActive;
         _hasEcoles = hasEcoles;
         _hasUser = hasUser;
@@ -159,7 +164,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    // Priorité 1 : Onboarding (Ecole)
+    // Priorité 1 : Licence BLOQUÉE (Sécurité critique)
+    if (_isLicenseBlocked) {
+      return const LicenseBlockedPage();
+    }
+
+    // Priorité 2 : Onboarding (Ecole)
     if (!_hasEcoles) {
       return const OnboardingPage();
     }
