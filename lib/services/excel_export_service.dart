@@ -195,8 +195,12 @@ class ExcelExportService {
       final directory = await getApplicationDocumentsDirectory();
       // Use timestamp to ensure a fresh file is created every time
       String ts = DateTime.now().millisecondsSinceEpoch.toString();
-      final fileName = "Fiche_Notes_${className}_${subjectName}_$ts.xlsx"
-          .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final String trimesterSuffix = trimesters.length == 1
+          ? "_Trim_${trimesters.first}"
+          : "";
+      final fileName =
+          "Fiche_Notes_${className}_${subjectName}${trimesterSuffix}.xlsx"
+              .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
       final path = "${directory.path}/$fileName";
 
       final fileBytes = excel.save();

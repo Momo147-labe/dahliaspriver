@@ -1290,6 +1290,42 @@ class DatabaseMigrations {
       await addColumnSafely(db, 'enseignant', 'salaire_base', 'REAL DEFAULT 0');
     }
 
+    if (oldVersion < 68) {
+      debugPrint('Applying migration v68: Creating performance indexes');
+      try {
+        final List<String> indexQueries = [
+          // eleve_parcours
+          'CREATE INDEX IF NOT EXISTS idx_eleve_parcours_eleve ON eleve_parcours(eleve_id)',
+          'CREATE INDEX IF NOT EXISTS idx_eleve_parcours_classe ON eleve_parcours(classe_id)',
+          'CREATE INDEX IF NOT EXISTS idx_eleve_parcours_annee ON eleve_parcours(annee_scolaire_id)',
+          // notes
+          'CREATE INDEX IF NOT EXISTS idx_notes_eleve ON notes(eleve_id)',
+          'CREATE INDEX IF NOT EXISTS idx_notes_matiere ON notes(matiere_id)',
+          'CREATE INDEX IF NOT EXISTS idx_notes_annee ON notes(annee_scolaire_id)',
+          // paiement
+          'CREATE INDEX IF NOT EXISTS idx_paiement_eleve ON paiement(eleve_id)',
+          'CREATE INDEX IF NOT EXISTS idx_paiement_classe ON paiement(classe_id)',
+          'CREATE INDEX IF NOT EXISTS idx_paiement_annee ON paiement(annee_scolaire_id)',
+          // paiement_detail
+          'CREATE INDEX IF NOT EXISTS idx_paiement_detail_eleve ON paiement_detail(eleve_id)',
+          'CREATE INDEX IF NOT EXISTS idx_paiement_detail_annee ON paiement_detail(annee_scolaire_id)',
+          // classe_matiere
+          'CREATE INDEX IF NOT EXISTS idx_classe_matiere_classe ON classe_matiere(classe_id)',
+          'CREATE INDEX IF NOT EXISTS idx_classe_matiere_matiere ON classe_matiere(matiere_id)',
+          // frais_scolarite
+          'CREATE INDEX IF NOT EXISTS idx_frais_scolarite_classe ON frais_scolarite(classe_id)',
+          'CREATE INDEX IF NOT EXISTS idx_frais_scolarite_annee ON frais_scolarite(annee_scolaire_id)',
+        ];
+
+        for (final query in indexQueries) {
+          await db.execute(query);
+        }
+        debugPrint('Migration v68: Performance indexes created successfully.');
+      } catch (e) {
+        debugPrint('Error applying migration v68: $e');
+      }
+    }
+
     if (oldVersion < 67) {
       // Fixup: Populate cycle_matiere_default if it was empty
       await populateDefaultSubjects(db);
@@ -1310,7 +1346,6 @@ class DatabaseMigrations {
       "Sciences d'observation",
       "Histoire-Géographie",
       "ECM",
-      "Dessin / Arts plastiques",
       "Éducation physique et sportive (EPS)",
     ];
     for (var m in primaireMatieres) {

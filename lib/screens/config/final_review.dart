@@ -36,9 +36,17 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
   }
 
   Future<void> _checkLicense() async {
-    final isValid = await LicenseService().checkLicenseLocally();
+    final licenseService = LicenseService();
+    final isValid = await licenseService.checkLicenseLocally();
+    final currentKey = await licenseService.getLicenseKey();
+
     if (mounted) {
-      setState(() => _isLicenseValidated = isValid);
+      setState(() {
+        _isLicenseValidated = isValid;
+        if (currentKey != null) {
+          _licenseController.text = currentKey;
+        }
+      });
     }
   }
 
@@ -781,9 +789,29 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
                             ],
                           ),
                         );
+                      } else {
+                        return SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              await TrialService.activateTrial();
+                              setState(() {}); // Rafraîchir l'UI
+                            },
+                            icon: const Icon(Icons.timer, size: 18),
+                            label: const Text(
+                              "ACTIVER LA PÉRIODE D'ESSAI (7 JOURS)",
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              side: const BorderSide(color: Colors.blue),
+                              foregroundColor: Colors.blue,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        );
                       }
-
-                      return SizedBox();
                     },
                   ),
                   const SizedBox(height: 16),

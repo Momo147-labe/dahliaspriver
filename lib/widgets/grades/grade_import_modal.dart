@@ -118,6 +118,7 @@ class _GradeImportModalState extends State<GradeImportModal> {
           _selectedFile!,
           trimester: widget.trimester,
           sequence: widget.sequence,
+          anneeId: widget.anneeId,
           expectedClassName: expectedClassName,
           expectedSubjectName: expectedSubjectName,
         );

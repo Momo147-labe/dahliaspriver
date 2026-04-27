@@ -148,45 +148,44 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
           }
 
           final grades = await db.rawQuery('''
-            SELECT note, coefficient, trimestre FROM notes 
-            WHERE eleve_id = ? AND annee_scolaire_id = ? AND matiere_id = ? $periodWhere
+            SELECT 
+              n.trimestre,
+              AVG(n.note) as moy_trimestre,
+              MAX(COALESCE(cm.coefficient, 1.0)) as coefficient
+            FROM notes n
+            JOIN eleve_parcours ep ON n.eleve_id = ep.eleve_id AND n.annee_scolaire_id = ep.annee_scolaire_id
+            LEFT JOIN classe_matiere cm ON cm.matiere_id = n.matiere_id AND cm.classe_id = ep.classe_id
+            WHERE n.eleve_id = ? AND n.annee_scolaire_id = ? AND n.matiere_id = ? $periodWhere
+            GROUP BY n.trimestre
           ''', args);
 
           if (grades.isNotEmpty) {
             double finalAvg = 0;
-            // The coefficient is pulled from the grade record directly
             double coeff =
                 (grades.first['coefficient'] as num?)?.toDouble() ?? 1.0;
 
             if (widget.trimestre == 4) {
               // BILAN ANNUEL: Moyenne des moyennes trimestrielles
-              Map<int, List<double>> trimGrades = {};
-              for (var g in grades) {
-                int trim = g['trimestre'] as int;
-                double val = (g['note'] as num).toDouble();
-                trimGrades.putIfAbsent(trim, () => []).add(val);
-              }
-
               double trimSum = 0;
-              for (var trim in trimGrades.keys) {
-                var trimList = trimGrades[trim]!;
-                double tSum = 0;
-                for (var note in trimList) tSum += note;
-                double tAvg = (tSum / trimList.length);
+              int triCount = 0;
+              for (var row in grades) {
+                int trim = row['trimestre'] as int;
+                double tAvg = (row['moy_trimestre'] as num).toDouble();
                 trimSum += tAvg;
+                triCount++;
 
                 trimPoints[trim] = (trimPoints[trim] ?? 0) + (tAvg * coeff);
                 trimCoeffs[trim] = (trimCoeffs[trim] ?? 0) + coeff;
               }
-              finalAvg = trimSum / trimGrades.length; // Moyenne des trimestres
+              finalAvg = triCount > 0 ? trimSum / triCount : 0.0;
             } else {
-              // TRIMESTRE: Moyenne des séquences
-              double sum = 0;
-              for (var g in grades) {
-                double val = (g['note'] as num).toDouble();
-                sum += val;
-              }
-              finalAvg = sum / grades.length;
+              // TRIMESTRE: Moyenne pondérée des séquences (déjà calculée par le SQL)
+              finalAvg = (grades.first['moy_trimestre'] as num).toDouble();
+
+              // Points du trimestre pour les stats en bas de page
+              int trim = grades.first['trimestre'] as int;
+              trimPoints[trim] = (trimPoints[trim] ?? 0) + (finalAvg * coeff);
+              trimCoeffs[trim] = (trimCoeffs[trim] ?? 0) + coeff;
             }
 
             subjectAverages[subj['id']] = finalAvg;
@@ -300,6 +299,38 @@ class _ResultSheetPageState extends State<ResultSheetPage> {
         foregroundColor: isDark ? Colors.white : Colors.black,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calculate),
+            onPressed: () async {
+              setState(() => _isLoading = true);
+              try {
+                await DatabaseHelper.instance.calculerRangsClasse(
+                  widget.classeId,
+                  widget.anneeId,
+                );
+                await _loadData();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Rangs recalculés avec succès (optimisé)'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+                setState(() => _isLoading = false);
+              }
+            },
+            tooltip: 'Calculer / Mettre à jour les Rangs',
+          ),
           IconButton(
             icon: const Icon(Icons.table_view),
             onPressed: _exportExcel,

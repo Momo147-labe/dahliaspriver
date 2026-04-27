@@ -55,18 +55,46 @@ class GradeImportService {
     File file, {
     required int trimester,
     required int sequence,
+    required int anneeId,
     required String expectedClassName,
     String? expectedSubjectName,
   }) async {
     final bytes = file.readAsBytesSync();
     final excel = Excel.decodeBytes(bytes);
 
-    final sheetName = "Trimestre $trimester";
-    if (!excel.sheets.containsKey(sheetName))
+    // Try multiple sheet name variants for "Trimestre X"
+    String? sheetName;
+    final List<String> possibleNames = [
+      "Trimestre $trimester",
+      "${trimester}er Trimestre",
+      "${trimester}ème Trimestre",
+      "Trimestre $trimester ", // Some excels have trailing spaces
+    ];
+
+    for (var name in possibleNames) {
+      if (excel.sheets.containsKey(name)) {
+        sheetName = name;
+        break;
+      }
+    }
+
+    // Last resort: find any sheet containing the trimester number
+    if (sheetName == null) {
+      for (var name in excel.sheets.keys) {
+        if (name.contains(trimester.toString()) &&
+            name.toLowerCase().contains("trim")) {
+          sheetName = name;
+          break;
+        }
+      }
+    }
+
+    if (sheetName == null || !excel.sheets.containsKey(sheetName)) {
       return {
         'students': <Map<String, dynamic>>[],
         'sequenceNames': <int, String>{},
       };
+    }
 
     final sheet = excel.sheets[sheetName]!;
     if (sheet.maxRows < 2)
@@ -119,7 +147,7 @@ class GradeImportService {
     int headerRowIndex = -1;
     for (int i = 0; i < sheet.maxRows; i++) {
       final row = sheet.rows[i];
-      if (row.isNotEmpty) {
+      if (row.isNotEmpty && row[0] != null) {
         final firstCell = row[0]?.value?.toString().toLowerCase() ?? '';
         if (firstCell.contains('matricule')) {
           headerRowIndex = i;
@@ -139,23 +167,26 @@ class GradeImportService {
     Map<int, String> sequenceNamesMap = {}; // sequenceNumber -> rawName
     try {
       final dbHelper = DatabaseHelper.instance;
+      // CRITICAL FIX: Filter by annee_scolaire_id
       final seqData = await dbHelper.rawQuery(
-        'SELECT numero_sequence, nom FROM sequence_planification WHERE trimestre = ?',
-        [trimester],
+        'SELECT numero_sequence, nom FROM sequence_planification WHERE trimestre = ? AND annee_scolaire_id = ?',
+        [trimester, anneeId],
       );
 
       final headerRow = sheet.rows[headerRowIndex];
 
       for (var seq in seqData) {
-        String sequenceName = seq['nom']?.toString().toLowerCase() ?? '';
+        String sequenceName = seq['nom']?.toString().toLowerCase().trim() ?? '';
         int sequenceNum = seq['numero_sequence'] as int;
         sequenceNamesMap[sequenceNum] =
             seq['nom']?.toString() ?? 'S$sequenceNum';
 
         for (int i = 0; i < headerRow.length; i++) {
-          final cellValue = headerRow[i]?.value?.toString().toLowerCase() ?? "";
+          final cellValue =
+              headerRow[i]?.value?.toString().toLowerCase().trim() ?? "";
           if (cellValue == sequenceName ||
-              cellValue.contains("sequence $sequenceNum")) {
+              cellValue.contains("sequence $sequenceNum") ||
+              cellValue.contains("séquence $sequenceNum")) {
             sequenceCols[sequenceNum] = i;
             break;
           }

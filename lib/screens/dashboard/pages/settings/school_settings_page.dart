@@ -6,7 +6,6 @@ import '../../../../core/services/file_service.dart';
 import '../../../../models/ecole.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../core/services/license_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class SchoolSettingsPage extends StatefulWidget {
   const SchoolSettingsPage({super.key});
@@ -64,11 +63,13 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
       }
 
       // Charger les infos de licence (Vérification sécurisée locale)
-      final isValid = await LicenseService().checkLicenseLocally();
-      final prefs = await SharedPreferences.getInstance();
+      final licenseService = LicenseService();
+      final isValid = await licenseService.checkLicenseLocally();
+      final currentKey = await licenseService.getLicenseKey();
+
       setState(() {
         _isLicenseValidated = isValid;
-        _currentLicenseKey = prefs.getString('licenseKey');
+        _currentLicenseKey = currentKey;
         if (_currentLicenseKey != null) {
           _licenseController.text = _currentLicenseKey!;
         }

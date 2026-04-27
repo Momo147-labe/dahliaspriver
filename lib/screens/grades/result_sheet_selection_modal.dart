@@ -23,8 +23,9 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
   List<Map<String, dynamic>> _classes = [];
   Map<String, dynamic>? _selectedClass;
 
-  // Period default (T1)
-  int _selectedTrimestre = 1;
+  // Dynamic Trimesters
+  List<Map<String, dynamic>> _trimesters = [];
+  int? _selectedTrimestre;
 
   bool _isLoading = true;
 
@@ -39,8 +40,37 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
       final db = await widget.dbHelper.database;
       final classes = await db.query('classe');
 
+      final sequencesData = await db.query(
+        'sequence_planification',
+        where: 'annee_scolaire_id = ?',
+        whereArgs: [widget.anneeId],
+      );
+
+      final trimestreValues =
+          sequencesData
+              .map((seq) => seq['trimestre'] as int?)
+              .where((t) => t != null)
+              .cast<int>()
+              .toSet()
+              .toList()
+            ..sort();
+
+      final List<Map<String, dynamic>> trimestersList = trimestreValues.map((
+        t,
+      ) {
+        String name = t == 1 ? "1er Trimestre" : "${t}ème Trimestre";
+        return {'id': t, 'nom': name};
+      }).toList();
+
+      // Add Bilan Annuel
+      trimestersList.add({'id': 4, 'nom': 'Bilan Annuel'});
+
       setState(() {
         _classes = classes;
+        _trimesters = trimestersList;
+        if (_trimesters.isNotEmpty) {
+          _selectedTrimestre = _trimesters.first['id'] as int;
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -50,17 +80,18 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
   }
 
   void _generateResultSheet() async {
-    if (_selectedClass == null) return;
+    if (_selectedClass == null || _selectedTrimestre == null) return;
 
     if (!mounted) return;
+
     Navigator.pop(context); // Close modal
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ResultSheetPage(
           classeId: _selectedClass!['id'] as int,
-          trimestre: _selectedTrimestre,
-          sequence: 0, // Not used for now or default
+          trimestre: _selectedTrimestre!,
+          sequence: 0,
           anneeId: widget.anneeId,
         ),
       ),
@@ -157,7 +188,7 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
 
           const SizedBox(height: 16),
 
-          // Trimester Dropdown (Static 1, 2, 3, 4)
+          // Trimester Dropdown (Dynamic based on sequence_planification)
           DropdownButtonFormField<int>(
             dropdownColor: isDark ? AppTheme.surfaceDark : Colors.white,
             style: TextStyle(
@@ -183,13 +214,17 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
                   : Colors.grey[50],
             ),
             value: _selectedTrimestre,
-            items: const [
-              DropdownMenuItem(value: 1, child: Text("1er Trimestre")),
-              DropdownMenuItem(value: 2, child: Text("2ème Trimestre")),
-              DropdownMenuItem(value: 3, child: Text("3ème Trimestre")),
-              DropdownMenuItem(value: 4, child: Text("Bilan Annuel")),
-            ],
-            onChanged: (val) => setState(() => _selectedTrimestre = val!),
+            items: _trimesters.map((item) {
+              return DropdownMenuItem<int>(
+                value: item['id'] as int,
+                child: Text(item['nom'] as String),
+              );
+            }).toList(),
+            onChanged: (val) {
+              setState(() {
+                _selectedTrimestre = val;
+              });
+            },
           ),
 
           const SizedBox(height: 32),

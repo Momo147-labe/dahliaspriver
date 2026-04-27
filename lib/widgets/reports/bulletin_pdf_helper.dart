@@ -502,18 +502,22 @@ class BulletinPdfHelper {
     List<Map<String, dynamic>> mentions,
   ) {
     return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
+      border: pw.TableBorder.all(color: PdfColors.black, width: 0.7),
+      columnWidths: {
+        0: const pw.FlexColumnWidth(3),
+        1: const pw.FlexColumnWidth(0.8),
+        for (int i = 0; i < columns.length; i++)
+          i + 2: const pw.FlexColumnWidth(1.3),
+        columns.length + 2: const pw.FlexColumnWidth(1.5),
+        columns.length + 3: const pw.FlexColumnWidth(3.5),
+      },
       children: [
         pw.TableRow(
           decoration: pw.BoxDecoration(color: PdfColors.grey100),
           children: [
             _tableHeader('MATIÈRES'),
             _tableHeader('COEFF.'),
-            ...columns.map(
-              (col) => _tableHeader(
-                '${col['label']} / ${noteMax.toStringAsFixed(0)}',
-              ),
-            ),
+            ...columns.map((col) => _tableHeader('${col['label']}')),
             _tableHeader('MOYENNE'),
             _tableHeader('APPRÉCIATIONS'),
           ],
@@ -585,10 +589,13 @@ class BulletinPdfHelper {
     bool alignLeft = false,
     bool isBold = false,
   }) {
+    // Sanitization to prevent PDF font loading issues for curved apostrophes
+    final sanitizedText = text.replaceAll('’', "'");
+
     return pw.Padding(
       padding: pw.EdgeInsets.all(5),
       child: pw.Text(
-        text,
+        sanitizedText,
         style: pw.TextStyle(
           fontSize: 8,
           fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,

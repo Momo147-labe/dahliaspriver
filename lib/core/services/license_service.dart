@@ -1,11 +1,12 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:postgres/postgres.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:crypto/crypto.dart';
-import 'dart:convert';
 import 'trial_service.dart';
 
 class LicenseService {
@@ -13,7 +14,13 @@ class LicenseService {
   factory LicenseService() => _instance;
   LicenseService._internal();
 
-  static const String _licenseTokenKey = 'signed_license_token';
+  static final ValueNotifier<bool> licenseBlockedNotifier = ValueNotifier<bool>(
+    false,
+  );
+
+  static const String _licenseKeyKey = 'license_key';
+  static const String _licenseDeviceIdKey = 'license_device_id';
+  static const String _licenseSignatureKey = 'license_signature_v2';
   static const String _licenseBlockedKey = 'license_blocked_status';
   static const String _secretKey = 'dahliaspriver_security_salt_2024';
 
@@ -91,41 +98,36 @@ class LicenseService {
     return hmac.convert(bytes).toString();
   }
 
-  /// Sauvegarde la licence localement avec signature
+  /// Sauvegarde la licence localement (Format solide et simple)
   Future<void> _saveLocalLicense(String key, String deviceId) async {
-    final data = {
-      'key': key,
-      'deviceId': deviceId,
-      'timestamp': DateTime.now().toIso8601String(),
-    };
-    final jsonStr = jsonEncode(data);
-    final signature = _generateHMAC(jsonStr);
-
-    final payload = jsonEncode({'data': data, 'sig': signature});
-    await _storage.write(key: _licenseTokenKey, value: payload);
+    final signature = _generateHMAC('$key|$deviceId');
+    await _storage.write(key: _licenseKeyKey, value: key);
+    await _storage.write(key: _licenseDeviceIdKey, value: deviceId);
+    await _storage.write(key: _licenseSignatureKey, value: signature);
   }
 
   /// Vérifie la licence localement (Hors-ligne)
   Future<bool> checkLicenseLocally() async {
     try {
-      final payloadStr = await _storage.read(key: _licenseTokenKey);
-      if (payloadStr == null) return false;
+      final key = await _storage.read(key: _licenseKeyKey);
+      final storedDeviceId = await _storage.read(key: _licenseDeviceIdKey);
+      final signature = await _storage.read(key: _licenseSignatureKey);
 
-      final payload = jsonDecode(payloadStr);
-      final data = payload['data'];
-      final String signature = payload['sig'];
+      if (key == null || storedDeviceId == null || signature == null) {
+        return false;
+      }
 
-      // 1. Vérifier la signature
-      final expectedSig = _generateHMAC(jsonEncode(data));
+      // 1. Vérifier l'intégrité (Signature)
+      final expectedSig = _generateHMAC('$key|$storedDeviceId');
       if (signature != expectedSig) {
-        debugPrint("ALERTE: Signature de licence invalide !");
+        debugPrint("ALERTE: Intégrité de la licence Windows compromise !");
         return false;
       }
 
       // 2. Vérifier le device ID
       final currentDeviceId = await getDeviceId();
-      if (data['deviceId'] != currentDeviceId) {
-        debugPrint("ALERTE: Licence transférée sur un autre appareil !");
+      if (storedDeviceId != currentDeviceId) {
+        debugPrint("ALERTE: Licence identifiée pour un autre PC !");
         return false;
       }
 
@@ -139,11 +141,8 @@ class LicenseService {
   /// Synchronise le statut avec Neon si internet est disponible
   Future<void> syncLicenseWithServer() async {
     try {
-      final payloadStr = await _storage.read(key: _licenseTokenKey);
-      if (payloadStr == null) return;
-
-      final payload = jsonDecode(payloadStr);
-      final String licenseKey = payload['data']['key'];
+      final licenseKey = await _storage.read(key: _licenseKeyKey);
+      if (licenseKey == null || licenseKey.isEmpty) return;
 
       final conn = await _getConnection();
       final result = await conn.execute(
@@ -158,11 +157,13 @@ class LicenseService {
             "Licence révoquée par le serveur. Marquage comme bloquée.",
           );
           await _storage.write(key: _licenseBlockedKey, value: 'true');
+          licenseBlockedNotifier.value = true;
         } else {
           debugPrint(
             "Licence confirmée par le serveur. Déblocage si nécessaire.",
           );
           await _storage.delete(key: _licenseBlockedKey);
+          licenseBlockedNotifier.value = false;
         }
       }
     } catch (e) {
@@ -175,6 +176,16 @@ class LicenseService {
   Future<bool> isLicenseBlocked() async {
     final blocked = await _storage.read(key: _licenseBlockedKey);
     return blocked == 'true';
+  }
+
+  /// Récupère la clé de licence active depuis le stockage sécurisé
+  Future<String?> getLicenseKey() async {
+    return await _storage.read(key: _licenseKeyKey);
+  }
+
+  /// Vide toutes les données du stockage sécurisé (Réinitialisation totale)
+  Future<void> clearAllData() async {
+    await _storage.deleteAll();
   }
 
   /// Vérifie et active la licence
@@ -205,6 +216,8 @@ class LicenseService {
       if (isActiveOnline) {
         if (dbDeviceId == deviceId) {
           await _saveLocalLicense(licenseKey, deviceId);
+          await TrialService.resetTrial();
+          await _storage.delete(key: _licenseBlockedKey);
           return {
             'success': true,
             'message': "Licence valide (Même appareil).",

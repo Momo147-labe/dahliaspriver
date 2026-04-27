@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/trial_service.dart';
+import '../../core/services/license_service.dart';
 import '../../theme/app_theme.dart';
 
 class TrialCountdown extends StatefulWidget {
@@ -21,8 +21,8 @@ class _TrialCountdownState extends State<TrialCountdown> {
   void initState() {
     super.initState();
     _checkStatus();
-    // Refresh every 30 seconds
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _checkStatus());
+    // Refresh every 1 minute
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) => _checkStatus());
   }
 
   @override
@@ -32,8 +32,8 @@ class _TrialCountdownState extends State<TrialCountdown> {
   }
 
   Future<void> _checkStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasRealLicense = prefs.getString('licenseKey') != null;
+    final licenseService = LicenseService();
+    final hasRealLicense = await licenseService.checkLicenseLocally();
 
     if (mounted) {
       setState(() {
@@ -78,11 +78,11 @@ class _TrialCountdownState extends State<TrialCountdown> {
     final isTrialActive =
         _isVisible && remaining != null && remaining > Duration.zero;
 
-    // Si l'essai n'est pas encore démarré, on affiche une invite
-    final displayTime = isTrialActive
-        ? _formatDuration(remaining)
-        : "7 jours offerts";
-    final isCritical = isTrialActive && remaining.inDays < 1;
+    // Si l'essai n'est pas encore démarré ou n'existe pas, on cache tout
+    if (!isTrialActive) return const SizedBox.shrink();
+
+    final displayTime = _formatDuration(remaining);
+    final isCritical = remaining.inDays < 1;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

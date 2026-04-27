@@ -404,6 +404,15 @@ class _GradesPageState extends State<GradesPage> {
             setState(() => _isLoading = false);
             return;
           }
+        } else {
+          // If the field was cleared, delete the existing note (if any)
+          await _dbHelper.deleteGrade(
+            eleveId: eleveId,
+            matiereId: _selectedSubject!['id'],
+            trimestre: _selectedTrimestre,
+            sequence: sequenceNum,
+            anneeId: anneeId,
+          );
         }
       }
       _showSuccess('Toutes les notes ont été enregistrées');

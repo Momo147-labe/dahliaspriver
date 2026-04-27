@@ -155,7 +155,7 @@ class DatabaseHelper {
     final path = await getDatabasePath();
     return await openDatabase(
       path,
-      version: 67,
+      version: 68,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -462,6 +462,20 @@ class DatabaseHelper {
 
   Future<void> saveGrade(Map<String, dynamic> noteData) =>
       notesDao.saveGrade(noteData);
+
+  Future<void> deleteGrade({
+    required int eleveId,
+    required int matiereId,
+    required int trimestre,
+    required int sequence,
+    required int anneeId,
+  }) => notesDao.deleteGrade(
+    eleveId: eleveId,
+    matiereId: matiereId,
+    trimestre: trimestre,
+    sequence: sequence,
+    anneeId: anneeId,
+  );
 
   Future<Map<String, dynamic>> getGradesStats(
     int classId,

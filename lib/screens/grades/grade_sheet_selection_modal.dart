@@ -162,25 +162,23 @@ class _GradeSheetSelectionModalState extends State<GradeSheetSelectionModal> {
 
       if (_selectedFormat == "EXCEL") {
         // Prepare data for ExcelExportService
-        Map<int, List<Map<String, dynamic>>> fullSequencesMap = {};
-
-        final allTrimesters =
-            allSequences.map((s) => s['trimestre'] as int).toSet().toList()
-              ..sort();
-        for (int t in allTrimesters) {
-          fullSequencesMap[t] =
-              allSequences.where((s) => s['trimestre'] == t).toList()..sort(
-                (a, b) => (a['numero_sequence'] as int).compareTo(
-                  b['numero_sequence'] as int,
+        Map<int, List<Map<String, dynamic>>> fullSequencesMap = {
+          _selectedTrimestre!:
+              allSequences
+                  .where((s) => s['trimestre'] == _selectedTrimestre)
+                  .toList()
+                ..sort(
+                  (a, b) => (a['numero_sequence'] as int).compareTo(
+                    b['numero_sequence'] as int,
+                  ),
                 ),
-              );
-        }
+        };
 
         final path = await ExcelExportService.instance.generateGradeTemplate(
           className: _selectedClass!['nom'],
           subjectName: _selectedSubject!['nom'],
           students: students,
-          trimesters: allTrimesters,
+          trimesters: [_selectedTrimestre!],
           trimesterSequences: fullSequencesMap,
           schoolInfo: ecole?.toMap() ?? {},
           teacherName: teacherName,

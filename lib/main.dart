@@ -95,7 +95,24 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
+    LicenseService.licenseBlockedNotifier.addListener(_onLicenseStatusChanged);
     _initCheck();
+  }
+
+  @override
+  void dispose() {
+    LicenseService.licenseBlockedNotifier.removeListener(
+      _onLicenseStatusChanged,
+    );
+    super.dispose();
+  }
+
+  void _onLicenseStatusChanged() {
+    if (mounted) {
+      setState(() {
+        _isLicenseBlocked = LicenseService.licenseBlockedNotifier.value;
+      });
+    }
   }
 
   Future<void> _initCheck() async {
@@ -105,17 +122,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       // 1. Check license
       final licenseService = LicenseService();
-      final licenseValidated = await licenseService.checkLicenseLocally();
-      final licenseBlocked = await licenseService.isLicenseBlocked();
-      final isTrialActive = await TrialService.isTrialActive();
+      bool licenseValidated = await licenseService.checkLicenseLocally();
+      bool licenseBlocked = await licenseService.isLicenseBlocked();
+      bool isTrialActive = await TrialService.isTrialActive();
 
       // Trigger background sync if internet is available (don't await)
-      if (licenseValidated && !licenseBlocked) {
+      if (licenseValidated) {
         licenseService.syncLicenseWithServer();
       }
 
       // 2. Check school
       final hasEcoles = await db.hasEcoles();
+
+      // Nouveau : Si aucune école n'est enregistrée, on vide tout par sécurité
+      if (!hasEcoles) {
+        await licenseService.clearAllData();
+        await prefs.clear();
+        // Rafraîchir les flags locaux pour le setState
+        licenseValidated = false;
+        licenseBlocked = false;
+        isTrialActive = false;
+      }
 
       // 3. Check for at least one user (admin)
       bool hasUser = false;
@@ -131,6 +158,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       setState(() {
         _isLicenseValidated = licenseValidated;
+        LicenseService.licenseBlockedNotifier.value = licenseBlocked;
         _isLicenseBlocked = licenseBlocked;
         _isTrialActive = isTrialActive;
         _hasEcoles = hasEcoles;
