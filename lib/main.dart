@@ -16,6 +16,7 @@ import 'screens/auth/license_activation_page.dart';
 import 'screens/auth/admin_registration_page.dart';
 import 'screens/main_layout.dart';
 import 'core/services/trial_service.dart';
+import 'core/services/license_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -101,8 +102,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
       final prefs = await SharedPreferences.getInstance();
 
       // 1. Check license
-      final licenseValidated = prefs.getBool('isLicenseValidated') ?? false;
+      final licenseValidated = await LicenseService().checkLicenseLocally();
       final isTrialActive = await TrialService.isTrialActive();
+
+      // Trigger background sync if internet is available (don't await)
+      if (licenseValidated) {
+        LicenseService().syncLicenseWithServer();
+      }
 
       // 2. Check school
       final hasEcoles = await db.hasEcoles();

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/license_service.dart';
 import '../../theme/app_theme.dart';
@@ -40,10 +39,6 @@ class _LicenseActivationPageState extends State<LicenseActivationPage> {
       );
 
       if (result['success']) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isLicenseValidated', true);
-        await prefs.setString('licenseKey', key);
-
         if (mounted) {
           // Vérifier si une école existe pour savoir où rediriger
           final hasEcoles = await DatabaseHelper.instance.hasEcoles();
@@ -61,7 +56,11 @@ class _LicenseActivationPageState extends State<LicenseActivationPage> {
         setState(() => _errorMessage = result['message']);
       }
     } catch (e) {
-      setState(() => _errorMessage = "Erreur de connexion : $e");
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            "Le serveur de licence est injoignable ou une erreur technique est survenue.";
+      });
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

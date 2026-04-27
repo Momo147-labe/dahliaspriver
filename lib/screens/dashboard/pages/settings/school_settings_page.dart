@@ -63,10 +63,11 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
         });
       }
 
-      // Charger les infos de licence
+      // Charger les infos de licence (Vérification sécurisée locale)
+      final isValid = await LicenseService().checkLicenseLocally();
       final prefs = await SharedPreferences.getInstance();
       setState(() {
-        _isLicenseValidated = prefs.getBool('isLicenseValidated') ?? false;
+        _isLicenseValidated = isValid;
         _currentLicenseKey = prefs.getString('licenseKey');
         if (_currentLicenseKey != null) {
           _licenseController.text = _currentLicenseKey!;
@@ -197,10 +198,6 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
       );
 
       if (result['success']) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isLicenseValidated', true);
-        await prefs.setString('licenseKey', key);
-
         setState(() {
           _isLicenseValidated = true;
           _currentLicenseKey = key;
@@ -227,8 +224,10 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur technique: $e'),
+          const SnackBar(
+            content: Text(
+              'Le serveur de licence est injoignable ou une erreur technique est survenue.',
+            ),
             backgroundColor: Colors.red,
           ),
         );

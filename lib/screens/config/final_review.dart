@@ -5,7 +5,6 @@ import '../../core/database/database_helper.dart';
 import '../../core/database/daos/config_dao.dart';
 import '../../theme/app_theme.dart';
 import '../auth/login_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/license_service.dart';
 import '../../core/services/trial_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -33,6 +32,14 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
   void initState() {
     super.initState();
     _loadSchoolData();
+    _checkLicense();
+  }
+
+  Future<void> _checkLicense() async {
+    final isValid = await LicenseService().checkLicenseLocally();
+    if (mounted) {
+      setState(() => _isLicenseValidated = isValid);
+    }
   }
 
   Future<void> _loadSchoolData() async {
@@ -906,10 +913,6 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
       );
 
       if (result['success'] == true) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isLicenseValidated', true);
-        await prefs.setString('licenseKey', key);
-
         setState(() {
           _isLicenseValidated = true;
           _isValidatingLicense = false;
@@ -921,7 +924,9 @@ class _FinalReviewPageState extends State<FinalReviewPage> {
       }
     } catch (e) {
       setState(() => _isValidatingLicense = false);
-      _showErrorSnackBar("Erreur de connexion au serveur de licence.");
+      _showErrorSnackBar(
+        "Le serveur de licence est injoignable ou une erreur technique est survenue.",
+      );
     }
   }
 
