@@ -237,7 +237,7 @@ class _AddStudentModalState extends State<AddStudentModal> {
         setState(() {
           _fraisId = fraisData.first['id'] as int?;
 
-          final bool isReinscrit = _selectedTypePaiement == 'reinscription';
+          final bool isReinscrit = _selectedTypeInscription == 'reinscrit';
           final registrationFee = (isReinscrit
               ? (fraisData.first['reinscription'] as num?)?.toDouble() ?? 0.0
               : (fraisData.first['inscription'] as num?)?.toDouble() ?? 0.0);
@@ -1375,7 +1375,14 @@ class _AddStudentModalState extends State<AddStudentModal> {
               values: ['inscrit', 'reinscrit'],
               displayValues: ['Inscription', 'Réinscription'],
               onChanged: (v) {
-                if (v != null) setState(() => _selectedTypeInscription = v);
+                if (v != null) {
+                  setState(() {
+                    _selectedTypeInscription = v;
+                    _selectedTypePaiement =
+                        v == 'reinscrit' ? 'reinscription' : 'inscription';
+                  });
+                  _loadFraisScolarite();
+                }
               },
               isRequired: true,
             ),
@@ -1568,12 +1575,19 @@ class _AddStudentModalState extends State<AddStudentModal> {
                       )
                     : _buildDropdownField(
                         label: 'Type de paiement',
-                        selectedValue: _selectedTypePaiement,
+                        selectedValue: _selectedTypeInscription == 'reinscrit'
+                            ? 'reinscription'
+                            : 'inscription',
                         values: ['inscription', 'reinscription'],
                         displayValues: ['Inscription', 'Réinscription'],
                         onChanged: (v) {
                           if (v != null) {
-                            setState(() => _selectedTypePaiement = v);
+                            setState(() {
+                              _selectedTypePaiement = v;
+                              _selectedTypeInscription = v == 'reinscription'
+                                  ? 'reinscrit'
+                                  : 'inscrit';
+                            });
                             _loadFraisScolarite();
                           }
                         },
