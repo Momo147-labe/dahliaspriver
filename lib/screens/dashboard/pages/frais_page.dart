@@ -197,12 +197,17 @@ class _FraisPageState extends State<FraisPage> with TickerProviderStateMixin {
 
       _editFraisData['montant_total'] = montantTotal;
 
+      final updateData = Map<String, dynamic>.from(_editFraisData);
+      updateData.remove('classe_nom');
+      updateData.remove('classe_niveau');
+      updateData.remove('annee_libelle');
+
       final db = await DatabaseHelper.instance.database;
       await db.update(
         'frais_scolarite',
-        _editFraisData,
+        updateData,
         where: 'id = ?',
-        whereArgs: [_editFraisData['id']],
+        whereArgs: [updateData['id']],
       );
 
       setState(() => _showEditModal = false);

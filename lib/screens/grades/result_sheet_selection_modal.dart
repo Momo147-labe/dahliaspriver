@@ -38,38 +38,48 @@ class _ResultSheetSelectionModalState extends State<ResultSheetSelectionModal> {
   Future<void> _loadData() async {
     try {
       final db = await widget.dbHelper.database;
-      final classes = await db.query('classe');
+      final classes = await db.query('classe', orderBy: 'nom ASC');
 
-      final sequencesData = await db.query(
-        'sequence_planification',
-        where: 'annee_scolaire_id = ?',
-        whereArgs: [widget.anneeId],
-      );
+      List<int> trimestreValues = [];
+      try {
+        final sequencesData = await db.query(
+          'sequence_planification',
+          where: 'annee_scolaire_id = ?',
+          whereArgs: [widget.anneeId],
+        );
 
-      final trimestreValues =
-          sequencesData
-              .map((seq) => seq['trimestre'] as int?)
-              .where((t) => t != null)
-              .cast<int>()
-              .toSet()
-              .toList()
-            ..sort();
+        trimestreValues = sequencesData
+            .map((seq) => int.tryParse(seq['trimestre']?.toString() ?? ''))
+            .where((t) => t != null)
+            .cast<int>()
+            .toSet()
+            .toList()
+          ..sort();
+      } catch (e) {
+        debugPrint("Error loading sequences for trimesters: $e");
+      }
 
-      final List<Map<String, dynamic>> trimestersList = trimestreValues.map((
-        t,
-      ) {
+      // Fallback if sequence_planification is empty or query failed
+      if (trimestreValues.isEmpty) {
+        trimestreValues = [1, 2, 3];
+      }
+
+      final List<Map<String, dynamic>> trimestersList = trimestreValues.map<Map<String, dynamic>>((t) {
         String name = t == 1 ? "1er Trimestre" : "${t}ème Trimestre";
-        return {'id': t, 'nom': name};
+        return <String, dynamic>{'id': t, 'nom': name};
       }).toList();
 
       // Add Bilan Annuel
-      trimestersList.add({'id': 4, 'nom': 'Bilan Annuel'});
+      trimestersList.add(<String, dynamic>{'id': 4, 'nom': 'Bilan Annuel'});
 
       setState(() {
         _classes = classes;
         _trimesters = trimestersList;
         if (_trimesters.isNotEmpty) {
           _selectedTrimestre = _trimesters.first['id'] as int;
+        }
+        if (_classes.isNotEmpty && _selectedClass == null) {
+          _selectedClass = _classes.first;
         }
         _isLoading = false;
       });

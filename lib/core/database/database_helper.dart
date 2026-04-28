@@ -477,6 +477,20 @@ class DatabaseHelper {
     anneeId: anneeId,
   );
 
+  Future<void> deleteAllGradesForSubjectSequence({
+    required int classeId,
+    required int matiereId,
+    required int trimestre,
+    required int sequence,
+    required int anneeId,
+  }) => notesDao.deleteAllGradesForSubjectSequence(
+        classeId: classeId,
+        matiereId: matiereId,
+        trimestre: trimestre,
+        sequence: sequence,
+        anneeId: anneeId,
+      );
+
   Future<Map<String, dynamic>> getGradesStats(
     int classId,
     int subjectId,

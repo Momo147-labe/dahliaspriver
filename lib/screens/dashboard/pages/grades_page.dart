@@ -154,6 +154,12 @@ class _GradesPageState extends State<GradesPage> {
 
       setState(() {
         _overviewGrades = grouped.values.toList();
+        // Tri par trimestre (décroissant) et nom de classe (croissant)
+        _overviewGrades.sort((a, b) {
+          int tComp = (b['trimestre'] as int).compareTo(a['trimestre'] as int);
+          if (tComp != 0) return tComp;
+          return (a['classe_nom'] as String).compareTo(b['classe_nom'] as String);
+        });
         _isLoading = false;
       });
     } catch (e) {
@@ -420,6 +426,56 @@ class _GradesPageState extends State<GradesPage> {
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('Erreur sauvegarde: $e');
+    }
+  }
+
+  Future<void> _deleteSequenceGrades(Map<String, dynamic> item, int sequence) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmation de suppression'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Text(
+          'Voulez-vous vraiment supprimer toutes les notes de ${item['matiere_nom']} '
+          'pour la séquence $sequence du trimestre ${item['trimestre']} '
+          'dans la classe ${item['classe_nom']} ?\n\n'
+          'Cette action est irréversible et recalculera les rangs de la classe.',
+          style: const TextStyle(fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Annuler', style: TextStyle(color: Colors.grey[600])),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[700],
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text('Supprimer tout', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _isLoading = true);
+      try {
+        await _dbHelper.deleteAllGradesForSubjectSequence(
+          classeId: item['classe_id'],
+          matiereId: item['matiere_id'],
+          trimestre: item['trimestre'],
+          sequence: sequence,
+          anneeId: _lastLoadedAnneeId!,
+        );
+        _showSuccess('Notes supprimées avec succès');
+        await _loadOverview(_lastLoadedAnneeId!);
+      } catch (e) {
+        setState(() => _isLoading = false);
+        _showError('Erreur lors de la suppression: $e');
+      }
     }
   }
 
@@ -781,11 +837,97 @@ class _GradesPageState extends State<GradesPage> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 100),
       itemCount: _overviewGrades.length,
       itemBuilder: (context, index) {
         final g = _overviewGrades[index];
-        return Container(
+
+        // Logic to show Trimester header
+        bool showTrimHeader = false;
+        if (index == 0 ||
+            _overviewGrades[index - 1]['trimestre'] != g['trimestre']) {
+          showTrimHeader = true;
+        }
+
+        // Logic to show Class header (secondary grouping)
+        bool showClassHeader = false;
+        if (index == 0 ||
+            _overviewGrades[index - 1]['classe_id'] != g['classe_id'] ||
+            showTrimHeader) {
+          showClassHeader = true;
+        }
+
+        final currentClass = _classes.firstWhere(
+          (c) => c['id'] == g['classe_id'],
+          orElse: () => {'note_max': 20.0, 'moyenne_passage': 10.0},
+        );
+        final noteMax = (currentClass['note_max'] as num?)?.toDouble() ?? 20.0;
+        final passingGrade = (currentClass['moyenne_passage'] as num?)?.toDouble() ?? (noteMax / 2);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showTrimHeader) ...[
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primaryColor,
+                          AppTheme.primaryColor.withValues(alpha: 0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      'TRIMESTRE ${g['trimestre']}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  const Expanded(
+                    child: Divider(indent: 16, thickness: 1.5),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+            if (showClassHeader) ...[
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 12, top: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.class_outlined,
+                        size: 16, color: AppTheme.primaryColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Classe: ${g['classe_nom']}',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white70 : Colors.blueGrey[800],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
             color: isDark ? AppTheme.surfaceDark : Colors.white,
@@ -911,23 +1053,46 @@ class _GradesPageState extends State<GradesPage> {
                                   ),
                                 ),
                                 child: Builder(
-                                  builder: (context) {
-                                    final seqName = _sequences.firstWhere(
-                                      (s) =>
-                                          s['numero_sequence'] == e.key &&
-                                          s['trimestre'] == _selectedTrimestre,
-                                      orElse: () => {'nom': 'Seq ${e.key}'},
-                                    )['nom'];
-                                    return Text(
-                                      '$seqName: ${e.value.toStringAsFixed(1)}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.primaryColor,
-                                      ),
-                                    );
-                                  },
-                                ),
+                                    builder: (context) {
+                                      final seqName = _sequences.firstWhere(
+                                        (s) =>
+                                            s['numero_sequence'] == e.key &&
+                                            s['trimestre'] == g['trimestre'],
+                                        orElse: () => {'nom': 'Seq ${e.key}'},
+                                      )['nom'];
+                                      return Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '$seqName: ${e.value.toStringAsFixed(1)}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.primaryColor,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          GestureDetector(
+                                            onTap: () => _deleteSequenceGrades(
+                                                g, e.key),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red
+                                                    .withValues(alpha: 0.1),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.close_rounded,
+                                                size: 12,
+                                                color: Colors.red,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
                               );
                             })
                             .toList(),
@@ -953,7 +1118,7 @@ class _GradesPageState extends State<GradesPage> {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: (g['average'] as num) >= 10
+                      color: (g['average'] as num) >= passingGrade
                           ? AppTheme.successColor
                           : AppTheme.errorColor,
                     ),
@@ -962,6 +1127,8 @@ class _GradesPageState extends State<GradesPage> {
               ),
             ),
           ),
+            ),
+          ],
         );
       },
     );

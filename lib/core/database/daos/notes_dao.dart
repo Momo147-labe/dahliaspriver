@@ -141,6 +141,29 @@ class NotesDao extends BaseDao {
     await calculerRangsClasse(classeId, anneeId);
   }
 
+  Future<void> deleteAllGradesForSubjectSequence({
+    required int classeId,
+    required int matiereId,
+    required int trimestre,
+    required int sequence,
+    required int anneeId,
+  }) async {
+    await db.delete(
+      NotesSchema.tableName,
+      where:
+          'matiere_id = ? AND trimestre = ? AND sequence = ? AND annee_scolaire_id = ? AND eleve_id IN (SELECT eleve_id FROM eleve_parcours WHERE classe_id = ? AND annee_scolaire_id = ?)',
+      whereArgs: [
+        matiereId,
+        trimestre,
+        sequence,
+        anneeId,
+        classeId,
+        anneeId,
+      ],
+    );
+    await calculerRangsClasse(classeId, anneeId);
+  }
+
   Future<Map<String, dynamic>> getGradesStats(
     int classId,
     int subjectId,

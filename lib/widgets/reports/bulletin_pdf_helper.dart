@@ -180,7 +180,7 @@ class BulletinPdfHelper {
         pageFormat: PdfPageFormat.a4,
         build: (pw.Context context) {
           return pw.Padding(
-            padding: pw.EdgeInsets.all(30),
+            padding: const pw.EdgeInsets.all(10),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -250,7 +250,7 @@ class BulletinPdfHelper {
         pageFormat: PdfPageFormat.a4,
         build: (pw.Context context) {
           return pw.Padding(
-            padding: pw.EdgeInsets.all(30),
+            padding: const pw.EdgeInsets.all(10),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
