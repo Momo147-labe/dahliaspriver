@@ -8,11 +8,27 @@ import '../../models/ecole.dart';
 class StudentCardPdfService {
   static const double cardWidth = 280.0;
   static const double cardHeight = 200.0;
+  static const double portraitCardWidth = 200.0;
+  static const double portraitCardHeight = 280.0;
+  static const String modelClassic = 'classic';
+  static const String modelModern = 'modern';
+  static const String modelPremium = 'premium';
+
+  static String? _normalizeFilePath(String? rawPath) {
+    if (rawPath == null) return null;
+    final trimmed = rawPath.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.startsWith('file://')) {
+      return Uri.parse(trimmed).toFilePath();
+    }
+    return trimmed;
+  }
 
   static Future<void> generateAndPrintBulk({
     required List<Student> students,
     required Ecole? ecole,
     required String? anneeLibelle,
+    String designModel = modelClassic,
   }) async {
     final doc = pw.Document();
 
@@ -20,14 +36,16 @@ class StudentCardPdfService {
     pw.ImageProvider? timbreProvider;
 
     if (ecole != null) {
-      if (ecole.logo != null && ecole.logo!.isNotEmpty) {
-        final logoFile = File(ecole.logo!);
+      final logoPath = _normalizeFilePath(ecole.logo);
+      if (logoPath != null) {
+        final logoFile = File(logoPath);
         if (logoFile.existsSync()) {
           logoProvider = pw.MemoryImage(logoFile.readAsBytesSync());
         }
       }
-      if (ecole.timbre != null && ecole.timbre!.isNotEmpty) {
-        final timbreFile = File(ecole.timbre!);
+      final timbrePath = _normalizeFilePath(ecole.timbre);
+      if (timbrePath != null) {
+        final timbreFile = File(timbrePath);
         if (timbreFile.existsSync()) {
           timbreProvider = pw.MemoryImage(timbreFile.readAsBytesSync());
         }
@@ -56,6 +74,7 @@ class StudentCardPdfService {
                       anneeLibelle,
                       logoProvider,
                       timbreProvider,
+                      designModel,
                     ),
                   )
                   .toList(),
@@ -75,6 +94,7 @@ class StudentCardPdfService {
     required Student student,
     required Ecole? ecole,
     required String? anneeLibelle,
+    String designModel = modelClassic,
   }) async {
     final doc = pw.Document();
 
@@ -82,23 +102,30 @@ class StudentCardPdfService {
     pw.ImageProvider? timbreProvider;
 
     if (ecole != null) {
-      if (ecole.logo != null && ecole.logo!.isNotEmpty) {
-        final logoFile = File(ecole.logo!);
+      final logoPath = _normalizeFilePath(ecole.logo);
+      if (logoPath != null) {
+        final logoFile = File(logoPath);
         if (logoFile.existsSync()) {
           logoProvider = pw.MemoryImage(logoFile.readAsBytesSync());
         }
       }
-      if (ecole.timbre != null && ecole.timbre!.isNotEmpty) {
-        final timbreFile = File(ecole.timbre!);
+      final timbrePath = _normalizeFilePath(ecole.timbre);
+      if (timbrePath != null) {
+        final timbreFile = File(timbrePath);
         if (timbreFile.existsSync()) {
           timbreProvider = pw.MemoryImage(timbreFile.readAsBytesSync());
         }
       }
     }
 
+    final bool isPortraitModel =
+        designModel == modelModern || designModel == modelPremium;
+    final pageWidth = (isPortraitModel ? portraitCardWidth : cardWidth) + 40;
+    final pageHeight = (isPortraitModel ? portraitCardHeight : cardHeight) + 40;
+
     doc.addPage(
       pw.Page(
-        pageFormat: const PdfPageFormat(cardWidth + 40, cardHeight + 40),
+        pageFormat: PdfPageFormat(pageWidth, pageHeight),
         margin: const pw.EdgeInsets.all(20),
         build: (context) {
           return _buildCard(
@@ -107,6 +134,7 @@ class StudentCardPdfService {
             anneeLibelle,
             logoProvider,
             timbreProvider,
+            designModel,
           );
         },
       ),
@@ -124,7 +152,34 @@ class StudentCardPdfService {
     String? anneeLibelle,
     pw.ImageProvider? logo,
     pw.ImageProvider? timbre,
+    String designModel,
   ) {
+    if (designModel == modelModern) {
+      return _buildPortraitCard(
+        student: student,
+        ecole: ecole,
+        anneeLibelle: anneeLibelle,
+        logo: logo,
+        accent: PdfColor.fromInt(0xFF1565C0),
+        top: PdfColor.fromInt(0xFF0D47A1),
+        background: PdfColor.fromInt(0xFFF5F9FF),
+        premium: false,
+      );
+    }
+
+    if (designModel == modelPremium) {
+      return _buildPortraitCard(
+        student: student,
+        ecole: ecole,
+        anneeLibelle: anneeLibelle,
+        logo: logo,
+        accent: PdfColor.fromInt(0xFFB8860B),
+        top: PdfColor.fromInt(0xFF5D4037),
+        background: PdfColor.fromInt(0xFFFFF8E1),
+        premium: true,
+      );
+    }
+
     // PDF colors
     final blueColor = PdfColor.fromInt(0xFF002D62);
     final redColor = PdfColor.fromInt(0xFFCE1126);
@@ -133,8 +188,9 @@ class StudentCardPdfService {
     final bgColor = PdfColor.fromInt(0xFFE8F4F8);
 
     pw.ImageProvider? photo;
-    if (student.photo.isNotEmpty && File(student.photo).existsSync()) {
-      photo = pw.MemoryImage(File(student.photo).readAsBytesSync());
+    final photoPath = _normalizeFilePath(student.photo);
+    if (photoPath != null && File(photoPath).existsSync()) {
+      photo = pw.MemoryImage(File(photoPath).readAsBytesSync());
     }
 
     return pw.Container(
@@ -371,6 +427,190 @@ class StudentCardPdfService {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildPortraitCard({
+    required Student student,
+    required Ecole? ecole,
+    required String? anneeLibelle,
+    required pw.ImageProvider? logo,
+    required PdfColor accent,
+    required PdfColor top,
+    required PdfColor background,
+    required bool premium,
+  }) {
+    pw.ImageProvider? photo;
+    final photoPath = _normalizeFilePath(student.photo);
+    if (photoPath != null && File(photoPath).existsSync()) {
+      photo = pw.MemoryImage(File(photoPath).readAsBytesSync());
+    }
+
+    return pw.Container(
+      width: portraitCardWidth,
+      height: portraitCardHeight,
+      decoration: pw.BoxDecoration(
+        color: background,
+        border: pw.Border.all(color: PdfColors.grey400, width: 1.2),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Container(
+            height: 76,
+            width: double.infinity,
+            padding: const pw.EdgeInsets.fromLTRB(10, 8, 10, 6),
+            decoration: pw.BoxDecoration(
+              color: top,
+              borderRadius: const pw.BorderRadius.only(
+                topLeft: pw.Radius.circular(8),
+                topRight: pw.Radius.circular(8),
+              ),
+            ),
+            child: pw.Column(
+              children: [
+                pw.Row(
+                  children: [
+                    pw.Container(
+                      width: 30,
+                      height: 20,
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.white, width: 0.5),
+                      ),
+                      child: pw.Row(
+                        children: [
+                          pw.Expanded(
+                            child: pw.Container(
+                              color: PdfColor.fromInt(0xFFCE1126),
+                            ),
+                          ),
+                          pw.Expanded(
+                            child: pw.Container(
+                              color: PdfColor.fromInt(0xFFFCD116),
+                            ),
+                          ),
+                          pw.Expanded(
+                            child: pw.Container(
+                              color: PdfColor.fromInt(0xFF009460),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.Spacer(),
+                    if (logo != null)
+                      pw.Container(
+                        width: 26,
+                        height: 26,
+                        decoration: const pw.BoxDecoration(
+                          shape: pw.BoxShape.circle,
+                          color: PdfColors.white,
+                        ),
+                        child: pw.ClipOval(child: pw.Image(logo, fit: pw.BoxFit.cover)),
+                      ),
+                  ],
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'CARTE D\'IDENTITE\nSCOLAIRE',
+                  textAlign: pw.TextAlign.center,
+                  style: pw.TextStyle(
+                    color: PdfColors.white,
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                    lineSpacing: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Container(
+            width: 72,
+            height: 86,
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: accent, width: 1.8),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(5)),
+              color: PdfColors.grey200,
+            ),
+            child: photo != null
+                ? pw.ClipRRect(
+                    horizontalRadius: 4,
+                    verticalRadius: 4,
+                    child: pw.Image(photo, fit: pw.BoxFit.cover),
+                  )
+                : pw.Center(child: pw.PdfLogo()),
+          ),
+          if (premium)
+            pw.Container(
+              margin: const pw.EdgeInsets.only(top: 4),
+              padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: pw.BoxDecoration(
+                color: PdfColor.fromInt(0xFFB8860B),
+                borderRadius: pw.BorderRadius.all(pw.Radius.circular(8)),
+              ),
+              child: pw.Text(
+                'MODELE PREMIUM',
+                style: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontSize: 7,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+          pw.SizedBox(height: 6),
+          pw.Expanded(
+            child: pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 10),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _buildInfoRow('Matricule:', student.matricule),
+                  _buildInfoRow('Nom:', student.fullName.toUpperCase(), isBold: true),
+                  _buildInfoRow('Naissance:', student.dateNaissance),
+                  _buildInfoRow('Lieu:', student.lieuNaissance),
+                  _buildInfoRow('Sexe:', student.sexe == 'M' ? 'Homme' : 'Femme'),
+                  _buildInfoRow('Classe:', student.classe),
+                ],
+              ),
+            ),
+          ),
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: pw.BoxDecoration(
+              color: accent,
+              borderRadius: const pw.BorderRadius.only(
+                bottomLeft: pw.Radius.circular(8),
+                bottomRight: pw.Radius.circular(8),
+              ),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  ecole?.nom.toUpperCase() ?? 'NOM DE L\'ECOLE',
+                  maxLines: 1,
+                  overflow: pw.TextOverflow.clip,
+                  style: pw.TextStyle(
+                    color: PdfColors.white,
+                    fontSize: 8.5,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.Text(
+                  'ANNEE: ${anneeLibelle ?? '2023-2024'}',
+                  style: pw.TextStyle(
+                    color: PdfColors.white,
+                    fontSize: 7.5,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

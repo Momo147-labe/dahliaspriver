@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/database/database_helper.dart';
 import '../models/student.dart';
 import '../widgets/carteele.dart';
+import '../widgets/student_card_design.dart';
 import '../models/ecole.dart';
 import '../services/pdf/student_card_pdf_service.dart';
 // import 'bulk_card_print_page.dart'; // File missing
@@ -23,6 +24,7 @@ class _CarteScolairePageState extends State<CarteScolairePage> {
   String? anneeLibelle;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _selectedDesignModel = StudentCardDesign.modelClassic;
 
   @override
   void dispose() {
@@ -118,7 +120,10 @@ class _CarteScolairePageState extends State<CarteScolairePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CarteScolaireGuinee(studentId: student.id),
+        builder: (context) => CarteScolaireGuinee(
+          studentId: student.id,
+          designModel: _selectedDesignModel,
+        ),
       ),
     );
   }
@@ -138,6 +143,7 @@ class _CarteScolairePageState extends State<CarteScolairePage> {
                   students: students,
                   ecole: ecole,
                   anneeLibelle: anneeLibelle,
+                  designModel: _selectedDesignModel,
                 );
               },
             ),
@@ -195,6 +201,48 @@ class _CarteScolairePageState extends State<CarteScolairePage> {
                             setState(() {
                               selectedClasseId = value;
                               _loadStudents();
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.style_outlined, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Modèle: ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: DropdownButton<String>(
+                          value: _selectedDesignModel,
+                          isExpanded: true,
+                          underline: const SizedBox(),
+                          items: const [
+                            DropdownMenuItem(
+                              value: StudentCardDesign.modelClassic,
+                              child: Text('Classique'),
+                            ),
+                            DropdownMenuItem(
+                              value: StudentCardDesign.modelModern,
+                              child: Text('Portrait 1'),
+                            ),
+                            DropdownMenuItem(
+                              value: StudentCardDesign.modelPremium,
+                              child: Text('Portrait 2'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _selectedDesignModel = value;
                             });
                           },
                         ),

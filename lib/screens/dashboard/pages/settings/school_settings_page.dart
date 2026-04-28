@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/services/file_service.dart';
 import '../../../../models/ecole.dart';
@@ -35,11 +37,26 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
   Ecole? _currentEcole;
   bool _isLoading = true;
   final _picker = ImagePicker();
+  List<String> _sloganSuggestions = [];
 
   @override
   void initState() {
     super.initState();
+    _loadSloganSuggestions();
     _loadEcoleData();
+  }
+
+  Future<void> _loadSloganSuggestions() async {
+    try {
+      final String slogansJson = await rootBundle.loadString('assets/slogan.json');
+      final Map<String, dynamic> slogansData = json.decode(slogansJson);
+      if (!mounted) return;
+      setState(() {
+        _sloganSuggestions = List<String>.from(slogansData['slogans'] ?? []);
+      });
+    } catch (e) {
+      debugPrint('Erreur lors du chargement des slogans: $e');
+    }
   }
 
   Future<void> _loadEcoleData() async {
@@ -342,12 +359,7 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
                               icon: Icons.school_outlined,
                             ),
                             const SizedBox(height: 20),
-                            _buildTextField(
-                              controller: _sloganController,
-                              label: 'SLOGAN / DEVISE DE L\'ÉTABLISSEMENT',
-                              hint: 'Ex: Discipline - Travail - Progrès',
-                              icon: Icons.format_quote_outlined,
-                            ),
+                            _buildSloganAutocompleteField(),
                             const SizedBox(height: 20),
                             Row(
                               children: [
@@ -806,6 +818,107 @@ class _SchoolSettingsPageState extends State<SchoolSettingsPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSloganAutocompleteField() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return RawAutocomplete<String>(
+      textEditingController: _sloganController,
+      focusNode: FocusNode(),
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text.isEmpty) {
+          return const Iterable<String>.empty();
+        }
+        return _sloganSuggestions.where((String option) {
+          return option.toLowerCase().contains(
+            textEditingValue.text.toLowerCase(),
+          );
+        });
+      },
+      onSelected: (String selection) {
+        _sloganController.text = selection;
+      },
+      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'SLOGAN / DEVISE DE L\'ÉTABLISSEMENT',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.2,
+                color: Colors.grey[500],
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: textController,
+              focusNode: focusNode,
+              onFieldSubmitted: (value) => onFieldSubmitted(),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Ex: Discipline - Travail - Progrès',
+                prefixIcon: Icon(
+                  Icons.format_quote_outlined,
+                  size: 20,
+                  color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                ),
+                filled: true,
+                fillColor: isDark ? Colors.grey[900] : Colors.grey[50],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primaryColor,
+                    width: 2,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 420,
+              constraints: const BoxConstraints(maxHeight: 240),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final String option = options.elementAt(index);
+                  return ListTile(
+                    dense: true,
+                    title: Text(option, style: const TextStyle(fontSize: 13)),
+                    onTap: () => onSelected(option),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

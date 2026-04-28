@@ -94,6 +94,7 @@ flutter:
     - assets/prenoms_guinee.json
     - assets/localites_frequentes.json
     - assets/ListeNomFamilles.json
+    - assets/slogan.json
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

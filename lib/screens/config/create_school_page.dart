@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/utils/uploadImage.dart';
@@ -31,11 +33,26 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
   String? _stampPath;
   bool _isLoading = false;
   int _currentStep = 0;
+  List<String> _sloganSuggestions = [];
 
   @override
   void initState() {
     super.initState();
     _initializeAcademicYearDefaults();
+    _loadSloganSuggestions();
+  }
+
+  Future<void> _loadSloganSuggestions() async {
+    try {
+      final String slogansJson = await rootBundle.loadString('assets/slogan.json');
+      final Map<String, dynamic> slogansData = json.decode(slogansJson);
+      if (!mounted) return;
+      setState(() {
+        _sloganSuggestions = List<String>.from(slogansData['slogans'] ?? []);
+      });
+    } catch (e) {
+      debugPrint('Erreur lors du chargement des slogans: $e');
+    }
   }
 
   void _initializeAcademicYearDefaults() {
@@ -339,13 +356,7 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
           isDark: isDark,
         ),
         const SizedBox(height: 20),
-        _buildEnhancedTextField(
-          controller: sloganCtrl,
-          label: "Slogan / Devise",
-          hint: "Ex: Discipline - Travail - Progrès",
-          icon: Icons.format_quote_outlined,
-          isDark: isDark,
-        ),
+        _buildSloganAutocompleteField(isDark),
         const SizedBox(height: 20),
         _buildEnhancedTextField(
           controller: founderCtrl,
@@ -533,6 +544,61 @@ class _CreateSchoolPageState extends State<CreateSchoolPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSloganAutocompleteField(bool isDark) {
+    return RawAutocomplete<String>(
+      textEditingController: sloganCtrl,
+      focusNode: FocusNode(),
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text.isEmpty) {
+          return const Iterable<String>.empty();
+        }
+        return _sloganSuggestions.where((String option) {
+          return option.toLowerCase().contains(
+            textEditingValue.text.toLowerCase(),
+          );
+        });
+      },
+      onSelected: (String selection) {
+        sloganCtrl.text = selection;
+      },
+      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+        return _buildEnhancedTextField(
+          controller: textController,
+          label: "Slogan / Devise",
+          hint: "Ex: Discipline - Travail - Progrès",
+          icon: Icons.format_quote_outlined,
+          isDark: isDark,
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 420,
+              constraints: const BoxConstraints(maxHeight: 240),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final String option = options.elementAt(index);
+                  return ListTile(
+                    dense: true,
+                    title: Text(option, style: const TextStyle(fontSize: 13)),
+                    onTap: () => onSelected(option),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

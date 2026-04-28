@@ -7,8 +7,13 @@ import 'student_card_design.dart';
 
 class CarteScolaireGuinee extends StatefulWidget {
   final String? studentId;
+  final String designModel;
 
-  const CarteScolaireGuinee({super.key, this.studentId});
+  const CarteScolaireGuinee({
+    super.key,
+    this.studentId,
+    this.designModel = StudentCardDesign.modelClassic,
+  });
 
   @override
   State<CarteScolaireGuinee> createState() => _CarteScolaireGuineeState();
@@ -19,10 +24,12 @@ class _CarteScolaireGuineeState extends State<CarteScolaireGuinee> {
   Ecole? ecole;
   String? anneeLibelle;
   bool isLoading = true;
+  late String _selectedDesignModel;
 
   @override
   void initState() {
     super.initState();
+    _selectedDesignModel = widget.designModel;
     _loadData();
   }
 
@@ -99,9 +106,33 @@ class _CarteScolaireGuineeState extends State<CarteScolaireGuinee> {
                   student: student!,
                   ecole: ecole,
                   anneeLibelle: anneeLibelle,
+                  designModel: _selectedDesignModel,
                 );
               }
             },
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Modèle de carte',
+            icon: const Icon(Icons.style),
+            onSelected: (value) {
+              setState(() {
+                _selectedDesignModel = value;
+              });
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: StudentCardDesign.modelClassic,
+                child: Text('Classique'),
+              ),
+              PopupMenuItem(
+                value: StudentCardDesign.modelModern,
+                child: Text('Portrait 1'),
+              ),
+              PopupMenuItem(
+                value: StudentCardDesign.modelPremium,
+                child: Text('Portrait 2'),
+              ),
+            ],
           ),
         ],
       ),
@@ -113,6 +144,7 @@ class _CarteScolaireGuineeState extends State<CarteScolaireGuinee> {
             ecole: ecole,
             anneeLibelle: anneeLibelle,
             scale: 1.5,
+            designModel: _selectedDesignModel,
           ),
         ),
       ),
